@@ -1,0 +1,5 @@
+<Solution>
+  <Folder Name="/SqlInterpol/">
+    <Project Path="SqlInterpol/SqlInterpol.csproj" />
+  </Folder>
+</Solution>
