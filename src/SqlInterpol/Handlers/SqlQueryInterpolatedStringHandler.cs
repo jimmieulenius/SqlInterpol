@@ -254,7 +254,7 @@ public ref struct SqlQueryInterpolatedStringHandler(int literalLength)
                             .Replace("\r\n", "\n").Replace("\r", "\n")
                             .Split('\n')
                             .Select(l => l.Length > 0 ? sqIndent + l : l));
-                        stringValue = $"(\n{indentedInner}\n) AS {options.IdentifierStart}{subqueryTable.Alias}{options.IdentifierEnd}";
+                        stringValue = $"(\n{indentedInner}\n) {SqlKeyword.As} {options.IdentifierStart}{subqueryTable.Alias}{options.IdentifierEnd}";
                         
                         // Renumber all subquery parameters to avoid collisions with main query
                         foreach (var (subParamName, subParamValue) in subqueryTable.EmbeddedParameters)

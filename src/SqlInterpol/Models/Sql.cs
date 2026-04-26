@@ -37,11 +37,6 @@ public class Sql
         return handler.ToQuery();
     }
 
-    public static SqlQuery B([InterpolatedStringHandlerArgument] SqlQueryInterpolatedStringHandler handler)
-    {
-        return Build(handler);
-    }
-
     public static SqlQuery SqlQuery<T>(Func<SqlTableDefinition<T>, SqlQuery> buildQuery) where T : class, new()
     {
         return buildQuery(GetTable<T>());

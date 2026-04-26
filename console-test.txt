@@ -1,0 +1,1298 @@
+using SqlDsl;
+using SqlSchema;
+using Microsoft.Data.SqlClient;
+using System.Xml;
+
+// Quick debug test for table alias issue
+var p = Sql.GetTable<Product>();
+var simpleTest = Sql.Build($"FROM {p} AS {p.Alias("t")}");
+Console.WriteLine("=== DEBUG: Simple Table Alias ===");
+Console.WriteLine(simpleTest);
+Console.WriteLine();
+
+/*
+Output:
+FROM [dbo].[Product] AS [t]
+*/
+
+// Test string parameterization
+var userName = "John Doe";
+var stringParamTest = Sql.Build($"SELECT * FROM users WHERE name = {userName}");
+Console.WriteLine("=== DEBUG: String Parameters ===");
+Console.WriteLine(stringParamTest);
+Console.WriteLine("Parameters:");
+foreach (var param in stringParamTest.Parameters)
+{
+    Console.WriteLine($"  {param.Key} = {param.Value}");
+}
+Console.WriteLine();
+
+/*
+Output:
+SELECT * FROM users WHERE name = @p0
+
+Parameters:
+  @p0 = John Doe
+*/
+
+// Test string parameter that starts with [
+var productCode = "[TEST123]";
+var bracketParamTest = Sql.Build($"WHERE code = {productCode}");
+Console.WriteLine("=== DEBUG: String Parameter Starting with [ ===");
+Console.WriteLine(bracketParamTest);
+Console.WriteLine("Parameters:");
+foreach (var param in bracketParamTest.Parameters)
+{
+    Console.WriteLine($"  {param.Key} = {param.Value}");
+}
+Console.WriteLine();
+
+/*
+Output:
+WHERE code = @p0
+
+Parameters:
+  @p0 = [TEST123]
+*/
+
+var minPrice = 100;
+var productsTable = Dbo.Products;
+var shouldAddOrderBy = true;
+var shouldAddWhere = true;
+
+var query = Sql.Build($@"
+SELECT
+    {productsTable.ItemNumber},
+    {productsTable.ProductName.As("Product")},
+    {productsTable.Price}
+FROM {productsTable.As("p")}
+{(shouldAddWhere ? Sql.Format("WHERE {0} > {1}", productsTable.Price, minPrice) : null)}
+{(shouldAddOrderBy ? Sql.Format("ORDER BY {0} ASC", productsTable.ProductName) : null)}
+");
+
+Console.WriteLine("=== Debug: Conditional Clauses ===");
+Console.WriteLine(query);
+
+/*
+Output:
+SELECT
+    [p].[ItemNumber],
+    [p].[ProductName] AS [Product],
+    [p].[Price]
+FROM [dbo].[Product] AS [p]
+WHERE [p].[Price] > @p0
+ORDER BY [p].[ProductName] ASC
+
+Parameters:
+  @p0 = 100
+
+*/
+
+var newItemNumber = 99999;
+var newProductName = "New Widget Pro";
+var newPrice = 149.99m;
+
+Console.WriteLine("=== SELECT Example ===");;
+Console.WriteLine("Generated Query:");
+Console.WriteLine(query);
+Console.WriteLine();
+Console.WriteLine("Parameters:");
+foreach (var param in query.Parameters)
+{
+    Console.WriteLine($"  {param.Key} = {param.Value}");
+}
+
+/*
+Output:
+SELECT
+    [p].[ItemNumber],
+    [p].[ProductName] AS [Product],
+    [p].[Price]
+FROM [dbo].[ReleasedProducts] AS [p]
+WHERE [p].[Price] > @p0
+ORDER BY [Product] ASC
+
+Parameters:
+  @p0 = 100
+*/
+
+Console.WriteLine();
+Console.WriteLine("=== Attribute-Based Schema (NEW) ===");
+
+// Slim fluent API with .Query() - table is in scope for clean interpolation
+var attributeQuery = Sql.GetTable<Product>().Query(table => Sql.Build($@"
+SELECT 
+    {table[p => p.ItemNumber]},
+    {table[p => p.Name]},
+    {table[p => p.Price]}
+FROM {table}
+WHERE {table[p => p.Price]} > {minPrice}
+"));
+
+Console.WriteLine("Query using attribute-based table definition:");
+Console.WriteLine(attributeQuery);
+Console.WriteLine();
+
+/*
+Output:
+SELECT 
+    [dbo].[Product].[ItemNumber],
+    [dbo].[Product].[Name],
+    [dbo].[Product].[Price]
+FROM [dbo].[Product]
+WHERE [dbo].[Product].[Price] > @p0
+*/
+
+Console.WriteLine();
+Console.WriteLine("=== INSERT Example (Alternative with Sql.Format) ===");
+
+// For cleaner INSERT statements, use Sql.Format() to build dynamic column/value pairs
+productsTable = Dbo.Products;
+var altInsertQuery = Sql.Build($@"
+INSERT INTO {productsTable}
+({productsTable.ItemNumber}, {productsTable.ProductName}, {productsTable.Price})
+{Sql.Format("VALUES ({0}, {1}, {2})", newItemNumber, newProductName, newPrice)}
+");
+
+Console.WriteLine("Generated INSERT Query (with Sql.Format):");
+Console.WriteLine(altInsertQuery);
+Console.WriteLine();
+Console.WriteLine("Parameters:");
+foreach (var param in altInsertQuery.Parameters)
+{
+    Console.WriteLine($"  {param.Key} = {param.Value}");
+}
+
+/*
+Output:
+INSERT INTO [dbo].[ReleasedProducts]
+([ItemNumber], [ProductName], [Price])
+VALUES (@p0, @p1, @p2)
+
+
+Parameters:
+  @p0 = 99999
+  @p1 = New Widget Pro
+  @p2 = 149,99
+*/
+
+Console.WriteLine();
+Console.WriteLine("=== UPDATE Example ===");
+
+// UPDATE example with SET clause and WHERE
+var updatePrice = 159.99m;
+var updateItemNumber = 99999;
+
+var updateQuery = Sql.Build($@"
+UPDATE {productsTable}
+SET {productsTable.ProductName} = {newProductName}, {productsTable.Price} = {updatePrice}
+WHERE {productsTable.ItemNumber} = {updateItemNumber}
+");
+
+Console.WriteLine("Generated UPDATE Query:");
+Console.WriteLine(updateQuery);
+Console.WriteLine();
+Console.WriteLine("Parameters:");
+foreach (var param in updateQuery.Parameters)
+{
+    Console.WriteLine($"  {param.Key} = {param.Value}");
+}
+
+/*
+Output:
+UPDATE [dbo].[ReleasedProducts]
+SET [ProductName] = @p0, [Price] = @p1
+WHERE [dbo].[ReleasedProducts].[ItemNumber] = @p2
+
+Parameters:
+  @p0 = New Widget Pro
+  @p1 = 159,99
+  @p2 = 99999
+*/
+
+Console.WriteLine();
+Console.WriteLine("=== DELETE Example ===");
+
+// DELETE example with WHERE clause
+var deleteQuery = Sql.Build($@"
+DELETE FROM {productsTable}
+WHERE {productsTable.ItemNumber} = {updateItemNumber}
+");
+
+Console.WriteLine("Generated DELETE Query:");
+Console.WriteLine(deleteQuery);
+Console.WriteLine();
+Console.WriteLine("Parameters:");
+foreach (var param in deleteQuery.Parameters)
+{
+    Console.WriteLine($"  {param.Key} = {param.Value}");
+}
+
+/*
+Output:
+DELETE FROM [dbo].[ReleasedProducts]
+WHERE [dbo].[ReleasedProducts].[ItemNumber] = @p0
+
+Parameters:
+  @p0 = 99999
+*/
+
+// Example: Using DBNull.Value if you need SQL NULL
+// var someValue = someCondition ? (object)100 : DBNull.Value;
+// The handler distinguishes between:
+//   null or "" -> omitted entirely
+//   DBNull.Value -> becomes SQL NULL
+//   other values -> become parameters
+
+Console.WriteLine();
+Console.WriteLine("=== Multi-Database Support Examples ===\n");
+
+// SQL Server (default)
+var sqlServerQuery = Sql.Build($@"
+SELECT {productsTable.ItemNumber}, {productsTable.ProductName}
+FROM {productsTable}
+WHERE {productsTable.Price} > {minPrice}
+");
+Console.WriteLine("SQL Server (default):");
+Console.WriteLine(sqlServerQuery);
+Console.WriteLine();
+
+/*
+Output:
+SELECT [dbo].[ReleasedProducts].[ItemNumber], [dbo].[ReleasedProducts].[ProductName]
+FROM [dbo].[ReleasedProducts]
+WHERE [dbo].[ReleasedProducts].[Price] > @p0
+*/
+
+// MySQL
+var mysqlQuery = Sql.Build(DatabaseType.MySQL, $@"
+SELECT {productsTable.ItemNumber}, {productsTable.ProductName}
+FROM {productsTable}
+WHERE {productsTable.Price} > {minPrice}
+");
+Console.WriteLine("MySQL (backticks, @prefix):");
+Console.WriteLine(mysqlQuery);
+Console.WriteLine();
+
+/*
+Output:
+SELECT `dbo`.`ReleasedProducts`.`ItemNumber`, `dbo`.`ReleasedProducts`.`ProductName`
+FROM `dbo`.`ReleasedProducts`
+WHERE `dbo`.`ReleasedProducts`.`Price` > @p0
+*/
+
+// PostgreSQL
+var postgresQuery = Sql.Build(DatabaseType.PostgreSQL, $@"
+SELECT {productsTable.ItemNumber}, {productsTable.ProductName}
+FROM {productsTable}
+WHERE {productsTable.Price} > {minPrice}
+");
+Console.WriteLine("PostgreSQL (double quotes, $positional):");
+Console.WriteLine(postgresQuery);
+Console.WriteLine();
+
+/*
+Output:
+SELECT "dbo"."ReleasedProducts"."ItemNumber", "dbo"."ReleasedProducts"."ProductName"
+FROM "dbo"."ReleasedProducts"
+WHERE "dbo"."ReleasedProducts"."Price" > @p0
+*/
+
+// SQLite
+var sqliteQuery = Sql.Build(DatabaseType.SQLite, $@"
+SELECT {productsTable.ItemNumber}, {productsTable.ProductName}
+FROM {productsTable}
+WHERE {productsTable.Price} > {minPrice}
+");
+Console.WriteLine("SQLite (double quotes, ?positional):");
+Console.WriteLine(sqliteQuery);
+Console.WriteLine();
+
+/*
+Output:
+SELECT "dbo"."ReleasedProducts"."ItemNumber", "dbo"."ReleasedProducts"."ProductName"
+FROM "dbo"."ReleasedProducts"
+WHERE "dbo"."ReleasedProducts"."Price" > @p0
+*/
+
+// Custom options
+var customOptions = new SqlQueryOptions
+{
+    Database = DatabaseType.Oracle,
+    IdentifierStart = "\"",
+    IdentifierEnd = "\"",
+    ParameterPrefix = ":",
+    UsePositionalParameters = false
+};
+var oracleQuery = Sql.Build(customOptions, $@"
+SELECT {productsTable.ItemNumber}, {productsTable.ProductName}
+FROM {productsTable}
+WHERE {productsTable.Price} > {minPrice}
+");
+Console.WriteLine("Oracle (custom config):");
+Console.WriteLine(oracleQuery);
+
+/*
+Output:
+SELECT "dbo"."ReleasedProducts"."ItemNumber", "dbo"."ReleasedProducts"."ProductName"
+FROM "dbo"."ReleasedProducts"
+WHERE "dbo"."ReleasedProducts"."Price" > :p0
+*/
+
+Console.WriteLine();
+Console.WriteLine("=== JOIN Examples (NEW) ===");
+
+// Get both table definitions
+var prodTable = Sql.GetTable<Product>();
+var orderTable = Sql.GetTable<Order>();
+
+// INNER JOIN example
+var innerJoinQuery = Sql.Build($@"
+SELECT 
+    {prodTable[p => p.ItemNumber]},
+    {prodTable[p => p.Name]},
+    {orderTable[o => o.OrderId]},
+    {orderTable[o => o.OrderDate]}
+FROM {prodTable.InnerJoin(orderTable).On(prodTable[p => p.ItemNumber], orderTable[o => o.ProductItemNumber])}
+WHERE {orderTable[o => o.OrderDate]} > {DateTime.Now.AddMonths(-1)}
+");
+Console.WriteLine("INNER JOIN:");
+Console.WriteLine(innerJoinQuery);
+Console.WriteLine();
+
+/*
+Output:
+
+SELECT 
+    [dbo].[Product].[ItemNumber],
+    [dbo].[Product].[Name],
+    [dbo].[Orders].[OrderId],
+    [dbo].[Orders].[OrderDate]
+FROM [dbo].[Product]
+INNER JOIN [dbo].[Orders]
+  ON [dbo].[Product].[ItemNumber] = [dbo].[Orders].[ProductItemNumber]
+WHERE [dbo].[Orders].[OrderDate] > @p0
+*/
+
+// Multiple JOINs example (chaining)
+var multiJoinQuery = Sql.Build($@"
+SELECT 
+    {prodTable[p => p.ItemNumber]},
+    {prodTable[p => p.Name]},
+    {orderTable[o => o.OrderId]}
+FROM {prodTable
+    .InnerJoin(orderTable).On(prodTable[p => p.ItemNumber], orderTable[o => o.ProductItemNumber])
+    .LeftJoin(orderTable).On(prodTable[p => p.ItemNumber], orderTable[o => o.ProductItemNumber])
+}
+");
+Console.WriteLine("Multiple JOINs (chained):");
+Console.WriteLine(multiJoinQuery);
+Console.WriteLine();
+
+/*
+Output:
+
+SELECT 
+    [dbo].[Product].[ItemNumber],
+    [dbo].[Product].[Name],
+    [dbo].[Orders].[OrderId]
+FROM [dbo].[Product]
+INNER JOIN [dbo].[Orders]
+  ON [dbo].[Product].[ItemNumber] = [dbo].[Orders].[ProductItemNumber]
+LEFT JOIN [dbo].[Orders]
+  ON [dbo].[Product].[ItemNumber] = [dbo].[Orders].[ProductItemNumber]
+*/
+
+// CROSS JOIN example (no ON clause)
+var crossJoinQuery = Sql.Build($@"
+SELECT TOP 10
+    {prodTable[p => p.ItemNumber]},
+    {orderTable[o => o.OrderId]}
+FROM {prodTable.CrossJoin(orderTable)}
+");
+Console.WriteLine("CROSS JOIN:");
+Console.WriteLine(crossJoinQuery);
+Console.WriteLine();
+
+/*
+Output:
+SELECT TOP 10
+    [dbo].[Product].[ItemNumber],
+    [dbo].[Orders].[OrderId]
+FROM [dbo].[Product]
+CROSS JOIN [dbo].[Orders]
+*/
+
+// JOIN with TABLE AND COLUMN ALIASES
+// Demonstrates how the clause-specific placeholder architecture renders the same column object
+// differently depending on the SQL clause:
+// - SELECT clause: Renders with alias (e.g., [o].[OrderDate] AS [OrderedDate])
+// - ORDER BY clause: Uses alias if set (e.g., [OrderedDate])
+// - ON clause: Always shows full qualified reference, ignoring aliases (e.g., [p].[ItemNumber])
+// This enables storing aliased column references and safely reusing them across clauses.
+var p_join = Sql.GetTable<Product>();
+var o = Sql.GetTable<Order>();
+var orderQuantity = 10;
+
+// Alias columns in SELECT; they'll render correctly in ORDER BY and other clauses
+var aliasedJoinQuery = Sql.Build($@"
+SELECT
+  {p_join[prod => prod.ItemNumber].As("SKU")},
+  {p_join[prod => prod.Name]},
+  {o[ord => ord.OrderId].As("OrderNumber")},
+  {o[ord => ord.OrderDate].As("OrderedDate")}
+FROM {p_join.As("p")}
+INNER JOIN {o.As("o")}
+  ON {p_join[prod => prod.ItemNumber]} = {o[ord => ord.ProductItemNumber]}
+WHERE {o[ord => ord.Quantity]} > {orderQuantity}
+ORDER BY {o[ord => ord.OrderDate]} DESC
+");
+Console.WriteLine("JOIN with Table and Column Aliases (stored references - note: ON uses fresh refs):");
+Console.WriteLine(aliasedJoinQuery);
+Console.WriteLine();
+
+/*
+Output:
+SELECT
+  [p].[ItemNumber] AS [SKU],
+  [p].[Name],
+  [o].[OrderId] AS [OrderNumber],
+  [o].[OrderDate] AS [OrderedDate]
+FROM [dbo].[Product] AS [p]
+INNER JOIN [dbo].[Orders] AS [o]
+  ON [p].[ItemNumber] = [o].[ProductItemNumber]
+WHERE [o].[Quantity] > @p0
+ORDER BY [OrderedDate] DESC
+*/
+
+// Alternative: Fluent .On() method for explicit ON clause control
+// Recommended when you want very clear separation between SELECT aliases and ON conditions.
+// The On() method automatically passes fresh column references to the ON clause.
+var fluentJoinQuery = Sql.Build($@"
+SELECT 
+  {p_join[prod => prod.ItemNumber].As("SKU")},
+  {p_join[prod => prod.Name]},
+  {o[ord => ord.OrderId].As("OrderNumber")},
+  {o[ord => ord.OrderDate].As("OrderedDate")}
+FROM {p_join.As("p").InnerJoin(o.As("o")).On(p_join[prod => prod.ItemNumber], o[ord => ord.ProductItemNumber])}
+WHERE {o[ord => ord.Quantity]} > {orderQuantity}
+ORDER BY {o[ord => ord.OrderDate]} DESC
+");
+Console.WriteLine("JOIN using fluent .On() method (clean, independent column references):");
+Console.WriteLine(fluentJoinQuery);
+Console.WriteLine();
+
+/*
+Output:
+SELECT 
+  [p].[ItemNumber] AS [SKU],
+  [p].[Name],
+  [o].[OrderId] AS [OrderNumber],
+  [o].[OrderDate] AS [OrderedDate]
+FROM [dbo].[Product] AS [p]
+INNER JOIN [dbo].[Orders] AS [o]
+  ON [p].[ItemNumber] = [o].[ProductItemNumber]
+WHERE [o].[Quantity] > @p0
+ORDER BY [OrderedDate] DESC
+*/
+
+// Customizing IndentSize for JOIN formatting
+var customIndentOptions = new SqlQueryOptions
+{
+    Database = DatabaseType.SqlServer,
+    IndentSize = 4  // Use 4-space indentation
+};
+
+var customIndentQuery = Sql.Build(customIndentOptions, $@"
+SELECT 
+    {p_join[prod => prod.ItemNumber].As("SKU")},
+    {p_join[prod => prod.Name]}
+FROM {p_join.As("p").InnerJoin(o.As("o")).On(p_join[prod => prod.ItemNumber], o[ord => ord.ProductItemNumber])}
+WHERE {o[ord => ord.Quantity]} > {orderQuantity}
+");
+Console.WriteLine("JOIN with custom IndentSize (4 spaces):");
+Console.WriteLine(customIndentQuery);
+Console.WriteLine();
+
+/*
+Output:
+SELECT 
+    [p].[ItemNumber] AS [SKU],
+    [p].[Name]
+FROM [dbo].[Product] AS [p]
+INNER JOIN [dbo].[Orders] AS [o]
+    ON [p].[ItemNumber] = [o].[ProductItemNumber]
+WHERE [o].[Quantity] > @p0
+*/
+
+// JOIN with additional AND conditions in ON clause
+// Use Sql.Format() to build parameterized conditions for the ON clause
+var minOrderDate = DateTime.Now.AddDays(-30);
+var joinWithAndQuery = Sql.Build($@"
+SELECT 
+    {p_join[prod => prod.ItemNumber].As("SKU")},
+    {p_join[prod => prod.Name]},
+    {o[ord => ord.OrderDate].As("OrderedDate")}
+FROM {p_join.As("p").InnerJoin(o.As("o")).On(p_join[prod => prod.ItemNumber], o[ord => ord.ProductItemNumber]).And(Sql.Format("{0} > {1}", o[ord => ord.OrderDate], minOrderDate))}
+WHERE {o[ord => ord.Quantity]} > {orderQuantity}
+ORDER BY {o[ord => ord.OrderDate]} DESC
+");
+Console.WriteLine("JOIN with additional ON conditions (WHERE-like filtering in ON):");
+Console.WriteLine(joinWithAndQuery);
+Console.WriteLine("Parameters:");
+foreach (var param in joinWithAndQuery.Parameters)
+{
+    Console.WriteLine($"  {param.Key} = {param.Value}");
+}
+Console.WriteLine();
+
+/*
+Output:
+SELECT 
+    [p].[ItemNumber] AS [SKU],
+    [p].[Name],
+    [o].[OrderDate] AS [OrderedDate]
+FROM [dbo].[Product] AS [p]
+INNER JOIN [dbo].[Orders] AS [o]
+  ON [p].[ItemNumber] = [o].[ProductItemNumber]
+  AND [o].[OrderDate] > @p0
+WHERE [o].[Quantity] > @p1
+ORDER BY [OrderedDate] DESC
+
+Parameters:
+  @p0 = 2026-03-27 12:58:51
+  @p1 = 10
+*/
+
+// JOIN with AND/OR conditions - showing complex ON clause logic
+// Mix AND and OR for flexible JOIN conditions
+var highValue = 500m;
+
+// Sql.Format() now automatically detects clause context from surrounding SQL
+// No need to explicitly pass "ORDER BY" - it's detected from the surrounding query
+var joinWithOrQuery = Sql.Build($@"
+SELECT 
+  {p_join[prod => prod.ItemNumber].As("SKU")},
+  {p_join[prod => prod.Name]},
+  {o[ord => ord.OrderDate].As("OrderedDate")}
+FROM {p_join.As("p")
+    .InnerJoin(o.As("o"))
+    .On(p_join[prod => prod.ItemNumber], o[ord => ord.ProductItemNumber])
+    .And(Sql.Format("{0} > {1}", o[ord => ord.OrderDate], minOrderDate))
+    .Or(Sql.Format("{0} > {1}", p_join[prod => prod.Price], highValue))}
+WHERE {o[ord => ord.Quantity]} > {orderQuantity}
+ORDER BY {Sql.Format("{0} DESC", o[ord => ord.OrderDate])}
+");
+
+Console.WriteLine("JOIN with AND/OR conditions in ON clause:");
+Console.WriteLine(joinWithOrQuery);
+Console.WriteLine("Parameters:");
+foreach (var param in joinWithOrQuery.Parameters)
+{
+    Console.WriteLine($"  {param.Key} = {param.Value}");
+}
+Console.WriteLine();
+
+/*
+Output:
+SELECT 
+  [p].[ItemNumber] AS [SKU],
+  [p].[Name],
+  [o].[OrderDate] AS [OrderedDate]
+FROM [dbo].[Product] AS [p]
+INNER JOIN [dbo].[Orders] AS [o]
+  ON [p].[ItemNumber] = [o].[ProductItemNumber]
+  AND [o].[OrderDate] > @p0
+  OR [p].[Price] > @p1
+WHERE [o].[Quantity] > @p2
+ORDER BY [OrderedDate] DESC
+
+Parameters:
+  @p0 = 2026-03-27 12:58:51
+  @p1 = 500
+  @p2 = 10
+*/
+
+// Multiple Sql.Format() calls in WHERE clause to verify parameter renumbering works everywhere
+var priceFloor = 100m;
+var priceCeiling = 1000m;
+var minQty = 5;
+var p2 = Sql.GetTable<Product>();
+var o2 = Sql.GetTable<Order>();
+var multipleFormatsQuery = Sql.Build($@"
+SELECT 
+  {p2[prod => prod.ItemNumber]},
+  {p2[prod => prod.Name]},
+  {o2[ord => ord.OrderDate]}
+FROM {p2.As("p")
+    .InnerJoin(o2.As("o"))
+    .On(p2[prod => prod.ItemNumber], o2[ord => ord.ProductItemNumber])}
+WHERE {Sql.Format("{0} >= {1}", p2[prod => prod.Price], priceFloor)}
+  AND {Sql.Format("{0} <= {1}", p2[prod => prod.Price], priceCeiling)}
+  AND {Sql.Format("{0} > {1}", o2[ord => ord.Quantity], minQty)}
+ORDER BY {p2[prod => prod.Price]} DESC
+");
+Console.WriteLine("Multiple Sql.Format() calls outside JOIN:");
+Console.WriteLine(multipleFormatsQuery);
+Console.WriteLine("Parameters:");
+foreach (var param in multipleFormatsQuery.Parameters)
+{
+    Console.WriteLine($"  {param.Key} = {param.Value}");
+}
+Console.WriteLine();
+
+/*
+Output:
+SELECT 
+  [p].[ItemNumber],
+  [p].[Name],
+  [o].[OrderDate]
+FROM [dbo].[Product] AS [p]
+INNER JOIN [dbo].[Orders] AS [o]
+  ON [p].[ItemNumber] = [o].[ProductItemNumber]
+WHERE [p].[Price] >= @p0
+  AND [p].[Price] <= @p1
+  AND [o].[Quantity] > @p2
+ORDER BY [p].[Price] DESC
+
+Parameters:
+  @p0 = 100
+  @p1 = 1000
+  @p2 = 5
+*/
+
+// Test 1: Simple inline AS syntax
+var p1 = Sql.GetTable<Product>();
+var name = "Widget";
+var simpleInlineTest = Sql.Build($@"
+SELECT
+  {p1[prod => prod.ItemNumber]} AS {p1[prod => prod.ItemNumber].Alias("SKU")},
+  {p1[prod => prod.Name]}
+FROM {p1} AS {p1.Alias("p")}
+WHERE {p1[prod => prod.Price]} > {minPrice}
+  AND {p1[prod => prod.Name]} = {name}
+ORDER BY {p1[prod => prod.Price]} DESC
+");
+Console.WriteLine("=== Test 1: Simple Inline AS (Raw SQL Style) ===");
+Console.WriteLine(simpleInlineTest);
+Console.WriteLine();
+
+/*
+Output:
+SELECT
+  [p].[ItemNumber] AS [SKU],
+  [p].[Name]
+FROM [dbo].[Product] AS [p]
+WHERE [p].[Price] > @p0
+  AND [p].[Name] = @p1
+ORDER BY [p].[Price] DESC
+*/
+
+// Test 2: Fluent .As() method
+var p3 = Sql.GetTable<Product>();
+var fluentAsTest = Sql.Build($@"
+SELECT
+  {p3[prod => prod.ItemNumber].As("SKU")},
+  {p3[prod => prod.Name]}
+FROM {p3.As("p")}
+");
+Console.WriteLine("=== Test 2: Fluent .As() Method ===");
+Console.WriteLine(fluentAsTest);
+Console.WriteLine();
+
+/*
+Output:
+SELECT
+  [p].[ItemNumber] AS [SKU],
+  [p].[Name]
+FROM [dbo].[Product] AS [p]
+*/
+
+Console.WriteLine("=== Comment Support Examples ===");
+
+// Example 1: Comments above clauses
+var commentAboveTest = Sql.Build($@"
+-- Select the item number and name
+SELECT
+  {p3[prod => prod.ItemNumber]},
+  {p3[prod => prod.Name]}
+-- Filter to active products only
+FROM {p3.As("p")}
+-- Only include expensive items
+WHERE {p3[prod => prod.Price]} > {minPrice}
+-- Sort by price descending
+ORDER BY {p3[prod => prod.Price]} DESC
+");
+Console.WriteLine("Example 1: Comments Above Clauses (attached to each clause)");
+Console.WriteLine(commentAboveTest);
+Console.WriteLine();
+
+/*
+Output:
+-- Select the item number and name
+SELECT
+  [p].[ItemNumber] AS [SKU],
+  [p].[Name]
+-- Filter to active products only
+FROM [dbo].[Product] AS [p]
+-- Only include expensive items
+WHERE [p].[Price] > @p0
+-- Sort by price descending
+ORDER BY [p].[Price] DESC
+*/
+
+// Example 2: Inline comments within clauses (preserved in place)
+var commentInlineTest = Sql.Build($@"
+SELECT
+  {p3[prod => prod.ItemNumber]} AS [SKU], -- Product identifier
+  {p3[prod => prod.Name]}, -- Display name
+  {p3[prod => prod.Price]} -- Unit price
+FROM {p3.As("p")}
+WHERE {p3[prod => prod.Price]} > {minPrice}
+");
+Console.WriteLine("Example 2: Inline Comments Within Clauses (preserved in place)");
+Console.WriteLine(commentInlineTest);
+Console.WriteLine();
+
+/*
+Output:
+SELECT
+  [p].[ItemNumber] AS [SKU], -- Product identifier
+  [p].[Name], -- Display name
+  [p].[Price] -- Unit price
+FROM [dbo].[Product] AS [p]
+WHERE [p].[Price] > @p0
+*/
+
+// Example 3: Block comments
+var commentBlockTest = Sql.Build($@"
+/* 
+ * Multi-line block comment
+ * This query retrieves high-value products
+ */
+SELECT
+  {p3[prod => prod.ItemNumber]},
+  {p3[prod => prod.Name]},
+  {p3[prod => prod.Price]}
+/*
+ * From the product table
+ */
+FROM {p3.As("p")}
+/* Filter criteria */
+WHERE {p3[prod => prod.Price]} > {minPrice}
+/* Sort by price */
+ORDER BY {p3[prod => prod.Price]} DESC
+");
+Console.WriteLine("Example 3: Block Comments (/* */ style, attached to clauses)");
+Console.WriteLine(commentBlockTest);
+Console.WriteLine();
+
+// Output:
+// /* 
+//  * Multi-line block comment
+//  * This query retrieves high-value products
+//  */
+// SELECT
+//   [p].[ItemNumber] AS [SKU],
+//   [p].[Name],
+//   [p].[Price]
+// /*
+//  * From the product table
+//  */
+// FROM [dbo].[Product] AS [p]
+// /* Filter criteria */
+// WHERE [p].[Price] > @p0
+// /* Sort by price */
+// ORDER BY [p].[Price] DESC
+
+// Example 4: Comments with clauses in arbitrary order (comments stay with their clauses)
+var commentArbitraryOrderTest = Sql.Build($@"
+/* Get expensive products sorted by price */
+ORDER BY {p3[prod => prod.Price]} DESC
+-- Product selection
+SELECT
+  {p3[prod => prod.ItemNumber]},
+  {p3[prod => prod.Name]}
+-- Filtering
+WHERE {p3[prod => prod.Price]} > {minPrice}
+-- Source table
+FROM {p3.As("p")}
+");
+Console.WriteLine("Example 4: Clauses in Arbitrary Order (comments follow their clauses)");
+Console.WriteLine(commentArbitraryOrderTest);
+Console.WriteLine();
+
+// Output:
+// -- Product selection
+// SELECT
+//   [p].[ItemNumber] AS [SKU],
+//   [p].[Name]
+// -- Source table
+// FROM [dbo].[Product] AS [p]
+
+// -- Filtering
+// WHERE [p].[Price] > @p0
+// /* Get expensive products sorted by price */
+// ORDER BY [p].[Price] DESC
+
+// Example 5: Comments at the end (appended to final output)
+var commentEndTest = Sql.Build($@"
+SELECT
+  {p3[prod => prod.ItemNumber]},
+  {p3[prod => prod.Name]},
+  {p3[prod => prod.Price]}
+FROM {p3.As("p")}
+WHERE {p3[prod => prod.Price]} > {minPrice}
+-- Query logged for audit trail
+-- Generated for reporting dashboard
+");
+Console.WriteLine("Example 5: Comments at End (appended after all clauses)");
+Console.WriteLine(commentEndTest);
+Console.WriteLine();
+
+/*
+Output:
+SELECT
+  [p].[ItemNumber] AS [SKU],
+  [p].[Name],
+  [p].[Price]
+FROM [dbo].[Product] AS [p]
+WHERE [p].[Price] > @p0
+-- Query logged for audit trail
+-- Generated for reporting dashboard
+*/
+
+// Example 6: Mixed comment styles with JOIN
+var p_comments = Sql.GetTable<Product>();
+var o_comments = Sql.GetTable<Order>();
+var commentJoinTest = Sql.Build($@"
+/* Main query: Select products with recent orders */
+SELECT
+  {p_comments[prod => prod.ItemNumber]} AS [SKU], -- Product code
+  -- Extra comment here
+  {p_comments[prod => prod.Name]}, -- Product name
+  {o_comments[ord => ord.OrderDate]} -- Order date
+FROM {p_comments.As("p")}
+-- Join with orders
+INNER JOIN {o_comments.As("o")}
+  ON {p_comments[prod => prod.ItemNumber]} = {o_comments[ord => ord.ProductItemNumber]}
+-- Recent orders only (last 30 days)
+WHERE {o_comments[ord => ord.OrderDate]} > {DateTime.Now.AddDays(-30)}
+/* Sort by newest first */
+ORDER BY {o_comments[ord => ord.OrderDate]} DESC
+-- End of query
+");
+Console.WriteLine("Example 6: Mixed Comments with JOIN (all comment types together)");
+Console.WriteLine(commentJoinTest);
+Console.WriteLine();
+
+// Output:
+// /* Main query: Select products with recent orders */
+// SELECT
+//   [p].[ItemNumber] AS [SKU], -- Product code
+//   -- Extra comment here
+//   [p].[Name], -- Product name
+//   [o].[OrderDate] -- Order date
+// FROM [dbo].[Product] AS [p]
+// -- Join with orders
+// INNER JOIN [dbo].[Orders] AS [o]
+//   ON [p].[ItemNumber] = [o].[ProductItemNumber]
+// -- Recent orders only (last 30 days)
+// WHERE [o].[OrderDate] > @p0
+// /* Sort by newest first */
+// ORDER BY [o].[OrderDate] DESC
+// -- End of query
+
+Console.WriteLine("=== Comment Features ===");
+Console.WriteLine("✓ Comments above clauses are attached to that clause");
+Console.WriteLine("✓ Inline comments within clauses are preserved in place");
+Console.WriteLine("✓ Block comments (/* */) and single-line comments (--) both supported");
+Console.WriteLine("✓ Comments travel with clauses even when clauses are in arbitrary order");
+Console.WriteLine("✓ Comments at the end are appended to final SQL output");
+Console.WriteLine("✓ All comments appear in logged SQL queries for better observability");
+Console.WriteLine();
+
+Console.WriteLine("=== Subquery Support (NEW) ===");
+
+// Example 7: Simple subquery in WHERE clause
+var p7 = Sql.GetTable<Product>();
+var avgPrice = 50m;
+var expensiveSubquery = Sql.Build($@"
+SELECT {p7[prod => prod.ItemNumber]}, {p7[prod => prod.Name]}
+FROM {p7}
+WHERE {p7[prod => prod.Price]} > (
+  SELECT AVG({p7[prod => prod.Price]})
+  FROM {p7}
+  WHERE {p7[prod => prod.Price]} > {avgPrice}
+)
+");
+Console.WriteLine("Example 7: Subquery in WHERE clause (find products above average)");
+Console.WriteLine(expensiveSubquery);
+Console.WriteLine("Parameters: " + string.Join(", ", expensiveSubquery.Parameters.Select(p => $"{p.Key}={p.Value}")));
+Console.WriteLine();
+
+/*
+Output:
+SELECT [dbo].[Product].[ItemNumber], [dbo].[Product].[Name]
+  SELECT AVG([dbo].[Product].[Price])
+FROM [dbo].[Product]
+  FROM [dbo].[Product]
+WHERE [dbo].[Product].[Price] > (
+  WHERE [dbo].[Product].[Price] > @p0
+)
+
+Parameters: @p0=50
+*/
+
+// Example 8: Subquery as derived table in FROM clause
+var p8 = Sql.GetTable<Product>();
+var minItemCount = 5;
+var derivedTableSubquery = Sql.Build($@"
+-- Top products by price
+SELECT t.[ItemNumber], t.[Name], t.[HighPrice]
+FROM (
+  SELECT 
+    {p8[prod => prod.ItemNumber]},
+    {p8[prod => prod.Name]},
+    {p8[prod => prod.Price]} AS [HighPrice]
+  FROM {p8}
+  WHERE {p8[prod => prod.Price]} > {minItemCount * 10}
+) AS t
+ORDER BY t.[HighPrice] DESC
+");
+Console.WriteLine("Example 8: Subquery as derived table (from WHERE condition)");
+Console.WriteLine(derivedTableSubquery);
+Console.WriteLine("Parameters: " + string.Join(", ", derivedTableSubquery.Parameters.Select(p => $"{p.Key}={p.Value}")));
+Console.WriteLine();
+
+/*
+Output:
+-- Top products by price
+SELECT t.[ItemNumber], t.[Name], t.[HighPrice]
+  SELECT 
+    [dbo].[Product].[ItemNumber],
+    [dbo].[Product].[Name],
+    [dbo].[Product].[Price] AS [HighPrice]
+FROM (
+  FROM [dbo].[Product]
+  WHERE [HighPrice] > @p0
+) AS [t]
+ORDER BY t.[HighPrice] DESC
+
+Parameters: @p0=50
+*/
+
+// Example 9: Composing subqueries (subquery within subquery)
+var p9 = Sql.GetTable<Product>();
+var threshold = 100m;
+var innerSubquery = Sql.Build($@"
+SELECT {p9[prod => prod.ItemNumber]} 
+FROM {p9}
+WHERE {p9[prod => prod.Price]} > {threshold}
+");
+var composedSubquery = Sql.Build($@"
+SELECT COUNT(*) AS [ExpensiveCount]
+FROM (
+  SELECT {p9[prod => prod.ItemNumber]}
+  FROM {p9}
+  WHERE {p9[prod => prod.ItemNumber]} IN (
+    {innerSubquery}
+  )
+) AS expensive_products
+");
+Console.WriteLine("Example 9: Composed subqueries (nested subqueries with parameter merging)");
+Console.WriteLine(composedSubquery);
+Console.WriteLine("Parameters: " + string.Join(", ", composedSubquery.Parameters.Select(p => $"{p.Key}={p.Value}")));
+Console.WriteLine();
+
+/*
+Output:
+SELECT COUNT(*) AS [ExpensiveCount]
+  SELECT [dbo].[Product].[ItemNumber]
+FROM (
+  FROM [dbo].[Product]
+  WHERE [dbo].[Product].[ItemNumber] IN (
+    (SELECT [dbo].[Product].[ItemNumber] 
+FROM [dbo].[Product]
+WHERE [dbo].[Product].[Price] > @p0)
+  )
+) AS [expensive_products]
+
+Parameters: @p0=100
+*/
+
+Console.WriteLine("=== Subquery Features ===");
+Console.WriteLine("✓ Subqueries automatically wrapped in parentheses");
+Console.WriteLine("✓ Subquery parameters merged with parent query");
+Console.WriteLine("✓ Parameter names automatically renumbered to avoid collisions");
+Console.WriteLine("✓ Works with positional parameters (PostgreSQL, SQLite) and named parameters (SQL Server, MySQL, Oracle)");
+Console.WriteLine("✓ Subqueries can be nested to any depth");
+Console.WriteLine("✓ Supports subqueries in WHERE, FROM, SELECT, and other clauses");
+Console.WriteLine("✓ Supports subqueries in JOIN clauses (as derived tables)");
+Console.WriteLine();
+
+// Example 10: Subquery in JOIN clause - using the new natural "AS alias" syntax.
+// {o10} AS o  and  {expensiveProducts} AS expensive_prods  are auto-aliased by the
+// interpolated string handler — no .As() call required in your code.
+var p10 = Sql.GetTable<Product>();
+var o10 = Sql.GetTable<Order>();
+var joinThreshold = 50m;
+
+var expensiveProducts = Sql.Build($@"
+SELECT {p10[prod => prod.ItemNumber]}
+FROM {p10}
+WHERE {p10[prod => prod.Price]} > {joinThreshold}
+");
+
+var expensiveProductsProduct = expensiveProducts.Project<Product>();
+
+var joinSubqueryTest = Sql.Build($@"
+SELECT {p10[prod => prod.ItemNumber]} AS SKU, {o10[ord => ord.OrderDate]} AS Ordered
+FROM {o10} AS o
+INNER JOIN {expensiveProducts} AS expensive_prods
+  ON {o10[ord => ord.ProductItemNumber]} = {expensiveProductsProduct[ep => ep.ItemNumber]}
+WHERE {o10[ord => ord.OrderDate]} > {DateTime.Now.AddMonths(-1)}
+ORDER BY {o10[ord => ord.OrderDate]} DESC
+");
+Console.WriteLine("Example 10: Subquery in JOIN - natural 'AS alias' syntax (auto-aliased)");
+Console.WriteLine(joinSubqueryTest);
+Console.WriteLine("Parameters: " + string.Join(", ", joinSubqueryTest.Parameters.Select(p => $"{p.Key}={p.Value}")));
+Console.WriteLine();
+
+/*
+Output:
+SELECT [dbo].[Product].[ItemNumber] AS [SKU], [o].[OrderDate] AS [Ordered]
+FROM [dbo].[Orders] AS [o]
+INNER JOIN (
+  SELECT [dbo].[Product].[ItemNumber]
+  FROM [dbo].[Product]
+  WHERE [dbo].[Product].[Price] > @p0
+) AS [expensive_prods]
+  ON [o].[ProductItemNumber] = [expensive_prods].[ItemNumber]
+WHERE [Ordered] > @p1
+ORDER BY [Ordered] DESC
+
+Parameters: @p0=50, @p1=2026-03-26 12:58:52
+*/
+
+// Verify CAST({col} AS INT) is NOT misinterpreted as a column alias
+var p10c = Sql.GetTable<Product>();
+var castSafetyTest = Sql.Build($@"
+SELECT CAST({p10c[prod => prod.ItemNumber]} AS BIGINT) AS ConvertedSKU
+FROM {p10c} AS products
+");
+Console.WriteLine("Example 10c: CAST safety - CAST({col} AS TYPE) not misinterpreted as alias");
+Console.WriteLine(castSafetyTest);
+Console.WriteLine();
+
+/*
+Output:
+SELECT CAST([products].[ItemNumber] AS BIGINT) AS [ConvertedSKU]
+FROM [dbo].[Product] AS [products]
+*/
+
+// Example 10d: Alias quoting across dialects
+// Verifies {col} AS alias and subquery AS alias produce dialect-correct quoting
+var p10d = Sql.GetTable<Product>();
+var o10d = Sql.GetTable<Order>();
+var expProducts10d = Sql.Build($@"
+-- Subquery to find expensive products, aliased as 'expensive_prods' in the JOIN
+SELECT {p10d[prod => prod.ItemNumber]}
+FROM {p10d}
+WHERE {p10d[prod => prod.Price]} > {50m}
+");
+var expProd10d = expProducts10d.Project<Product>();
+
+foreach (var (label, dbType) in new[] {
+    ("SQL Server [brackets]", DatabaseType.SqlServer),
+    ("PostgreSQL \"double quotes\"", DatabaseType.PostgreSQL),
+    ("MySQL `backticks`", DatabaseType.MySQL),
+    ("SQLite \"double quotes\"", DatabaseType.SQLite),
+})
+{
+    var dialectQuery = Sql.Build(dbType, $@"
+SELECT
+  {p10d[prod => prod.ItemNumber]} AS SKU,
+  CAST({p10d[prod => prod.Price]} AS DECIMAL) AS CastPrice
+FROM {o10d} AS o
+INNER JOIN {expProducts10d} AS [expensive_prods]
+  ON {o10d[ord => ord.ProductItemNumber]} = {expProd10d[ep => ep.ItemNumber]}
+WHERE {o10d[ord => ord.OrderDate]} > {DateTime.Now.AddMonths(-1)}
+");
+    Console.WriteLine($"  {label}:");
+    Console.WriteLine("  " + string.Join("\n  ", dialectQuery.Sql.Trim().Split('\n')));
+    Console.WriteLine();
+}
+
+/*
+Output:
+SQL Server [brackets]:
+SELECT
+  [dbo].[Product].[ItemNumber] AS [SKU],
+  CAST([dbo].[Product].[Price] AS DECIMAL) AS [CastPrice]
+FROM [dbo].[Orders] AS [o]
+INNER JOIN (
+  -- Subquery to find expensive products, aliased as 'expensive_prods' in the JOIN
+  SELECT [dbo].[Product].[ItemNumber]
+  FROM [dbo].[Product]
+  WHERE [dbo].[Product].[Price] > @p0
+) AS [expensive_prods]
+  ON [o].[ProductItemNumber] = [expensive_prods].[ItemNumber]
+WHERE [o].[OrderDate] > @p1
+
+PostgreSQL "double quotes":
+SELECT
+  "dbo"."Product"."ItemNumber" AS "SKU",
+  CAST("dbo"."Product"."Price" AS DECIMAL) AS "CastPrice"
+FROM "dbo"."Orders" AS "o"
+INNER JOIN (
+  -- Subquery to find expensive products, aliased as 'expensive_prods' in the JOIN
+  SELECT "dbo"."Product"."ItemNumber"
+  FROM "dbo"."Product"
+  WHERE "dbo"."Product"."Price" > $1
+) AS "expensive_prods"
+  ON "o"."ProductItemNumber" = "expensive_prods"."ItemNumber"
+WHERE "o"."OrderDate" > $2
+
+MySQL `backticks`:
+SELECT
+  `dbo`.`Product`.`ItemNumber` AS `SKU`,
+  CAST(`dbo`.`Product`.`Price` AS DECIMAL) AS `CastPrice`
+FROM `dbo`.`Orders` AS `o`
+INNER JOIN (
+  -- Subquery to find expensive products, aliased as 'expensive_prods' in the JOIN
+  SELECT `dbo`.`Product`.`ItemNumber`
+  FROM `dbo`.`Product`
+  WHERE `dbo`.`Product`.`Price` > @p0
+) AS `expensive_prods`
+  ON `o`.`ProductItemNumber` = `expensive_prods`.`ItemNumber`
+WHERE `o`.`OrderDate` > @p1
+
+SQLite "double quotes":
+SELECT
+  "dbo"."Product"."ItemNumber" AS "SKU",
+  CAST("dbo"."Product"."Price" AS DECIMAL) AS "CastPrice"
+FROM "dbo"."Orders" AS "o"
+INNER JOIN (
+  -- Subquery to find expensive products, aliased as 'expensive_prods' in the JOIN
+  SELECT "dbo"."Product"."ItemNumber"
+  FROM "dbo"."Product"
+  WHERE "dbo"."Product"."Price" > ?1
+) AS "expensive_prods"
+  ON "o"."ProductItemNumber" = "expensive_prods"."ItemNumber"
+WHERE "o"."OrderDate" > ?2
+*/
+
+// Example 10b: Column reference BEFORE .As() in the interpolation (lazy alias resolution).
+// The alias is set when the interpolation handler processes {expensiveProducts} AS expensive_prods,
+// which happens before ToQuery() is called — so the Func<string?> in expProd resolves correctly
+// even though {expProd[...]} appears earlier in the string.
+var expProd = expensiveProducts.Project<Product>();
+
+var joinReversedOrderTest = Sql.Build($@"
+FROM {o10} AS o
+  ON {o10[ord => ord.ProductItemNumber]} = {expProd[ep => ep.ItemNumber]}
+SELECT
+  {p10[prod => prod.ItemNumber]},
+  {o10[ord => ord.OrderDate]}
+INNER JOIN {expensiveProducts} AS expensive_prods
+WHERE {o10[ord => ord.OrderDate]} > {DateTime.Now.AddMonths(-1)}
+ORDER BY {o10[ord => ord.OrderDate]} DESC
+");
+Console.WriteLine("Example 10b: Column ref BEFORE alias in interpolation (lazy alias resolution)");
+Console.WriteLine(joinReversedOrderTest);
+Console.WriteLine();
+
+/*
+Output:
+SELECT
+  [dbo].[Product].[ItemNumber] AS [SKU],
+  [o].[OrderDate] AS [Ordered]
+INNER JOIN (
+  SELECT [dbo].[Product].[ItemNumber]
+  FROM [dbo].[Product]
+  WHERE [dbo].[Product].[Price] > @p0
+) AS [expensive_prods]
+FROM [dbo].[Orders] AS [o]
+  ON [o].[ProductItemNumber] = [expensive_prods].[ItemNumber]
+WHERE [Ordered] > @p1
+ORDER BY [Ordered] DESC
+*/
+
+var onlineQuery = Sql.SqlQuery<Product>(table => Sql.Build($@"
+SELECT {table[p => p.ItemNumber].As("SKU")} FROM {table.As("p")} WHERE {table[p => p.Price]} > {minPrice} ORDER BY {table[p => p.ItemNumber]} ASC"));
+
+Console.WriteLine("=== One-line Query ===");
+Console.WriteLine(onlineQuery);
+
+/*
+Output:
+SELECT [p].[ItemNumber] AS [SKU] FROM [dbo].[Product] AS [p] WHERE [p].[Price] > @p0 ORDER BY [SKU] ASC
+*/
+
+/// <summary>
+/// Product DTO with attribute-based database mapping
+/// Eliminates redundancy between DTO and schema definitions
+/// </summary>
+// [SqlTable("ReleasedProducts", "dbo")]
+[SqlTable(schemaName: "dbo")]
+public class Product
+{
+    /// <summary>Product item number (SKU)</summary>
+    // [SqlColumn]
+    public int ItemNumber { get; set; }
+
+    /// <summary>Product name - mapped from database column 'ProductName'</summary>
+    // [SqlColumn("ProductName")]
+    public string Name { get; set; } = null!;
+
+    /// <summary>Product price</summary>
+    // [SqlColumn]
+    public decimal Price { get; set; }
+}
+
+/// <summary>
+/// Order DTO with attribute-based database mapping
+/// Demonstrates JOIN usage with multiple DTOs
+/// </summary>
+[SqlTable("Orders", "dbo")]
+public class Order
+{
+    /// <summary>Order ID (PK)</summary>
+    [SqlColumn]
+    public int OrderId { get; set; }
+
+    /// <summary>Product item number (FK)</summary>
+    [SqlColumn]
+    public int ProductItemNumber { get; set; }
+
+    /// <summary>Order date</summary>
+    [SqlColumn]
+    public DateTime OrderDate { get; set; }
+
+    /// <summary>Order quantity</summary>
+    [SqlColumn]
+    public int Quantity { get; set; }
+}
+
+namespace SqlSchema
+{
+  public class ProductsTable(string? schema = null) : SqlTable("ReleasedProducts", schema)
+  {
+      private SqlColumn? _itemNumber;
+      private SqlColumn? _productName;
+      private SqlColumn? _price;
+
+      public SqlColumn ItemNumber => _itemNumber ??= new(this, "ItemNumber");
+
+      public SqlColumn ProductName => _productName ??= new(this, "ProductName");
+
+      public SqlColumn Price => _price ??= new(this, "Price");
+  }
+
+  public static class Dbo
+  {
+      public const string Schema = "dbo";
+      public static ProductsTable Products => new(Schema);
+  }
+}
