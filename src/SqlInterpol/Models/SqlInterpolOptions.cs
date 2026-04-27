@@ -2,9 +2,9 @@ using SqlInterpol.Enums;
 
 namespace SqlInterpol.Models;
 
-public class SqlQueryOptions
+public class SqlInterpolOptions
 {
-    public SqlDatabaseType Database { get; set; } = SqlDatabaseType.SqlServer;
+    public SqlDialect Dialect { get; set; } = SqlDialect.SqlServer;
 
     public string IdentifierStart { get; set; } = "[";
 
@@ -16,43 +16,43 @@ public class SqlQueryOptions
 
     public int IndentSize { get; set; } = 2;
 
-    public static SqlQueryOptions ForDatabase(SqlDatabaseType database) => database switch
+    public static SqlInterpolOptions ForDialect(SqlDialect dialect) => dialect switch
     {
-        SqlDatabaseType.SqlServer => new SqlQueryOptions 
+        SqlDialect.SqlServer => new SqlInterpolOptions 
         { 
-            Database = SqlDatabaseType.SqlServer,
+            Dialect = SqlDialect.SqlServer,
             IdentifierStart = "[",
             IdentifierEnd = "]",
             ParameterPrefix = "@",
             UsePositionalParameters = false
         },
-        SqlDatabaseType.MySql => new SqlQueryOptions 
+        SqlDialect.MySql => new SqlInterpolOptions 
         { 
-            Database = SqlDatabaseType.MySql,
+            Dialect = SqlDialect.MySql,
             IdentifierStart = "`",
             IdentifierEnd = "`",
             ParameterPrefix = "@",
             UsePositionalParameters = false
         },
-        SqlDatabaseType.PostgreSql => new SqlQueryOptions 
+        SqlDialect.PostgreSql => new SqlInterpolOptions 
         { 
-            Database = SqlDatabaseType.PostgreSql,
+            Dialect = SqlDialect.PostgreSql,
             IdentifierStart = "\"",
             IdentifierEnd = "\"",
             ParameterPrefix = "$",
             UsePositionalParameters = true
         },
-        SqlDatabaseType.SQLite => new SqlQueryOptions 
+        SqlDialect.SqLite => new SqlInterpolOptions 
         { 
-            Database = SqlDatabaseType.SQLite,
+            Dialect = SqlDialect.SqLite,
             IdentifierStart = "\"",
             IdentifierEnd = "\"",
             ParameterPrefix = "?",
             UsePositionalParameters = true
         },
-        SqlDatabaseType.Oracle => new SqlQueryOptions 
+        SqlDialect.Oracle => new SqlInterpolOptions 
         { 
-            Database = SqlDatabaseType.Oracle,
+            Dialect = SqlDialect.Oracle,
             IdentifierStart = "\"",
             IdentifierEnd = "\"",
             ParameterPrefix = ":",

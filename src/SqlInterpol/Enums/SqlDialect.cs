@@ -1,11 +1,10 @@
 namespace SqlInterpol.Enums;
 
-public enum SqlDatabaseType
+public enum SqlDialect
 {
     SqlServer,
     MySql,
     PostgreSql,
     Oracle,
-    SQLite,
-    Sqlite
+    SqLite
 }

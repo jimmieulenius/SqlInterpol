@@ -28,12 +28,12 @@ public class SqlTable(string name, string? schema = null, string? alias = null) 
         return ToString(clause, Sql.CurrentOptions);
     }
 
-    public override string ToString(string clause, SqlQueryOptions options)
+    public override string ToString(string clause, SqlInterpolOptions options)
     {
         return ToString(clause, options, isInAsContext: false);
     }
 
-    public override string ToString(string clause, SqlQueryOptions options, bool isInAsContext)
+    public override string ToString(string clause, SqlInterpolOptions options, bool isInAsContext)
     {
         try
         {

@@ -7,7 +7,7 @@ using SqlInterpol.Models;
 namespace SqlInterpol.Handlers;
 
 [InterpolatedStringHandler]
-public ref struct SqlQueryInterpolatedStringHandler(int literalLength)
+public ref struct SqlQueryInterpolatedStringHandler(int literalLength, int formattedCount)
 {
     // Precompiled regex patterns for extreme performance (avoid re-compilation per query)
     private static readonly Regex _asPatternRegex = new(@"__OBJ(\d+)__\s+AS\s+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -125,7 +125,7 @@ public ref struct SqlQueryInterpolatedStringHandler(int literalLength)
         return ToQuery(Sql.CurrentOptions);
     }
 
-    public SqlQuery ToQuery(SqlQueryOptions options)
+    public SqlQuery ToQuery(SqlInterpolOptions options)
     {
         string result = _builder.ToString();
         // Preprocess to associate comments with the correct clause
@@ -250,11 +250,11 @@ public ref struct SqlQueryInterpolatedStringHandler(int literalLength)
                         //     FROM ...
                         //   ) AS [alias]
                         var sqIndent = new string(' ', options.IndentSize);
-                        var indentedInner = string.Join("\n", innerSql
+                        var indentedInner = string.Join(Environment.NewLine, innerSql
                             .Replace("\r\n", "\n").Replace("\r", "\n")
                             .Split('\n')
                             .Select(l => l.Length > 0 ? sqIndent + l : l));
-                        stringValue = $"(\n{indentedInner}\n) {SqlKeyword.As} {options.IdentifierStart}{subqueryTable.Alias}{options.IdentifierEnd}";
+                        stringValue = $"({Environment.NewLine}{indentedInner}{Environment.NewLine}) {SqlKeyword.As} {options.IdentifierStart}{subqueryTable.Alias}{options.IdentifierEnd}";
                         
                         // Renumber all subquery parameters to avoid collisions with main query
                         foreach (var (subParamName, subParamValue) in subqueryTable.EmbeddedParameters)
@@ -535,7 +535,7 @@ public ref struct SqlQueryInterpolatedStringHandler(int literalLength)
         return new SqlQuery(result, parameters, options);
     }
 
-    private static string ReQuoteIdentifiers(string sql, SqlQueryOptions source, SqlQueryOptions target)
+    private static string ReQuoteIdentifiers(string sql, SqlInterpolOptions source, SqlInterpolOptions target)
     {
         if (source.IdentifierStart == target.IdentifierStart &&
             source.IdentifierEnd   == target.IdentifierEnd)
@@ -640,7 +640,7 @@ public ref struct SqlQueryInterpolatedStringHandler(int literalLength)
             output.AddRange(commentBuffer);
         }
 
-        return string.Join("\n", output);
+        return string.Join(Environment.NewLine, output);
     }
 
     private static string ReorderClausesWithComments(string sql)
@@ -758,6 +758,6 @@ public ref struct SqlQueryInterpolatedStringHandler(int literalLength)
             output.AddRange(trailingLines);
         }
 
-        return string.Join("\n", output);
+        return string.Join(Environment.NewLine, output);
     }
 }

@@ -22,12 +22,12 @@ public class SqlColumn(SqlTable table, string name, string? alias = null) : SqlR
         return ToString(clause, Sql.CurrentOptions);
     }
 
-    public override string ToString(string clause, SqlQueryOptions options)
+    public override string ToString(string clause, SqlInterpolOptions options)
     {
         return ToString(clause, options, isInAsContext: false);
     }
 
-    public override string ToString(string clause, SqlQueryOptions options, bool isInAsContext)
+    public override string ToString(string clause, SqlInterpolOptions options, bool isInAsContext)
     {
         try
         {

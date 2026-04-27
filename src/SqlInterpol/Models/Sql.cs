@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using SqlInterpol.Attributes;
@@ -10,11 +11,11 @@ namespace SqlInterpol.Models;
 public class Sql
 {
     [ThreadStatic]
-    private static SqlQueryOptions? _currentOptions;
+    private static SqlInterpolOptions? _currentOptions;
 
-    internal static SqlQueryOptions CurrentOptions => _currentOptions ?? new SqlQueryOptions();
+    internal static SqlInterpolOptions CurrentOptions => _currentOptions ?? new SqlInterpolOptions();
 
-    internal static void SetCurrentOptions(SqlQueryOptions? options)
+    internal static void SetCurrentOptions(SqlInterpolOptions? options)
     {
         _currentOptions = options;
     }
@@ -42,14 +43,14 @@ public class Sql
         return buildQuery(GetTable<T>());
     }
 
-    public static SqlQuery Build(SqlDatabaseType database, [InterpolatedStringHandlerArgument] SqlQueryInterpolatedStringHandler handler)
+    public static SqlQuery Build(SqlDialect dialect, [InterpolatedStringHandlerArgument] SqlQueryInterpolatedStringHandler handler)
     {
-        var options = SqlQueryOptions.ForDatabase(database);
+        var options = SqlInterpolOptions.ForDialect(dialect);
 
         return Build(options, handler);
     }
 
-    public static SqlQuery Build(SqlQueryOptions options, [InterpolatedStringHandlerArgument] SqlQueryInterpolatedStringHandler handler)
+    public static SqlQuery Build(SqlInterpolOptions options, [InterpolatedStringHandlerArgument] SqlQueryInterpolatedStringHandler handler)
     {
         _currentOptions = options;
 
@@ -147,7 +148,7 @@ public class Sql
         return new SqlFormat(result, parameters, clause, template, args);
     }
 
-    private static readonly Dictionary<Type, object> _tableCache = new();
+    private static readonly ConcurrentDictionary<Type, object> _tableCache = new();
 
     private record TableMetadata(string? SchemaName, string TableName, Dictionary<string, string> ColumnsByProperty);
 

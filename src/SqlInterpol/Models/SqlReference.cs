@@ -1,6 +1,9 @@
+using SqlInterpol.Abstractions;
+
 namespace SqlInterpol.Models;
 
-public abstract class SqlReference(string name, string? alias = null) : Sql(string.Empty)
+// public abstract class SqlReference(string name, string? alias = null) : Sql(string.Empty)
+public abstract class SqlReference : ISqlFragment
 {
     public string Name { get; set; } = name;
 
@@ -16,9 +19,9 @@ public abstract class SqlReference(string name, string? alias = null) : Sql(stri
 
     public virtual string ToString(string clause) => ToString(clause, Sql.CurrentOptions);
 
-    public virtual string ToString(string clause, SqlQueryOptions options) => ToString();
+    public virtual string ToString(string clause, SqlInterpolOptions options) => ToString();
 
-    public virtual string ToString(string clause, SqlQueryOptions options, bool isInAsContext) => ToString(clause, options);
+    public virtual string ToString(string clause, SqlInterpolOptions options, bool isInAsContext) => ToString(clause, options);
 
     public string? Alias() => _alias;
 

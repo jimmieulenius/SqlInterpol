@@ -88,7 +88,7 @@ public class SqlTableJoin : SqlReference
 
     public override string Reference => _baseTable.Reference;
 
-    public override string ToString(string clause, SqlQueryOptions options)
+    public override string ToString(string clause, SqlInterpolOptions options)
     {
         var result = new StringBuilder();
         var indent = new string(' ', options.IndentSize);
@@ -96,14 +96,14 @@ public class SqlTableJoin : SqlReference
 
         foreach (var join in _joins)
         {
-            result.Append("\n");
+            result.Append(Environment.NewLine);
             result.Append(join.JoinType);
             result.Append(" ");
             result.Append(join.Table.ToString(clause, options));
 
             if (join.LeftColumn != null && join.RightColumn != null)
             {
-                result.Append("\n");
+                result.Append(Environment.NewLine);
                 result.Append(indent);
                 result.Append(SqlKeyword.On);
                 result.Append(" ");
@@ -115,7 +115,7 @@ public class SqlTableJoin : SqlReference
                 // Add any additional AND/OR conditions
                 foreach (var (condition, op) in join.AdditionalConditions)
                 {
-                    result.Append("\n");
+                    result.Append(Environment.NewLine);
                     result.Append(indent);
                     result.Append(op);
                     result.Append(" ");

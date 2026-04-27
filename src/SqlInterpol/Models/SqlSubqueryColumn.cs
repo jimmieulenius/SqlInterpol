@@ -18,7 +18,7 @@ public class SqlSubqueryColumn : SqlReference
 
     public override string Reference => FullName;
 
-    public override string ToString(string clause, SqlQueryOptions options)
+    public override string ToString(string clause, SqlInterpolOptions options)
     {
         var start = options.IdentifierStart;
         var end = options.IdentifierEnd;
@@ -29,7 +29,7 @@ public class SqlSubqueryColumn : SqlReference
     public override SqlReference As(string alias)
     {
         _alias = alias;
-        
+
         return this;
     }
 }
