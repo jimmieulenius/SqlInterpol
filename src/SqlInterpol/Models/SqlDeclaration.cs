@@ -11,7 +11,8 @@ public class SqlDeclaration(ISqlReference reference) : ISqlDeclaration
         // The Declaration asks the projection for its 'Source' name 
         // (e.g., "Product" or "(SELECT...)"), then applies the alias 
         // stored in the Reference.
-        var sourceSql = Reference.Parent.ToSql(context);
+        var sourceSql = Reference.Source.ToSql(context);
+        
         return context.Dialect.ApplyAlias(sourceSql, Reference.Alias);
     }
 }

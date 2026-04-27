@@ -4,7 +4,7 @@ namespace SqlInterpol.Models;
 
 public abstract class SqlReference(ISqlProjection parent) : ISqlReference
 {
-    public ISqlProjection Parent { get; } = parent;
+    public ISqlProjection Source { get; } = parent;
     public string? Alias { get; set; }
 
     // Every specific reference (Table vs Column) 

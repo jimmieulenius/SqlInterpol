@@ -2,7 +2,7 @@ namespace SqlInterpol.Abstractions;
 
 public interface ISqlReference : ISqlFragment
 {
-    ISqlProjection Parent { get; }
+    ISqlProjection Source { get; }
 
     string? Alias { get; }
 }
