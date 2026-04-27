@@ -4,5 +4,5 @@ namespace SqlInterpol.Abstractions;
 
 public interface ISqlFragment
 {
-    string ToSql(SqlInterpolOptions options);
+    string ToSql(SqlContext context);
 }
