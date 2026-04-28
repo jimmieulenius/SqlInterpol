@@ -10,4 +10,5 @@ public readonly struct SqlContext(SqlInterpolOptions options, ISqlDialectService
         IndentSize = 2
     };
     public ISqlDialectService Dialect { get; } = dialect ?? new SqlServerDialectService();
+    public Dictionary<string, object?> Parameters { get; } = [];
 }

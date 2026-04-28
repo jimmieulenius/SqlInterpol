@@ -11,38 +11,32 @@ public abstract class SqlEntity<T> : ISqlProjection
     public ISqlReference Reference { get; }
     public ISqlDeclaration Declaration { get; }
 
-    protected SqlEntity(string name, string? schema = null, ISqlProjection? parent = null)
+    protected SqlEntity(string name, string? schema, ISqlProjection? parent = null)
     {
         Name = name;
         Schema = schema;
         Parent = parent;
 
-        // Concrete Reference/Declaration instances
-        // TableReference/TableDeclaration can actually be renamed to 
-        // EntityReference/EntityDeclaration to be truly DRY.
         Reference = new EntityReference(this);
         Declaration = new SqlDeclaration(Reference);
     }
 
-    // This defines what the physical source looks like: [dbo].[Name]
-    public virtual string ToSql(SqlContext context)
-    {
-        return context.Dialect.QuoteTableName(Name, Schema);
-    }
-
-    public ISqlReference GetColumnReference(string propertyName, SqlInterpolOptions options)
-    {
-        throw new NotImplementedException();
-    }
-
-    // Property indexer for columns: table[x => x.Name]
+    // 1. Strongly-Typed Indexer: table[t => t.Name]
     public ISqlReference this[Expression<Func<T, object>> propertySelector]
     {
-        get 
-        {
-            var memberName = GetMemberName(propertySelector);
-            
-            return new ColumnReference(Reference, memberName);
-        }
+        get => new SqlColumnReference(Reference, propertySelector);
+    }
+
+    // 2. String-Based Indexer: table["Name"]
+    public ISqlReference this[string columnName]
+    {
+        get => new SqlRawColumnReference(Reference, columnName);
+    }
+
+    public virtual string ToSql(SqlContext context)
+    {
+        // If it's a subquery, this is overridden. 
+        // If it's a table, it returns [schema].[name]
+        return context.Dialect.QuoteTableName(Name, Schema);
     }
 }

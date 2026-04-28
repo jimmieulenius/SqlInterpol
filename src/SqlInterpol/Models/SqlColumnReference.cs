@@ -1,18 +1,13 @@
+using System.Linq.Expressions;
 using SqlInterpol.Abstractions;
+using SqlInterpol.Helpers;
 
 namespace SqlInterpol.Models;
 
-public class SqlColumnReference(ISqlReference parentReference, string columnName) : SqlReference(parentReference.Source)
+public class SqlColumnReference(ISqlReference sourceReference, LambdaExpression expression) : SqlColumnBase(sourceReference)
 {
-    private readonly ISqlReference _parentReference = parentReference;
-    private readonly string _columnName = columnName;
+    private readonly LambdaExpression _expression = expression;
 
-    public override string ToSql(SqlContext context)
-    {
-        // Get the parent pointer (either "p" or "dbo.Product")
-        var parentPath = _parentReference.ToSql(context);
-        
-        // Return "p.Name"
-        return $"{parentPath}.{context.Dialect.QuoteIdentifier(_columnName)}";
-    }
+    protected override string GetColumnName(SqlContext context) 
+        => SqlExpressionHelper.GetMemberName(_expression);
 }

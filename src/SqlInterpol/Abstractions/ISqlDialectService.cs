@@ -2,6 +2,10 @@ namespace SqlInterpol.Abstractions;
 
 public interface ISqlDialectService
 {    
+    string OpenQuote { get; }
+    string CloseQuote { get; }
+    string ParameterPrefix { get; }
+
     string QuoteIdentifier(string name);
 
     string QuoteTableName(string table, string? schema = null);

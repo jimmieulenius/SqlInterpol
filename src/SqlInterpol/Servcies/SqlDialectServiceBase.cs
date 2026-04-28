@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 using SqlInterpol.Abstractions;
-using SqlInterpol.Constants;
+using SqlInterpol.Models;
 
 namespace SqlInterpol.Services;
 
@@ -58,6 +58,6 @@ public abstract class SqlDialectServiceBase : ISqlDialectService
             return source;
         }
 
-        return $"{source} {SqlKeyword.As} {QuoteIdentifier(alias)}";
+        return $"{source} {SqlKeyword.As.Value} {QuoteIdentifier(alias)}";
     }
 }
