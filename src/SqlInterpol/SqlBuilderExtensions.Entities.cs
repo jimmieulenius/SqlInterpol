@@ -2,7 +2,7 @@ using SqlInterpol.Metadata;
 
 namespace SqlInterpol;
 
-public static class SqlBuilderExtensions
+public static partial class SqlBuilderExtensions
 {
     public static (SqlBuilder Builder, SqlEntity<T1> T1) 
         Entities<T1>(this SqlBuilder b) 

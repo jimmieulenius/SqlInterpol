@@ -6,61 +6,66 @@ internal static class SqlParser
 {
     public static void ProcessLiteral(SqlContext context, ReadOnlySpan<char> span)
     {
-        // 1. Sniff for Aliases if the context is "waiting" for one
-        if (context.PendingAliasCapture != null)
+        // 1. Alias Sniffing
+        if (context.State.PendingAliasCapture != null)
         {
             if (TryCaptureAlias(span, out var alias, out int consumed))
             {
-                context.PendingAliasCapture.Reference.Alias = alias;
-                context.PendingAliasCapture = null;
-                span = span.Slice(consumed);
+                context.State.PendingAliasCapture.Reference.Alias = alias;
+                context.State.PendingAliasCapture = null;
+                span = span[consumed..];
             }
             else if (IsCaptureTerminated(span))
             {
-                context.PendingAliasCapture = null;
+                context.State.PendingAliasCapture = null;
             }
         }
 
-        // 2. Scan for keywords to update the current SQL clause state
-        UpdateClauseState(context, span);
-    }
-
-    private static void UpdateClauseState(SqlContext context, ReadOnlySpan<char> span)
-    {
-        // This logic helps the builder know if a table should render 
-        // as a "Declaration" (Table Name) or a "Reference" (Alias)
+        // 2. Lexical Scanning
         for (int i = 0; i < span.Length; i++)
         {
-            // Only check for keywords at word boundaries
+            var slice = span[i..];
+
+            // Handle Strings
+            if (span[i] == '\'' && (i == 0 || span[i - 1] != '\\'))
+            {
+                context.State.IsInsideString = !context.State.IsInsideString;
+                continue;
+            }
+
+            if (context.State.IsInsideString) continue;
+
+            // Handle Comments
+            if (slice.StartsWith("--"))
+            {
+                int nl = slice.IndexOfAny('\r', '\n');
+                i += (nl == -1) ? slice.Length : nl;
+                continue;
+            }
+            if (slice.StartsWith("/*"))
+            {
+                int end = slice[2..].IndexOf("*/");
+                i += (end == -1) ? slice.Length : end + 3;
+                continue;
+            }
+
+            // Detect Keywords
             if (i == 0 || char.IsWhiteSpace(span[i - 1]))
             {
-                var slice = span.Slice(i);
                 foreach (var keyword in SqlKeyword.AllInitiatorsOrdered)
                 {
                     if (slice.StartsWith(keyword.Value, StringComparison.OrdinalIgnoreCase))
                     {
-                        // Ensure it's the whole word (e.g., "SELECT" not "SELECTION")
                         if (slice.Length == keyword.Value.Length || !char.IsLetterOrDigit(slice[keyword.Value.Length]))
                         {
-                            // context.CurrentKeyword = keyword;
-                            i += keyword.Value.Length; // Advance past the keyword
-                            break; 
+                            context.State.CurrentKeyword = keyword;
+                            i += keyword.Value.Length - 1; 
+                            break;
                         }
                     }
                 }
             }
         }
-    }
-
-    public static bool IsCaptureTerminated(ReadOnlySpan<char> span)
-    {
-        var current = span;
-        if (!SkipWhitespaceAndComments(ref current)) return false;
-
-        // If the next character is a comma, closing paren, or semicolon, 
-        // it's impossible for a table alias to follow.
-        char c = current[0];
-        return c == ',' || c == ')' || c == ';' || c == '(';
     }
 
     public static bool TryCaptureAlias(ReadOnlySpan<char> span, out string? alias, out int consumed)
@@ -71,21 +76,17 @@ internal static class SqlParser
 
         if (!SkipWhitespaceAndComments(ref current)) return false;
 
-        // 1. Handle explicit 'AS'
-        bool hasExplicitAs = false;
         if (current.StartsWith("AS", StringComparison.OrdinalIgnoreCase))
         {
-            // Ensure word boundary (AS vs ASSET)
             if (current.Length == 2 || !char.IsLetterOrDigit(current[2]))
             {
-                hasExplicitAs = true;
-                current = current.Slice(2);
+                current = current[2..];
                 if (!SkipWhitespaceAndComments(ref current)) return false;
             }
         }
 
-        // 2. Identify the potential alias token
         int end = 0;
+
         while (end < current.Length && (char.IsLetterOrDigit(current[end]) || current[end] == '_'))
         {
             end++;
@@ -93,34 +94,41 @@ internal static class SqlParser
 
         if (end > 0)
         {
-            var token = current.Slice(0, end).ToString();
-
-            // If it's a SQL keyword (like WHERE, JOIN), it's not an alias
+            var token = current[..end].ToString();
             if (IsSqlKeyword(token)) return false;
 
             alias = token;
-            // Calculate total characters consumed from the original span
-            consumed = span.Length - current.Slice(end).Length;
+            consumed = span.Length - current[end..].Length;
             return true;
         }
 
         return false;
     }
 
-    public static bool SkipWhitespaceAndComments(ref ReadOnlySpan<char> span)
+    public static bool IsCaptureTerminated(ReadOnlySpan<char> span)
+    {
+        var current = span;
+        if (!SkipWhitespaceAndComments(ref current)) return false;
+        char c = current[0];
+        return c == ',' || c == ')' || c == ';' || c == '(';
+    }
+
+    private static bool SkipWhitespaceAndComments(ref ReadOnlySpan<char> span)
     {
         while (span.Length > 0)
         {
-            if (char.IsWhiteSpace(span[0])) { span = span.Slice(1); continue; }
-            if (span.StartsWith("--")) { /* skip line */ }
-            if (span.StartsWith("/*")) { /* skip block */ }
-            break; 
+            if (char.IsWhiteSpace(span[0])) { span = span[1..]; continue; }
+            if (span.StartsWith("--"))
+            {
+                int nl = span.IndexOfAny('\r', '\n');
+                span = nl == -1 ? ReadOnlySpan<char>.Empty : span[nl..];
+                continue;
+            }
+            break;
         }
         return span.Length > 0;
     }
 
-    public static bool IsSqlKeyword(string word) => 
+    private static bool IsSqlKeyword(string word) => 
         SqlKeyword.AllKeywords.Any(k => k.Value.Equals(word, StringComparison.OrdinalIgnoreCase));
-
-    // ... TryCaptureAlias, IsCaptureTerminated, and SkipWhitespaceAndComments ...
 }

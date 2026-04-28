@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Linq.Expressions;
 using System.Reflection;
 using SqlInterpol.Parsing;
@@ -7,8 +6,6 @@ namespace SqlInterpol.Metadata;
 
 public static class SqlMetadataRegistry
 {
-    // The "Golden" Cache: One static field per type T. 
-    // This is the fastest possible way to store data per-type in .NET.
     private static class Cache<T>
     {
         public static readonly EntityMetadata Metadata = InitializeMetadata(typeof(T));
