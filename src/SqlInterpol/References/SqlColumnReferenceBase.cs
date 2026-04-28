@@ -2,7 +2,7 @@ using SqlInterpol.Config;
 
 namespace SqlInterpol.References;
 
-public abstract class SqlColumnBase(ISqlReference sourceReference) : SqlReference(sourceReference.Source)
+public abstract class SqlColumnReferenceBase(ISqlReference sourceReference) : SqlReference(sourceReference.Source)
 {
     protected readonly ISqlReference SourceReference = sourceReference;
 

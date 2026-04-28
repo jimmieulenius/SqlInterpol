@@ -7,4 +7,6 @@ public class SqlInterpolOptions
     public bool UsePositionalParameters { get; set; } = false;
 
     public int IndentSize { get; set; } = 2;
+
+    public static SqlInterpolOptions Default => new();
 }

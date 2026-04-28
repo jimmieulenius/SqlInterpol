@@ -6,6 +6,7 @@ namespace SqlInterpol.Dialects;
 public abstract class SqlDialectBase : ISqlDialect
 {
     // Specific dialects define these symbols
+    public abstract SqlDialectKind Kind { get; }
     public abstract string OpenQuote { get; }
     public abstract string CloseQuote { get; }
     public abstract string ParameterPrefix { get; }

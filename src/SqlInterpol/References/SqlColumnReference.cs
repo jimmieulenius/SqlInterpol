@@ -1,13 +1,11 @@
-using System.Linq.Expressions;
 using SqlInterpol.Config;
-using SqlInterpol.Parsing;
 
 namespace SqlInterpol.References;
 
-public class SqlColumnReference(ISqlReference sourceReference, LambdaExpression expression) : SqlColumnBase(sourceReference)
+public class SqlColumnReference(ISqlReference sourceReference, string columnName) 
+    : SqlColumnReferenceBase(sourceReference)
 {
-    private readonly LambdaExpression _expression = expression;
+    private readonly string _columnName = columnName;
 
-    protected override string GetColumnName(SqlContext context) 
-        => SqlExpressionHelper.GetMemberName(_expression);
+    protected override string GetColumnName(SqlContext context) => _columnName;
 }

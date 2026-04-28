@@ -2,6 +2,7 @@ namespace SqlInterpol.Config;
 
 public interface ISqlDialect
 {    
+    SqlDialectKind Kind { get; }
     string OpenQuote { get; }
     string CloseQuote { get; }
     string ParameterPrefix { get; }

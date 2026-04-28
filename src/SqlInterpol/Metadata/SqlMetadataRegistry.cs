@@ -1,36 +1,76 @@
 using System.Collections.Concurrent;
+using System.Linq.Expressions;
 using System.Reflection;
+using SqlInterpol.Parsing;
 
 namespace SqlInterpol.Metadata;
 
-internal static class SqlMetadataRegistry
+public static class SqlMetadataRegistry
 {
-    private static readonly ConcurrentDictionary<Type, SqlTableMetadata> _cache = new();
-
-    public static SqlTableMetadata GetMetadata<T>()
+    // The "Golden" Cache: One static field per type T. 
+    // This is the fastest possible way to store data per-type in .NET.
+    private static class Cache<T>
     {
-        return _cache.GetOrAdd(typeof(T), type =>
+        public static readonly EntityMetadata Metadata = InitializeMetadata(typeof(T));
+    }
+
+    public static EntityMetadata GetMetadata<T>() => Cache<T>.Metadata;
+
+    private static EntityMetadata InitializeMetadata(Type type)
+    {
+        var tableAttr = type.GetCustomAttribute<SqlTableAttribute>();
+        
+        string name = tableAttr?.Name ?? type.Name;
+        string? schema = tableAttr?.Schema;
+
+        // Discover all properties with [Column] attribute or use naming convention
+        var columns = type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .ToDictionary(
+                p => (MemberInfo)p,
+                p => p.GetCustomAttribute<SqlColumnAttribute>()?.Name ?? p.Name
+            );
+
+        return new EntityMetadata(name, schema, columns);
+    }
+
+    // Resolves p[x => x.Name] to "[Name]"
+    // Inside SqlMetadataRegistry.cs
+    public static string GetColumnName<T>(Expression<Func<T, object>> propertySelector)
+    {
+        // Use your helper to get the MemberInfo
+        var member = SqlExpressionHelper.GetMember(propertySelector);
+        var meta = GetMetadata<T>();
+
+        // Support for [SqlColumn("custom_name")]
+        if (meta.Columns.TryGetValue(member, out var columnName))
         {
-            var tableAttr = type.GetCustomAttribute<SqlTableAttribute>();
-            string name = tableAttr?.Name ?? type.Name;
-            string? schema = tableAttr?.Schema;
+            return columnName;
+        }
 
-            // Ensure we filter for non-null attribute names and cast to non-nullable string
-            var columnOverrides = type.GetProperties()
-                .Select(p => new { p.Name, Attr = p.GetCustomAttribute<SqlColumnAttribute>() })
-                .Where(x => x.Attr != null && !string.IsNullOrEmpty(x.Attr.Name))
-                .ToDictionary(
-                    x => x.Name, 
-                    x => x.Attr!.Name! // The ! tells the compiler we know these aren't null
-                );
+        throw new ArgumentException($"Property '{member.Name}' not found on {typeof(T).Name}");
+    }
 
-            return new SqlTableMetadata(name, schema, columnOverrides);
-        });
+    private static MemberInfo GetMemberInfo(LambdaExpression expression)
+    {
+        Expression body = expression.Body;
+
+        // Handle boxing for value types: Convert(x.Id, Object)
+        if (body is UnaryExpression unary && unary.NodeType == ExpressionType.Convert)
+        {
+            body = unary.Operand;
+        }
+
+        if (body is MemberExpression member)
+        {
+            return member.Member;
+        }
+
+        throw new ArgumentException("Expression must be a simple property access (e.g., x => x.Name).");
     }
 }
 
-internal record SqlTableMetadata(
+public record EntityMetadata(
     string Name, 
     string? Schema, 
-    Dictionary<string, string> ColumnOverrides
+    IReadOnlyDictionary<MemberInfo, string> Columns
 );

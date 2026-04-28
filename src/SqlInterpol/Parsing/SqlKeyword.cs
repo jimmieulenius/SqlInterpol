@@ -71,6 +71,10 @@ public sealed class SqlKeyword
         Not, In, Exists, Is, Null
     ];
 
+    public static readonly SqlKeyword[] AllInitiatorsOrdered = [.. AllKeywords
+        .Where(k => k.IsClauseInitiator)
+        .OrderByDescending(k => k.Value.Length)];
+
     public static implicit operator string(SqlKeyword keyword) => keyword.Value;
     public override string ToString() => Value;
 }

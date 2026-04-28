@@ -2,7 +2,7 @@ using SqlInterpol.Config;
 
 namespace SqlInterpol.References;
 
-public class SqlRawColumnReference : SqlColumnBase
+public class SqlRawColumnReference : SqlColumnReferenceBase
 {
     private readonly string _columnName;
 
