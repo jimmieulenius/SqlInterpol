@@ -1,8 +1,10 @@
-using SqlInterpol.Attributes;
+
+
+using SqlInterpol.Metadata;
 
 namespace SqlInterpol.Test.Models;
 
-[SqlTable(schemaName: "dbo")]
+[SqlTable(schema: "dbo")]
 public class Product
 {
     /// <summary>Product item number (SKU)</summary>

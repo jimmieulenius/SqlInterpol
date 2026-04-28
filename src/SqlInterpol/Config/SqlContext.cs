@@ -1,13 +1,15 @@
-using SqlInterpol.Dialects;
-
 namespace SqlInterpol.Config;
 
-public readonly struct SqlContext(SqlInterpolOptions options, ISqlDialect? dialect = null)
+public class SqlContext
 {
-    public SqlInterpolOptions Options { get; } = options ?? new SqlInterpolOptions()
+    public ISqlDialect Dialect { get; }
+    public SqlInterpolOptions Options { get; }
+    public Dictionary<string, object?> Parameters { get; } = new();
+
+    // The context is now a passive recipient of the dialect
+    public SqlContext(ISqlDialect dialect, SqlInterpolOptions options)
     {
-        IndentSize = 2
-    };
-    public ISqlDialect Dialect { get; } = dialect ?? new SqlServerSqlDialect();
-    public Dictionary<string, object?> Parameters { get; } = [];
+        Dialect = dialect;
+        Options = options;
+    }
 }

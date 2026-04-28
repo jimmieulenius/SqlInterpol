@@ -5,14 +5,14 @@ namespace SqlInterpol.Metadata;
 
 internal static class SqlMetadataRegistry
 {
-    private static readonly ConcurrentDictionary<Type, TableMetadata> _cache = new();
+    private static readonly ConcurrentDictionary<Type, SqlTableMetadata> _cache = new();
 
-    public static TableMetadata GetMetadata<T>()
+    public static SqlTableMetadata GetMetadata<T>()
     {
         return _cache.GetOrAdd(typeof(T), type =>
         {
             var tableAttr = type.GetCustomAttribute<SqlTableAttribute>();
-            string tableName = tableAttr?.Name ?? (type.Name + "s");
+            string name = tableAttr?.Name ?? type.Name;
             string? schema = tableAttr?.Schema;
 
             // Ensure we filter for non-null attribute names and cast to non-nullable string
@@ -24,13 +24,13 @@ internal static class SqlMetadataRegistry
                     x => x.Attr!.Name! // The ! tells the compiler we know these aren't null
                 );
 
-            return new TableMetadata(tableName, schema, columnOverrides);
+            return new SqlTableMetadata(name, schema, columnOverrides);
         });
     }
 }
 
-internal record TableMetadata(
-    string TableName, 
+internal record SqlTableMetadata(
+    string Name, 
     string? Schema, 
     Dictionary<string, string> ColumnOverrides
 );

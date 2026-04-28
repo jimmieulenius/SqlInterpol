@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using SqlInterpol.Config;
 using SqlInterpol.Parsing;
 
@@ -20,17 +19,17 @@ public abstract class SqlDialectBase : ISqlDialect
         }
 
         var trimmed = name.Trim();
-        // Use regex to check if already quoted
-        var open = Regex.Escape(OpenQuote);
-        var close = Regex.Escape(CloseQuote);
-        var pattern = $@"^\s*{open}.*{close}\s*$";
 
-        if (Regex.IsMatch(trimmed, pattern))
+        // If the string is too short to be quoted (e.g., "[A]"), or 
+        // it doesn't start/end with the dialect's quotes, add them.
+        if (trimmed.Length < 2 || 
+            !trimmed.StartsWith(OpenQuote) || 
+            !trimmed.EndsWith(CloseQuote))
         {
-            return trimmed;
+            return $"{OpenQuote}{trimmed}{CloseQuote}";
         }
 
-        return $"{OpenQuote}{trimmed}{CloseQuote}";
+        return trimmed;
     }
 
     public virtual string QuoteTableName(string table, string? schema = null)
