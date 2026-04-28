@@ -9,7 +9,8 @@ namespace SqlInterpol;
 
 public class SqlBuilder
 {
-    private readonly StringBuilder _sql = new();
+    // private readonly StringBuilder _sql = new();
+    private readonly List<SqlSegment> _allSegments = new();
     
     public SqlContext Context { get; }
 
@@ -42,31 +43,114 @@ public class SqlBuilder
     public static SqlBuilder ForDialect<T>(SqlInterpolOptions? opt = null) where T : ISqlDialect, new()
         => new(new T(), opt);
 
-    // Interpolated Version (The magic happens here)
-    public SqlBuilder Append([InterpolatedStringHandlerArgument("")] ref SqlQueryInterpolatedStringHandler handler)
+    public SqlBuilder Append(string? value)
     {
-        _sql.Append(handler.GetBuiltSql());
+        if (string.IsNullOrEmpty(value))
+        {
+            return this;
+        }
+
+        SqlParser.ProcessLiteral(Context, value.AsSpan());
+        
+        _allSegments.Add(new SqlSegment(SegmentType.Literal, value));
+
         return this;
     }
+
+    public SqlBuilder Append([InterpolatedStringHandlerArgument("")] ref SqlQueryInterpolatedStringHandler handler)
+    {
+        handler.TransferSegments(_allSegments);
+
+        return this;
+    }
+
+    public SqlBuilder AppendLine() 
+        => Append(Environment.NewLine);
+
+    public SqlBuilder AppendLine(string? value) 
+        => Append(value).AppendLine();
 
     public SqlBuilder AppendLine([InterpolatedStringHandlerArgument("")] ref SqlQueryInterpolatedStringHandler handler)
     {
-        _sql.Append(handler.GetBuiltSql());
-        _sql.AppendLine();
-        return this;
+        Append(ref handler);
+    
+        return AppendLine();
     }
+
+    // public SqlBuilder Append([InterpolatedStringHandlerArgument("")] ref SqlQueryInterpolatedStringHandler handler)
+    // {
+    //     handler.TransferSegments(_allSegments);
+
+    //     return this;
+    // }
+
+    // Interpolated Version (The magic happens here)
+    // public SqlBuilder Append([InterpolatedStringHandlerArgument("")] ref SqlQueryInterpolatedStringHandler handler)
+    // {
+    //     _sql.Append(handler.GetBuiltSql());
+    //     return this;
+    // }
+
+    // public SqlBuilder AppendLine([InterpolatedStringHandlerArgument("")] ref SqlQueryInterpolatedStringHandler handler)
+    // {
+    //     _sql.Append(handler.GetBuiltSql());
+    //     _sql.AppendLine();
+    //     return this;
+    // }
 
     // Raw String Version (For comments or non-parameterized SQL)
-    public SqlBuilder Append(string rawSql)
+    // public SqlBuilder Append(string rawSql)
+    // {
+    //     _sql.Append(rawSql);
+    //     return this;
+    // }
+
+    // public SqlBuilder AppendLine(string rawSql)
+    // {
+    //     _sql.AppendLine(rawSql);
+    //     return this;
+    // }
+
+    public SqlQueryResult Build()
     {
-        _sql.Append(rawSql);
-        return this;
+        var vsb = new ValueStringBuilder(stackalloc char[1024]);
+
+        try
+        {
+            foreach (var segment in _allSegments)
+            {
+                RenderSegment(ref vsb, segment);
+            }
+
+            return new SqlQueryResult(vsb.ToString(), Context.Parameters);
+        }
+        finally
+        {
+            vsb.Dispose();
+        }
     }
 
-    public SqlBuilder AppendLine(string rawSql)
+    private void RenderSegment(ref ValueStringBuilder vsb, SqlSegment segment)
     {
-        _sql.AppendLine(rawSql);
-        return this;
+        switch (segment.Type)
+        {
+            case SegmentType.Literal:
+                vsb.Append((string)segment.Value!);
+                break;
+            case SegmentType.Projection:
+                var proj = (ISqlProjection)segment.Value!;
+                vsb.Append(segment.Context?.ExpectsDeclaration == true 
+                    ? proj.Declaration.ToSql(Context) 
+                    : proj.Reference.ToSql(Context));
+                break;
+            case SegmentType.Reference:
+                vsb.Append(((ISqlReference)segment.Value!).ToSql(Context));
+                break;
+            case SegmentType.Parameter:
+                vsb.Append(Context.Dialect.ParameterPrefix);
+                vsb.Append((string)segment.Value!);
+                break;
+        }
     }
 
     internal SqlEntity<T> CreateEntity<T>()
@@ -77,6 +161,4 @@ public class SqlBuilder
         // For now, we default to the Table implementation.
         return new SqlTable<T>(meta.Name, meta.Schema);
     }
-
-    public SqlQueryResult Build() => new(_sql.ToString(), Parameters);
 }

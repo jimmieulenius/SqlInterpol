@@ -17,10 +17,15 @@ public class SqlGenerationTests
     [MemberData(nameof(Select_From_Data))]
     public void Select_From(SqlBuilder db, string expectedSql)
     {
+        // Arrange
         var (_, p) = db.Entities<Product>();
-        db.Append($@"SELECT {p[x => x.ProductName]} FROM {p}");
         
-        Assert.Equal(expectedSql, db.Build().Sql);
+        // Act
+        db.Append($@"SELECT {p[x => x.ProductName]} FROM {p}");
+        var actualSql = db.Build().Sql;
+        
+        // Assert
+        Assert.Equal(expectedSql, actualSql);
     }
 
     #endregion
@@ -37,10 +42,15 @@ public class SqlGenerationTests
     [MemberData(nameof(Select_From_As_Data))]
     public void Select_From_As(SqlBuilder db, string expectedSql)
     {
+        // Arrange
         var (_, p) = db.Entities<Product>();
+
+        // Act
         db.Append($@"SELECT {p[x => x.ProductName]} FROM {p} AS prod");
-        
-        Assert.Equal(expectedSql, db.Build().Sql);
+        var actualSql = db.Build().Sql;
+
+        // Assert
+        Assert.Equal(expectedSql, actualSql);
     }
 
     #endregion
@@ -51,20 +61,25 @@ public class SqlGenerationTests
     {
         yield return new object[] { 
             SqlBuilder.SqlServer(), 
-            "SELECT p.[Name], c.[Name] FROM [dbo].[Products] AS p JOIN [dbo].[Categories] AS c ON p.[CategoryId] = c.[Id]" 
+            "SELECT [p].[Name], [c].[Name] FROM [dbo].[Products] AS p JOIN [Category] AS c ON [p].[CategoryId] = [c].[Id]" 
         };
     }
 
-    // [Theory]
-    // [MemberData(nameof(Select_From_Join_Data))]
-    // public void Select_From_Join(SqlBuilder db, string expectedSql)
-    // {
-    //     var (_, p, c) = db.Entities<Product, Category>();
-    //     db.Append($@"SELECT {p[x => x.ProductName]}, {c[x => x.CategoryName]} ")
-    //       .Append($@"FROM {p} AS p JOIN {c} AS c ON {p[x => x.CategoryId]} = {c[x => x.Id]}");
-        
-    //     Assert.Equal(expectedSql, db.Build().Sql);
-    // }
+    [Theory]
+    [MemberData(nameof(Select_From_Join_Data))]
+    public void Select_From_Join(SqlBuilder db, string expectedSql)
+    {
+        // Arrange
+        var (_, p, c) = db.Entities<Product, Category>();
+
+        // Act
+        db.Append($@"SELECT {p[x => x.ProductName]}, {c[x => x.Name]} ")
+          .Append($@"FROM {p} AS p JOIN {c} AS c ON {p[x => x.CategoryId]} = {c[x => x.Id]}");
+        var actualSql = db.Build().Sql;
+
+        // Assert
+        Assert.Equal(expectedSql, actualSql);
+    }
 
     #endregion
 }
