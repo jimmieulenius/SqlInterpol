@@ -5,10 +5,8 @@ namespace SqlInterpol;
 
 public static partial class SqlBuilderExtensions
 {
-    extension (SqlBuilder b)
+    extension (SqlBuilder _)
     {
-        
-
         public static SqlBuilder PostgreSql(SqlInterpolOptions? opt = null) 
             => new(new PostgreSqlSqlDialect(), opt);
 
