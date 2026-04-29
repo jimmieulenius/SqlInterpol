@@ -1,6 +1,6 @@
-namespace SqlInterpol.Parsing;
+namespace SqlInterpol;
 
-public enum SegmentType
+public enum SqlSegmentType
 {
     Literal,
     Projection,

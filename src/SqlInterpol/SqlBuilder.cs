@@ -30,7 +30,7 @@ public class SqlBuilder
 
         SqlParser.ProcessLiteral(Context, value.AsSpan());
         
-        _segments.Add(new SqlSegment(SegmentType.Literal, value));
+        _segments.Add(new SqlSegment(SqlSegmentType.Literal, value));
 
         return this;
     }
@@ -78,19 +78,19 @@ public class SqlBuilder
     {
         switch (segment.Type)
         {
-            case SegmentType.Literal:
+            case SqlSegmentType.Literal:
                 vsb.Append((string)segment.Value!);
                 break;
-            case SegmentType.Projection:
+            case SqlSegmentType.Projection:
                 var proj = (ISqlProjection)segment.Value!;
                 vsb.Append(segment.Context?.ExpectsDeclaration == true 
                     ? proj.Declaration.ToSql(Context) 
                     : proj.Reference.ToSql(Context));
                 break;
-            case SegmentType.Reference:
+            case SqlSegmentType.Reference:
                 vsb.Append(((ISqlReference)segment.Value!).ToSql(Context));
                 break;
-            case SegmentType.Parameter:
+            case SqlSegmentType.Parameter:
                 vsb.Append(Context.Dialect.ParameterPrefix);
                 vsb.Append((string)segment.Value!);
                 break;

@@ -33,7 +33,7 @@ public ref struct SqlQueryInterpolatedStringHandler
         }
 
         SqlParser.ProcessLiteral(_context, value.AsSpan());
-        AddSegment(new SqlSegment(SegmentType.Literal, value));
+        AddSegment(new SqlSegment(SqlSegmentType.Literal, value));
     }
 
     public void AppendFormatted(object? value)
@@ -51,57 +51,6 @@ public ref struct SqlQueryInterpolatedStringHandler
 
         _segments[_segmentCount++] = segment;
     }
-
-    // public void AppendLiteral(string value)
-    // {
-    //     if (string.IsNullOrEmpty(value))
-    //     {
-    //         return;
-    //     }
-
-    //     // 1. Analyze for metadata using the shared state in _context
-    //     SqlParser.ProcessLiteral(_context, value.AsSpan());
-
-    //     // 2. Add as a literal segment
-    //     AddSegment(new SqlSegment(SegmentType.Literal, value));
-    // }
-
-    // public void AppendFormatted(object? value)
-    // {
-    //     switch (value)
-    //     {
-    //         case ISqlProjection projection:
-    //             _context.State.PendingAliasCapture = projection; 
-    //             AddSegment(new SqlSegment(SegmentType.Projection, projection, _context.State.CurrentKeyword));
-    //             break;
-                
-    //         case ISqlReference reference:
-    //             AddSegment(new SqlSegment(SegmentType.Reference, reference));
-    //             break;
-                
-    //         case ISqlFragment fragment:
-    //             AddSegment(new SqlSegment(SegmentType.Fragment, fragment));
-    //             break;
-                
-    //         default:
-    //             HandleParameter(value);
-    //             break;
-    //     }
-    // }
-
-    // private void HandleParameter(object? value)
-    // {
-    //     // Use the persistent parameter count from the context
-    //     string paramKey = $"p{_context.State.ParameterCount++}";
-    //     _context.Parameters[paramKey] = value ?? DBNull.Value;
-    //     AddSegment(new SqlSegment(SegmentType.Parameter, paramKey));
-    // }
-
-    // private void AddSegment(SqlSegment segment)
-    // {
-    //     if (_segmentCount >= _segments.Length) GrowBuffer();
-    //     _segments[_segmentCount++] = segment;
-    // }
 
     private void GrowBuffer()
     {

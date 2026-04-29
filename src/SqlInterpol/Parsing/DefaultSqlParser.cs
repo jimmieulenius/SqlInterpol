@@ -75,13 +75,13 @@ public class DefaultSqlParser : ISqlParser
             case ISqlProjection projection:
                 // Parser manages the alias sniffing state
                 context.State.PendingAliasCapture = projection; 
-                return new SqlSegment(SegmentType.Projection, projection, context.State.CurrentKeyword);
+                return new SqlSegment(SqlSegmentType.Projection, projection, context.State.CurrentKeyword);
 
             case ISqlReference reference:
-                return new SqlSegment(SegmentType.Reference, reference);
+                return new SqlSegment(SqlSegmentType.Reference, reference);
 
             case ISqlFragment fragment:
-                return new SqlSegment(SegmentType.Fragment, fragment);
+                return new SqlSegment(SqlSegmentType.Fragment, fragment);
 
             case string s:
                 return CreateParameter(context, s);
@@ -95,8 +95,8 @@ public class DefaultSqlParser : ISqlParser
     {
         string paramKey = $"p{context.State.ParameterCount++}";
         context.Parameters[paramKey] = value ?? DBNull.Value;
-        
-        return new SqlSegment(SegmentType.Parameter, paramKey);
+
+        return new SqlSegment(SqlSegmentType.Parameter, paramKey);
     }
 
     protected virtual bool TryCaptureAlias(ReadOnlySpan<char> span, out string? alias, out int consumed)

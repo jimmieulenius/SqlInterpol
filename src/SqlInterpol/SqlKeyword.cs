@@ -1,4 +1,4 @@
-namespace SqlInterpol.Parsing;
+namespace SqlInterpol;
 
 public sealed class SqlKeyword
 {

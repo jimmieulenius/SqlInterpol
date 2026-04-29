@@ -1,15 +1,16 @@
 using System.Runtime.InteropServices;
+using SqlInterpol.Parsing;
 
-namespace SqlInterpol.Parsing;
+namespace SqlInterpol;
 
 [StructLayout(LayoutKind.Auto)]
 public readonly struct SqlSegment
 {
-    public readonly SegmentType Type;
+    public readonly SqlSegmentType Type;
     public readonly object? Value;
     public readonly SqlKeyword? Context;
 
-    public SqlSegment(SegmentType type, object? value, SqlKeyword? context = null)
+    public SqlSegment(SqlSegmentType type, object? value, SqlKeyword? context = null)
     {
         Type = type;
         Value = value;
