@@ -12,7 +12,7 @@ public ref struct SqlQueryInterpolatedStringHandler
     private int _segmentCount;
     private SqlSegment[] _arrayToReturn;
 
-    public int SegmentCount => _segmentCount;
+    public readonly int SegmentCount => _segmentCount;
 
     public SqlQueryInterpolatedStringHandler(int literalLength, int formattedCount, SqlBuilder builder, out bool shouldAppend)
     {
