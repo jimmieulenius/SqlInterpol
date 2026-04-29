@@ -1,12 +1,12 @@
 namespace SqlInterpol.Config;
 
+public delegate ISqlParser SqlParserFactory(IServiceProvider serviceProvider);
+
 public class SqlInterpolOptions
 {
     public SqlDialectKind Dialect { get; set; } = SqlDialectKind.SqlServer;
 
-    public bool UsePositionalParameters { get; set; } = false;
-
-    public int IndentSize { get; set; } = 2;
+    public SqlParserFactory? ParserFactory { get; set; }
 
     public static SqlInterpolOptions Default => new();
 }
