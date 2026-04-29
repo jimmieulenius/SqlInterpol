@@ -5,26 +5,36 @@ namespace SqlInterpol;
 
 public static partial class SqlBuilderExtensions
 {
+    private static readonly PostgreSqlSqlDialect _postgreSql = new();
+    private static readonly MySqlSqlDialect _mySql = new();
+    private static readonly OracleSqlDialect _oracle = new();
+    private static readonly SqLiteSqlDialect _sqLite = new();
+    private static readonly SqlServerSqlDialect _sqlServer = new();
+
+    private static class DialectCache<T> where T : ISqlDialect, new()
+    {
+        public static readonly T Instance = new();
+    }
+
     extension (SqlBuilder _)
     {
         public static SqlBuilder PostgreSql(SqlInterpolOptions? opt = null) 
-            => new(new PostgreSqlSqlDialect(), opt);
+            => new(_postgreSql, opt);
 
         public static SqlBuilder MySql(SqlInterpolOptions? opt = null) 
-            => new(new MySqlSqlDialect(), opt);
+            => new(_mySql, opt);
 
         public static SqlBuilder Oracle(SqlInterpolOptions? opt = null) 
-            => new(new OracleSqlDialect(), opt);
+            => new(_oracle, opt);
 
         public static SqlBuilder SqLite(SqlInterpolOptions? opt = null) 
-            => new(new SqLiteSqlDialect(), opt);
+            => new(_sqLite, opt);
 
         public static SqlBuilder SqlServer(SqlInterpolOptions? opt = null) 
-            => new(new SqlServerSqlDialect(), opt);
+            => new(_sqlServer, opt);
 
-        // Generic fallback for any custom dialect
         public static SqlBuilder ForDialect<TDialect>(SqlInterpolOptions? opt = null) 
             where TDialect : ISqlDialect, new()
-            => new(new TDialect(), opt);
+            => new(DialectCache<TDialect>.Instance, opt);
     }
 }
