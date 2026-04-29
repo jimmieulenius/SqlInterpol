@@ -68,6 +68,37 @@ public class DefaultSqlParser : ISqlParser
         }
     }
 
+    public virtual SqlSegment ProcessValue(SqlContext context, object? value)
+    {
+        switch (value)
+        {
+            case ISqlProjection projection:
+                // Parser manages the alias sniffing state
+                context.State.PendingAliasCapture = projection; 
+                return new SqlSegment(SegmentType.Projection, projection, context.State.CurrentKeyword);
+
+            case ISqlReference reference:
+                return new SqlSegment(SegmentType.Reference, reference);
+
+            case ISqlFragment fragment:
+                return new SqlSegment(SegmentType.Fragment, fragment);
+
+            case string s:
+                return CreateParameter(context, s);
+
+            default:
+                return CreateParameter(context, value);
+        }
+    }
+
+    protected virtual SqlSegment CreateParameter(SqlContext context, object? value)
+    {
+        string paramKey = $"p{context.State.ParameterCount++}";
+        context.Parameters[paramKey] = value ?? DBNull.Value;
+        
+        return new SqlSegment(SegmentType.Parameter, paramKey);
+    }
+
     protected virtual bool TryCaptureAlias(ReadOnlySpan<char> span, out string? alias, out int consumed)
     {
         alias = null;
@@ -95,10 +126,15 @@ public class DefaultSqlParser : ISqlParser
         if (end > 0)
         {
             var token = current[..end].ToString();
-            if (IsSqlKeyword(token)) return false;
+
+            if (IsSqlKeyword(token))
+            {
+                return false;
+            }
 
             alias = token;
             consumed = span.Length - current[end..].Length;
+
             return true;
         }
 
@@ -108,8 +144,14 @@ public class DefaultSqlParser : ISqlParser
     protected virtual bool IsCaptureTerminated(ReadOnlySpan<char> span)
     {
         var current = span;
-        if (!SkipWhitespaceAndComments(ref current)) return false;
+
+        if (!SkipWhitespaceAndComments(ref current))
+        {
+            return false;
+        }
+
         char c = current[0];
+
         return c == ',' || c == ')' || c == ';' || c == '(';
     }
 
@@ -117,15 +159,22 @@ public class DefaultSqlParser : ISqlParser
     {
         while (span.Length > 0)
         {
-            if (char.IsWhiteSpace(span[0])) { span = span[1..]; continue; }
+            if (char.IsWhiteSpace(span[0]))
+            {
+                span = span[1..];
+                continue;
+            }
+
             if (span.StartsWith("--"))
             {
                 int nl = span.IndexOfAny('\r', '\n');
                 span = nl == -1 ? ReadOnlySpan<char>.Empty : span[nl..];
                 continue;
             }
+
             break;
         }
+
         return span.Length > 0;
     }
 
