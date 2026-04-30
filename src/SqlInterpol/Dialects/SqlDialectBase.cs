@@ -60,4 +60,6 @@ public abstract class SqlDialectBase : ISqlDialect
 
         return $"{source} {SqlKeyword.As.Value} {QuoteIdentifier(alias)}";
     }
+
+    public virtual SqlInterpolOptions GetDefaultOptions() => new();
 }

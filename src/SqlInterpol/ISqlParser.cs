@@ -1,6 +1,6 @@
-using SqlInterpol.Parsing;
+using SqlInterpol.Config;
 
-namespace SqlInterpol.Config;
+namespace SqlInterpol;
 
 public interface ISqlParser
 {

@@ -14,4 +14,6 @@ public interface ISqlDialect
     string GetParameterName(int index);
 
     string ApplyAlias(string source, string? alias = null);
+
+    SqlInterpolOptions GetDefaultOptions() => new();
 }

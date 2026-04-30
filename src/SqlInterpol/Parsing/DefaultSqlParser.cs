@@ -93,9 +93,17 @@ public class DefaultSqlParser : ISqlParser
 
     protected virtual SqlSegment CreateParameter(SqlContext context, object? value)
     {
-        string paramKey = $"p{context.State.ParameterCount++}";
+        // Calculate index based on the starting offset
+        int index = context.Options.ParameterIndexStart + context.State.ParameterCount;
+        
+        // Use the override if present, otherwise the Dialect's prefix
+        string prefix = context.Options.ParameterPrefixOverride ?? context.Dialect.ParameterPrefix;
+        
+        string paramKey = $"{prefix}{index}";
+        
         context.Parameters[paramKey] = value ?? DBNull.Value;
-
+        context.State.ParameterCount++;
+        
         return new SqlSegment(SqlSegmentType.Parameter, paramKey);
     }
 

@@ -16,9 +16,13 @@ public class SqlBuilder
 
     public SqlBuilder(ISqlDialect dialect, SqlInterpolOptions? options = null)
     {
-        options ??= SqlInterpolOptions.Default;
-        options.Dialect = dialect.Kind; // Ensure the options know which dialect we're using
-        Context = new SqlContext(dialect, options);
+        // Start with defaults if null, otherwise start with user provided options
+        var baseOptions = options ?? SqlInterpolOptions.GetDefault(dialect);
+
+        // 2. Use 'with' to create a new record instance with the mandatory Dialect sync.
+        // This is thread-safe and ensures the user's original object is untouched.
+        var finalOptions = baseOptions with { Dialect = dialect.Kind };
+        Context = new SqlContext(dialect, finalOptions);
     }
 
     public SqlBuilder Append(string? value)
