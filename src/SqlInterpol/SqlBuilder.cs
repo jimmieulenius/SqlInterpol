@@ -87,7 +87,7 @@ public class SqlBuilder
                 break;
             case SqlSegmentType.Projection:
                 var proj = (ISqlProjection)segment.Value!;
-                vsb.Append(segment.Context?.ExpectsDeclaration == true 
+                vsb.Append(segment.Keyword?.ExpectsDeclaration == true 
                     ? proj.Declaration.ToSql(Context) 
                     : proj.Reference.ToSql(Context));
                 break;
@@ -95,7 +95,9 @@ public class SqlBuilder
                 vsb.Append(((ISqlReference)segment.Value!).ToSql(Context));
                 break;
             case SqlSegmentType.Parameter:
-                vsb.Append(Context.Dialect.ParameterPrefix);
+                vsb.Append((string)segment.Value!);
+                break;
+            case SqlSegmentType.Raw:
                 vsb.Append((string)segment.Value!);
                 break;
         }

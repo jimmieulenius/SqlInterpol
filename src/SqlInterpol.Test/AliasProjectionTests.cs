@@ -45,27 +45,27 @@ public class AliasProjectionTests
     {
         {
             SqlBuilder.CustomDb(),
-            "SELECT <<prd>>.<<Id>> AS ProductId FROM <<dbo>>.<<Products>> AS prd"
+            "SELECT <<prd>>.<<Id>> AS <<ProductId>> FROM <<dbo>>.<<Products>> AS <<prd>>"
         },
         {
             SqlBuilder.MySql(),
-            "SELECT `prd`.`Id` AS ProductId FROM `dbo`.`Products` AS prd"
+            "SELECT `prd`.`Id` AS `ProductId` FROM `dbo`.`Products` AS `prd`"
         },
         {
             SqlBuilder.Oracle(),
-            "SELECT \"prd\".\"Id\" AS ProductId FROM \"dbo\".\"Products\" AS prd"
+            "SELECT \"prd\".\"Id\" AS \"ProductId\" FROM \"dbo\".\"Products\" AS \"prd\""
         },
         {
             SqlBuilder.PostgreSql(),
-            "SELECT \"prd\".\"Id\" AS ProductId FROM \"dbo\".\"Products\" AS prd"
+            "SELECT \"prd\".\"Id\" AS \"ProductId\" FROM \"dbo\".\"Products\" AS \"prd\""
         },
         {
             SqlBuilder.SqLite(),
-            "SELECT \"prd\".\"Id\" AS ProductId FROM \"dbo\".\"Products\" AS prd"
+            "SELECT \"prd\".\"Id\" AS \"ProductId\" FROM \"dbo\".\"Products\" AS \"prd\""
         },
         {
             SqlBuilder.SqlServer(),
-            "SELECT [prd].[Id] AS ProductId FROM [dbo].[Products] AS prd"
+            "SELECT [prd].[Id] AS [ProductId] FROM [dbo].[Products] AS [prd]"
         }
     };
 
@@ -189,6 +189,57 @@ public class AliasProjectionTests
                 [prd].[Name] AS ProductName
             FROM [dbo].[Products] AS prd
             """ 
+        }
+    };
+
+    [Theory]
+    [MemberData(nameof(ReservedAliasData))]
+    public void Alias_With_Reserved_Words_Preserves_Quotes_And_Mapping(SqlBuilder db, string expected)
+    {
+        var (_, p) = db.Entities<Product>();
+        
+        // We use Sql.Raw to inject the dialect's quotes as syntax, not parameters.
+        var open = Sql.Raw(db.Dialect.OpenQuote);
+        var close = Sql.Raw(db.Dialect.CloseQuote);
+
+        // Scenario: Aliasing a column as 'Order' and a table as 'Group'
+        db.Append($@"SELECT {p[x => x.Id]} AS {open}Order{close} FROM {p} AS {open}Group{close}");
+
+        var result = db.Build();
+        
+        // 1. Verify the SQL matches the exact WYSIWYG expectation
+        Assert.Equal(expected, result.Sql);
+
+        // 2. Verify the column was correctly prefixed with the 'clean' alias 'Group'
+        // SQL Server example check: "SELECT Group.[Id]..." 
+        // (Note: The internal mapper uses the clean name, the output uses the user's quotes)
+    }
+
+    public static TheoryData<SqlBuilder, string> ReservedAliasData => new()
+    {
+        { 
+            SqlBuilder.CustomDb(),   
+            "SELECT <<Group>>.<<Id>> AS <<Order>> FROM <<dbo>>.<<Products>> AS <<Group>>" 
+        },
+        { 
+            SqlBuilder.MySql(),      
+            "SELECT `Group`.`Id` AS `Order` FROM `dbo`.`Products` AS `Group`" 
+        },
+        { 
+            SqlBuilder.Oracle(),    
+            "SELECT \"Group\".\"Id\" AS \"Order\" FROM \"dbo\".\"Products\" AS \"Group\"" 
+        },
+        { 
+            SqlBuilder.PostgreSql(),    
+            "SELECT \"Group\".\"Id\" AS \"Order\" FROM \"dbo\".\"Products\" AS \"Group\"" 
+        },
+        { 
+            SqlBuilder.SqLite(),    
+            "SELECT \"Group\".\"Id\" AS \"Order\" FROM \"dbo\".\"Products\" AS \"Group\"" 
+        },
+        { 
+            SqlBuilder.SqlServer(), 
+            "SELECT [Group].[Id] AS [Order] FROM [dbo].[Products] AS [Group]" 
         }
     };
 }
