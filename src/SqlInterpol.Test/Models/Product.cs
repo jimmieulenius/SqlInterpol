@@ -6,7 +6,7 @@ namespace SqlInterpol.Test.Models;
 public class Product
 {
     public int Id { get; set; }
-    [SqlColumn("Name")] 
+    // [SqlColumn("Name")] 
     public string ProductName { get; set; } = null!;
     public bool IsActive { get; set; }
     public int CategoryId { get; set; }
