@@ -32,8 +32,8 @@ public class AliasProjectionTests
     public void QuotedAlias_Append(SqlBuilder db, string expected)
     {
         var (_, p) = db.Entities<Product>();
-        var open = Sql.Raw(db.Dialect.OpenQuote);
-        var close = Sql.Raw(db.Dialect.CloseQuote);
+        var open = Sql.Raw(db.Context.Dialect.OpenQuote);
+        var close = Sql.Raw(db.Context.Dialect.CloseQuote);
         
         db.Append($"SELECT {p[x => x.Id]} AS {open}ProductId{close} FROM {p} AS {open}prd{close}");
         
@@ -141,7 +141,7 @@ public class AliasProjectionTests
             """
             SELECT 
                 <<prd>>.<<Id>> AS ProductId,
-                <<prd>>.<<Name>> AS ProductName
+                <<prd>>.<<PROD_NAME>> AS ProductName
             FROM <<dbo>>.<<Products>> AS prd
             """ 
         },
@@ -150,7 +150,7 @@ public class AliasProjectionTests
             """
             SELECT 
                 `prd`.`Id` AS ProductId,
-                `prd`.`Name` AS ProductName
+                `prd`.`PROD_NAME` AS ProductName
             FROM `dbo`.`Products` AS prd
             """ 
         },
@@ -159,7 +159,7 @@ public class AliasProjectionTests
             """
             SELECT 
                 "prd"."Id" AS ProductId,
-                "prd"."Name" AS ProductName
+                "prd"."PROD_NAME" AS ProductName
             FROM "dbo"."Products" AS prd
             """ 
         },
@@ -168,7 +168,7 @@ public class AliasProjectionTests
             """
             SELECT 
                 "prd"."Id" AS ProductId,
-                "prd"."Name" AS ProductName
+                "prd"."PROD_NAME" AS ProductName
             FROM "dbo"."Products" AS prd
             """ 
         },
@@ -177,7 +177,7 @@ public class AliasProjectionTests
             """
             SELECT 
                 "prd"."Id" AS ProductId,
-                "prd"."Name" AS ProductName
+                "prd"."PROD_NAME" AS ProductName
             FROM "dbo"."Products" AS prd
             """ 
         },
@@ -186,7 +186,7 @@ public class AliasProjectionTests
             """
             SELECT 
                 [prd].[Id] AS ProductId,
-                [prd].[Name] AS ProductName
+                [prd].[PROD_NAME] AS ProductName
             FROM [dbo].[Products] AS prd
             """ 
         }
@@ -199,8 +199,8 @@ public class AliasProjectionTests
         var (_, p) = db.Entities<Product>();
         
         // We use Sql.Raw to inject the dialect's quotes as syntax, not parameters.
-        var open = Sql.Raw(db.Dialect.OpenQuote);
-        var close = Sql.Raw(db.Dialect.CloseQuote);
+        var open = Sql.Raw(db.Context.Dialect.OpenQuote);
+        var close = Sql.Raw(db.Context.Dialect.CloseQuote);
 
         // Scenario: Aliasing a column as 'Order' and a table as 'Group'
         db.Append($@"SELECT {p[x => x.Id]} AS {open}Order{close} FROM {p} AS {open}Group{close}");
@@ -240,6 +240,130 @@ public class AliasProjectionTests
         { 
             SqlBuilder.SqlServer(), 
             "SELECT [Group].[Id] AS [Order] FROM [dbo].[Products] AS [Group]" 
+        }
+    };
+
+    [Theory]
+    [MemberData(nameof(AliasMappingIdentityData))]
+    public void Alias_Mapping_Identity(SqlBuilder db, string expected)
+    {
+        var (_, p) = db.Entities<Product>();
+
+        // Logic: Database column vs C# Property name toggling
+        db.Append($"SELECT {p[x => x.Name]} AS {p[x => x.Name]} ")
+        .Append($"FROM {p} AS {p.Alias("prd")}");
+
+        var result = db.Build();
+
+        Assert.Equal(expected, result.Sql);
+    }
+
+    public static TheoryData<SqlBuilder, string> AliasMappingIdentityData => new()
+    {
+        {
+            SqlBuilder.CustomDb(),
+            "SELECT <<prd>>.<<PROD_NAME>> AS <<Name>> FROM <<dbo>>.<<Products>> AS <<prd>>"
+        },
+        {
+            SqlBuilder.MySql(),
+            "SELECT `prd`.`PROD_NAME` AS `Name` FROM `dbo`.`Products` AS `prd`"
+        },
+        {
+            SqlBuilder.Oracle(),
+            "SELECT \"prd\".\"PROD_NAME\" AS \"Name\" FROM \"dbo\".\"Products\" AS \"prd\""
+        },
+        {
+            SqlBuilder.PostgreSql(),
+            "SELECT \"prd\".\"PROD_NAME\" AS \"Name\" FROM \"dbo\".\"Products\" AS \"prd\""
+        },
+        {
+            SqlBuilder.SqLite(),
+            "SELECT \"prd\".\"PROD_NAME\" AS \"Name\" FROM \"dbo\".\"Products\" AS \"prd\""
+        },
+        {
+            SqlBuilder.SqlServer(),
+            "SELECT [prd].[PROD_NAME] AS [Name] FROM [dbo].[Products] AS [prd]"
+        }
+    };
+
+    [Theory]
+    [MemberData(nameof(AliasMappingUnquotedData))]
+    public void Alias_Mapping_Unquoted(SqlBuilder db, string expected)
+    {
+        var (_, p) = db.Entities<Product>();
+
+        // Logic: Database column vs C# Property name toggling
+        db.Append($"SELECT {p[x => x.Name]} AS {p[x => x.Name]} ")
+        .Append($"FROM {p} AS prd");
+
+        var result = db.Build();
+
+        Assert.Equal(expected, result.Sql);
+    }
+
+    public static TheoryData<SqlBuilder, string> AliasMappingUnquotedData => new()
+    {
+        {
+            SqlBuilder.CustomDb(),
+            "SELECT <<prd>>.<<PROD_NAME>> AS <<Name>> FROM <<dbo>>.<<Products>> AS prd"
+        },
+        {
+            SqlBuilder.MySql(),
+            "SELECT `prd`.`PROD_NAME` AS `Name` FROM `dbo`.`Products` AS prd"
+        },
+        {
+            SqlBuilder.Oracle(),
+            "SELECT \"prd\".\"PROD_NAME\" AS \"Name\" FROM \"dbo\".\"Products\" AS prd"
+        },
+        {
+            SqlBuilder.PostgreSql(),
+            "SELECT \"prd\".\"PROD_NAME\" AS \"Name\" FROM \"dbo\".\"Products\" AS prd"
+        },
+        {
+            SqlBuilder.SqLite(),
+            "SELECT \"prd\".\"PROD_NAME\" AS \"Name\" FROM \"dbo\".\"Products\" AS prd"
+        },
+        {
+            SqlBuilder.SqlServer(),
+            "SELECT [prd].[PROD_NAME] AS [Name] FROM [dbo].[Products] AS prd"
+        }
+    };
+
+    [Theory]
+    [MemberData(nameof(ManualColumnData))]
+    public void Manual_Column_With_Alias_Theory(SqlBuilder db, string expected)
+    {
+        var (_, p) = db.Entities<Product>();
+
+        // Logic: Manual DB string + Metadata Property name
+        db.Append($"SELECT {p.Column("LEGACY_PROD_NAME")} AS {p[x => x.Name]} ")
+        .Append($"FROM {p} AS {p.Alias("prd")}");
+
+        var result = db.Build();
+
+        Assert.Equal(expected, result.Sql);
+    }
+
+    public static TheoryData<SqlBuilder, string> ManualColumnData => new()
+    {
+        {
+            SqlBuilder.CustomDb(),
+            "SELECT <<prd>>.<<LEGACY_PROD_NAME>> AS <<Name>> FROM <<dbo>>.<<Products>> AS <<prd>>" },
+        {
+            SqlBuilder.MySql(),
+            "SELECT `prd`.`LEGACY_PROD_NAME` AS `Name` FROM `dbo`.`Products` AS `prd`" },
+        {
+            SqlBuilder.Oracle(),
+            "SELECT \"prd\".\"LEGACY_PROD_NAME\" AS \"Name\" FROM \"dbo\".\"Products\" AS \"prd\"" },
+        {
+            SqlBuilder.PostgreSql(),
+            "SELECT \"prd\".\"LEGACY_PROD_NAME\" AS \"Name\" FROM \"dbo\".\"Products\" AS \"prd\"" },
+        {
+            SqlBuilder.SqLite(),
+            "SELECT \"prd\".\"LEGACY_PROD_NAME\" AS \"Name\" FROM \"dbo\".\"Products\" AS \"prd\"" },
+        {
+            SqlBuilder.SqlServer(),
+            "SELECT [prd].[LEGACY_PROD_NAME] AS [Name] FROM [dbo].[Products] AS [prd]"
         }
     };
 }

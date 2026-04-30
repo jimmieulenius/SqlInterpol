@@ -1,16 +1,25 @@
 using System.Linq.Expressions;
 using SqlInterpol.Config;
 using SqlInterpol.References;
+using SqlInterpol.Metadata;
 
 namespace SqlInterpol.Metadata;
 
-public abstract class SqlEntity<T> : ISqlProjection<T>
+public abstract class SqlEntity<T> : ISqlEntity<T>
 {
-    public string Name { get; }
+    // ISqlEntity implementation
+    public string Name { get; set; }
     public string? Schema { get; }
+    
+    // Internal state
     public ISqlProjection? Parent { get; }
     public ISqlReference Reference { get; protected set; }
     public ISqlDeclaration Declaration { get; protected set; }
+
+    // ISqlProjection implementation
+    // For an entity, the PropertyName is the 'Identity' in C#. 
+    // We use the Alias if set, otherwise the Table Name.
+    public string PropertyName => (Reference as EntityReference)?.Alias ?? Name;
 
     protected SqlEntity(string name, string? schema, ISqlProjection? parent = null)
     {
@@ -18,36 +27,66 @@ public abstract class SqlEntity<T> : ISqlProjection<T>
         Schema = schema;
         Parent = parent;
 
-        // Reference represents the entity in SELECT/JOIN/WHERE (p.[Name])
-        Reference = new EntityReference(this);
+        // 1. Reference acts as the 'Smart Pointer' (Alias ?? Name)
+        // We cast 'this' to ISqlEntity to pass it to the reference
+        Reference = new EntityReference(this); 
         
-        // Declaration represents the entity in FROM/JOIN ([dbo].[Products] AS p)
+        // 2. Declaration represents the source (e.g. [Schema].[Table] AS [Alias])
         Declaration = new SqlDeclaration(Reference);
     }
 
-    // 1. Strongly-Typed Indexer: table[t => t.Name]
-    // Now powered by the Registry!
+    // --- Semantic Helpers ---
+
+    public ISqlFragment Entity(string name) => new SqlEntityNameFragment(this, name);
+
+    // public ISqlFragment Column(string name) => new SqlColumnNameFragment(name);
+    public ISqlFragment Column(string dbColumnName)
+    {
+        // We return a deferred fragment
+        return new SqlRawFragment(ctx => 
+        {
+            // 1. Get the current prefix ([dbo].[Products] or [prd])
+            var prefix = Reference.ToSql(ctx);
+            
+            // 2. Quote the manual column name
+            var column = ctx.Dialect.QuoteIdentifier(dbColumnName);
+            
+            // 3. Combine them
+            return $"{prefix}.{column}";
+        });
+    }
+
+    public ISqlFragment Alias(string alias)
+    {
+        // 1. Immediately update the shared reference.
+        // This ensures any columns (rendered before or after) know their prefix.
+        Reference.Alias = alias;
+
+        // 2. Return a fragment that tells the Dialect to quote this specific string.
+        return new SqlRawFragment(ctx => ctx.Dialect.QuoteIdentifier(alias));
+    }
+
+    // --- Indexers ---
+
     public ISqlReference this[Expression<Func<T, object>> propertySelector]
     {
         get
         {
-            // Resolve the mapped column name immediately using the cached registry
+            string propertyName = SqlMetadataRegistry.GetPropertyName(propertySelector);
             string columnName = SqlMetadataRegistry.GetColumnName(propertySelector);
-            
-            // Pass the resolved string to the reference to avoid re-parsing expressions later
-            return new SqlColumnReference(Reference, columnName);
+
+            return new SqlColumnReference(
+                sourceReference: this.Reference, 
+                columnName: columnName, 
+                propertyName: propertyName
+            );
         }
     }
 
-    // 2. String-Based Indexer: table["Name"]
-    public ISqlReference this[string columnName]
-    {
-        get => new SqlRawColumnReference(Reference, columnName);
-    }
+    public ISqlReference this[string columnName] 
+        => new SqlRawColumnReference(Reference, columnName);
 
-    public virtual string ToSql(SqlContext context)
-    {
-        // Dialect handles the specific quoting (e.g., [dbo].[Products] vs "dbo"."Products")
-        return context.Dialect.QuoteTableName(Name, Schema);
-    }
+    // ISqlFragment implementation
+    public virtual string ToSql(SqlContext context) 
+        => context.Dialect.QuoteTableName(Name, Schema);
 }

@@ -2,11 +2,11 @@ using SqlInterpol.Metadata;
 
 namespace SqlInterpol.Test.Models;
 
-[SqlTable(Name = "Products", Schema = "dbo")]
+[SqlTable(name: "Products", schema: "dbo")]
 public class Product
 {
     public int Id { get; set; }
-    // [SqlColumn("Name")] 
+    [SqlColumn("PROD_NAME")]
     public string Name { get; set; } = null!;
     public bool IsActive { get; set; }
     public int CategoryId { get; set; }

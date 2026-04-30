@@ -2,7 +2,7 @@ namespace SqlInterpol;
 
 public interface ISqlReference : ISqlFragment
 {
-    ISqlProjection Source { get; }
+    ISqlEntity Source { get; }
 
     string? Alias { get; set; }
 }

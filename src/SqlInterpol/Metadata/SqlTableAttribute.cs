@@ -1,14 +1,6 @@
 namespace SqlInterpol.Metadata;
 
-[AttributeUsage(AttributeTargets.Class, Inherited = false)]
-public class SqlTableAttribute : Attribute
+public class SqlTableAttribute(string name, string? schema = null) : SqlEntityAttribute(name, schema)
 {
-    public string? Schema { get; set; }
-    public string? Name { get; set; }
-
-    public SqlTableAttribute(string? name = null, string? schema = null)
-    {
-        Name = name;
-        Schema = schema;
-    }
+    public override SqlEntityType Type => SqlEntityType.Table;
 }

@@ -2,15 +2,11 @@ using SqlInterpol.Config;
 
 namespace SqlInterpol.References;
 
-public class SqlRawColumnReference : SqlColumnReferenceBase
+public class SqlRawColumnReference(ISqlReference sourceReference, string columnName) 
+    : SqlColumnReferenceBase(sourceReference)
 {
-    private readonly string _columnName;
+    // For raw columns, the PropertyName falls back to the column name
+    public override string PropertyName => columnName;
 
-    public SqlRawColumnReference(ISqlReference sourceReference, string columnName) 
-        : base(sourceReference)
-    {
-        _columnName = columnName;
-    }
-
-    protected override string GetColumnName(SqlContext context) => _columnName;
+    protected override string GetColumnName(SqlContext context) => columnName;
 }

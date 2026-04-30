@@ -8,26 +8,30 @@ public static class SqlMetadataRegistry
 {
     private static class Cache<T>
     {
-        public static readonly EntityMetadata Metadata = InitializeMetadata(typeof(T));
+        public static readonly SqlEntityMetadata Metadata = InitializeMetadata(typeof(T));
     }
 
-    public static EntityMetadata GetMetadata<T>() => Cache<T>.Metadata;
+    public static SqlEntityMetadata GetMetadata<T>() => Cache<T>.Metadata;
 
-    private static EntityMetadata InitializeMetadata(Type type)
+    private static SqlEntityMetadata InitializeMetadata(Type type)
     {
-        var tableAttr = type.GetCustomAttribute<SqlTableAttribute>();
+        // 1. Look for the BASE attribute. 
+        // This captures [SqlTable] or [SqlView] correctly.
+        var entityAttr = type.GetCustomAttribute<SqlEntityAttribute>(inherit: true);
         
-        string name = tableAttr?.Name ?? type.Name;
-        string? schema = tableAttr?.Schema;
+        // 2. Extract properties from the attribute
+        string name = entityAttr?.Name ?? type.Name;
+        string? schema = entityAttr?.Schema; // This should now be populated
+        SqlEntityType entityType = entityAttr?.Type ?? SqlEntityType.Table;
 
-        // Discover all properties with [Column] attribute or use naming convention
+        // 3. Map columns
         var columns = type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .ToDictionary(
                 p => (MemberInfo)p,
                 p => p.GetCustomAttribute<SqlColumnAttribute>()?.Name ?? p.Name
             );
 
-        return new EntityMetadata(name, schema, columns);
+        return new SqlEntityMetadata(name, schema, entityType, columns);
     }
 
     // Resolves p[x => x.Name] to "[Name]"
@@ -45,6 +49,13 @@ public static class SqlMetadataRegistry
         }
 
         throw new ArgumentException($"Property '{member.Name}' not found on {typeof(T).Name}");
+    }
+
+    public static string GetPropertyName<T>(Expression<Func<T, object>> propertySelector)
+    {
+        var member = GetMemberInfo(propertySelector);
+
+        return member.Name;
     }
 
     private static MemberInfo GetMemberInfo(LambdaExpression expression)
@@ -66,8 +77,11 @@ public static class SqlMetadataRegistry
     }
 }
 
-public record EntityMetadata(
+public record SqlEntityMetadata(
     string Name, 
     string? Schema, 
+    SqlEntityType Type,
     IReadOnlyDictionary<MemberInfo, string> Columns
 );
+
+public enum SqlEntityType { Table, View, Subquery }

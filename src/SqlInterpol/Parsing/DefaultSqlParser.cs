@@ -1,63 +1,68 @@
 using System.Collections;
 using System.Text;
 using SqlInterpol.Config;
+using SqlInterpol.References;
 
 namespace SqlInterpol.Parsing;
 
 public class DefaultSqlParser : ISqlParser
 {
-    /// <summary>
-    /// Processes literal text from the interpolated string.
-    /// In this version, we only "peek" at the span to update state, 
-    /// ensuring the original text is preserved exactly.
-    /// </summary>
+    public SqlSegment ProcessValue(SqlContext context, object? value)
+    {
+        // 1. Highest Priority: Projections (Entities/Columns)
+        if (value is ISqlProjection projection)
+        {
+            // Set for "Time Traveler" Alias Capture
+            context.State.LastAliasableTarget = projection;
+            
+            var mode = context.State.ExpectsAliasOnly ? SqlRenderMode.AliasOnly : SqlRenderMode.Default;
+            context.State.ExpectsAliasOnly = false;
+
+            return new SqlSegment(SqlSegmentType.Projection, projection, context.State.CurrentKeyword, mode);
+        }
+
+        // 2. Collections (WHERE IN support)
+        // We exclude string because it is an IEnumerable but we want it as a parameter
+        if (value is IEnumerable collection && value is not string)
+        {
+            return HandleCollection(context, collection);
+        }
+
+        // 3. Manual Fragments
+        if (value is ISqlFragment fragment)
+        {
+            return new SqlSegment(SqlSegmentType.Raw, fragment);
+        }
+
+        // 4. Default: Standard Parameter
+        return CreateParameter(context, value);
+    }
+
     public void ProcessLiteral(SqlContext context, ReadOnlySpan<char> span)
     {
-        // 1. Alias Sniffing (Non-Destructive)
-        // If we just placed a table/projection, we look for "AS alias" here.
-        if (context.State.PendingAliasCapture != null)
+        context.State.ExpectsAliasOnly = EndsWithAsKeyword(span);
+
+        // The "Time Traveler" Capture logic
+        if (context.State.LastAliasableTarget is ISqlProjection projection)
         {
             if (TryPeekAlias(context, span, out var alias))
             {
-                // Set the clean internal alias for property prefixing
-                context.State.PendingAliasCapture.Reference.Alias = alias;
-                context.State.PendingAliasCapture = null;
+                // 1. We check if the reference is an EntityReference (the prefix owner)
+                if (projection.Reference is EntityReference entRef)
+                {
+                    entRef.Alias = alias;
+                }
+                
+                // 2. Clear the target once captured
+                context.State.LastAliasableTarget = null;
             }
             else if (IsCaptureTerminated(span))
             {
-                context.State.PendingAliasCapture = null;
+                context.State.LastAliasableTarget = null;
             }
         }
 
-        // 2. Lexical Scanning
-        // Updates keywords, comment state, and string state without modifying the span.
         UpdateScannerState(context, span);
-    }
-
-    /// <summary>
-    /// Handles the objects inside the interpolation holes {}.
-    /// </summary>
-    public virtual SqlSegment ProcessValue(SqlContext context, object? value)
-    {
-        return value switch
-        {
-            ISqlProjection proj => HandleProjection(context, proj),
-            ISqlReference refr => new SqlSegment(SqlSegmentType.Reference, refr),
-            ISqlFragment frag => new SqlSegment(SqlSegmentType.Raw, frag.ToSql(context)),
-            
-            // Collection Expansion (WHERE IN)
-            IEnumerable col when value is not string => HandleCollection(context, col),
-            
-            // Standard Parameter
-            _ => CreateParameter(context, value)
-        };
-    }
-
-    private SqlSegment HandleProjection(SqlContext context, ISqlProjection projection)
-    {
-        // Mark that the next literal might contain an alias for this projection
-        context.State.PendingAliasCapture = projection;
-        return new SqlSegment(SqlSegmentType.Projection, projection, context.State.CurrentKeyword);
     }
 
     protected virtual SqlSegment HandleCollection(SqlContext context, IEnumerable collection)
@@ -68,17 +73,14 @@ public class DefaultSqlParser : ISqlParser
         foreach (var item in collection)
         {
             if (!first) sb.Append(", ");
-            
-            // Create a parameter for each item and get its full key (e.g., @p0)
             var paramSegment = CreateParameter(context, item);
-            sb.Append(paramSegment.Value); 
-            
+            sb.Append(paramSegment.Value); // Append the param name (e.g. @p1)
             first = false;
         }
 
-        if (first) sb.Append("NULL");
+        if (first) sb.Append("NULL"); // Handle empty collections safely
 
-        // Return as Raw because the string already contains the final parameter names
+        // We return as Raw because the string now contains the parameter names
         return new SqlSegment(SqlSegmentType.Raw, sb.ToString());
     }
 
@@ -86,16 +88,71 @@ public class DefaultSqlParser : ISqlParser
     {
         int index = context.Options.ParameterIndexStart + context.State.ParameterCount;
         string prefix = context.Options.ParameterPrefixOverride ?? context.Dialect.ParameterPrefix;
-        
-        // This is the FINAL identifier (e.g. "@p0", "$1", "!!100")
         string paramKey = $"{prefix}{index}";
         
         context.Parameters[paramKey] = value ?? DBNull.Value;
         context.State.ParameterCount++;
         
-        // The Renderer should append this Value exactly as is
         return new SqlSegment(SqlSegmentType.Parameter, paramKey);
     }
+
+    private bool EndsWithAsKeyword(ReadOnlySpan<char> span)
+    {
+        var trimmed = span.TrimEnd();
+        if (trimmed.Length < 2) return false;
+        
+        // Match " AS" at the end of the string
+        if (trimmed.EndsWith("AS", StringComparison.OrdinalIgnoreCase))
+        {
+            // Must be start of string or preceded by whitespace
+            return trimmed.Length == 2 || char.IsWhiteSpace(trimmed[^(3)]);
+        }
+        return false;
+    }
+
+    private SqlSegment HandleProjection(SqlContext context, ISqlProjection projection)
+    {
+        // Mark that the next literal might contain an alias for this projection
+        context.State.PendingAliasCapture = projection;
+        return new SqlSegment(SqlSegmentType.Projection, projection, context.State.CurrentKeyword);
+    }
+
+    // protected virtual SqlSegment HandleCollection(SqlContext context, IEnumerable collection)
+    // {
+    //     var sb = new StringBuilder();
+    //     bool first = true;
+
+    //     foreach (var item in collection)
+    //     {
+    //         if (!first) sb.Append(", ");
+            
+    //         // Create a parameter for each item and get its full key (e.g., @p0)
+    //         var paramSegment = CreateParameter(context, item);
+    //         sb.Append(paramSegment.Value); 
+            
+    //         first = false;
+    //     }
+
+    //     if (first) sb.Append("NULL");
+
+    //     // Return as Raw because the string already contains the final parameter names
+    //     return new SqlSegment(SqlSegmentType.Raw, sb.ToString());
+    // }
+
+    // protected virtual SqlSegment CreateParameter(SqlContext context, object? value)
+    // {
+    //     int index = context.Options.ParameterIndexStart + context.State.ParameterCount;
+    //     string prefix = context.Options.ParameterPrefixOverride ?? context.Dialect.ParameterPrefix;
+        
+    //     // This is the FINAL identifier (e.g. "@p0", "$1", "!!100")
+    //     string paramKey = $"{prefix}{index}";
+        
+    //     context.Parameters[paramKey] = value ?? DBNull.Value;
+    //     context.State.ParameterCount++;
+        
+    //     // The Renderer should append this Value exactly as is
+    //     return new SqlSegment(SqlSegmentType.Parameter, paramKey);
+    // }
 
     protected virtual bool TryPeekAlias(SqlContext context, ReadOnlySpan<char> span, out string? alias)
     {
