@@ -6,5 +6,6 @@ public enum SqlSegmentType
     Projection,
     Reference,
     Fragment,
-    Parameter
+    Parameter,
+    Raw
 }

@@ -83,8 +83,8 @@ public class DefaultSqlParser : ISqlParser
             case ISqlFragment fragment:
                 return new SqlSegment(SqlSegmentType.Fragment, fragment);
 
-            case string s:
-                return CreateParameter(context, s);
+            // case string s:
+            //     return CreateParameter(context, s);
 
             default:
                 return CreateParameter(context, value);
