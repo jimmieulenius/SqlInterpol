@@ -44,5 +44,4 @@ public abstract class SqlColumnReferenceBase(ISqlReference sourceReference)
     
     // Explicit implementation if needed, though Reference is usually enough
     ISqlReference ISqlProjection.Reference => this;
-    ISqlDeclaration ISqlProjection.Declaration => throw new NotSupportedException("Columns do not have declarations.");
 }
