@@ -2,14 +2,10 @@ using SqlInterpol.Config;
 
 namespace SqlInterpol.References;
 
-public abstract class SqlReference(ISqlEntity parent) : ISqlReference
+public abstract class SqlReference(ISqlFragment parent) : ISqlReference
 {
-    public ISqlEntity Source { get; } = parent;
+    public ISqlFragment Source { get; } = parent;
     public string? Alias { get; set; }
 
-    // Every specific reference (Table vs Column) 
-    // must decide how its 'Pointer' looks.
     public abstract string ToSql(SqlContext context, SqlRenderMode mode = SqlRenderMode.Default);
-
-    public override string ToString() => $"[SqlFragment: {GetType().Name}]";
 }
