@@ -1,8 +1,7 @@
-using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.DependencyInjection;
+using SqlInterpol;
 using SqlInterpol.Config;
 using SqlInterpol.Parsing;
-
-namespace Microsoft.Extensions.DependencyInjection;
 
 public static class ServiceCollectionExtensions
 {
@@ -12,40 +11,9 @@ public static class ServiceCollectionExtensions
         {
             var options = new SqlInterpolOptions();
             configure?.Invoke(options);
-
-            // If the user provided a factory, we use it to set the global instance
-            // Note: This usually happens during the BuildServiceProvider phase 
-            // or via a small 'bootstrapper' service.
             services.AddSingleton(options);
-            
-            // One way to set the static instance once the container is built:
-            if (options.ParserFactory != null)
-            {
-                // We can't set it 'now' because we don't have the IServiceProvider yet.
-                // We register a 'Initializer' service to do it.
-                services.AddHostedService<SqlInterpolInitializer>();
-            }
-
+            services.AddSingleton<ISqlParser>(sp => options.Parser ?? new DefaultSqlParser());
             return services;
         }
-    }
-    
-    // Moved to top-level public class for AddHostedService compatibility
-    internal class SqlInterpolInitializer(IServiceProvider sp, SqlInterpolOptions opt) : IHostedService
-    {
-        private readonly IServiceProvider _sp = sp;
-        private readonly SqlInterpolOptions _opt = opt;
-
-        public Task StartAsync(CancellationToken ct)
-        {
-            if (_opt.ParserFactory != null)
-            {
-                SqlParser.Instance = _opt.ParserFactory(_sp);
-            }
-
-            return Task.CompletedTask;
-        }
-
-        public Task StopAsync(CancellationToken ct) => Task.CompletedTask;
     }
 }

@@ -2,17 +2,12 @@ using SqlInterpol.Dialects;
 
 namespace SqlInterpol.Config;
 
-public delegate ISqlParser SqlParserFactory(IServiceProvider serviceProvider);
-
 public record SqlInterpolOptions
 {
-    public SqlDialectKind Dialect { get; set; } = SqlDialectKind.SqlServer;
-
-    public int ParameterIndexStart { get; set; } = 0;
-
-    public string? ParameterPrefixOverride { get; set; }
-
-    public SqlParserFactory? ParserFactory { get; set; }
+    public SqlDialectKind Dialect { get; init; } = SqlDialectKind.SqlServer;
+    public int ParameterIndexStart { get; init; } = 0;
+    public string? ParameterPrefixOverride { get; init; }
+    public ISqlParser? Parser { get; init; }
 
     public static SqlInterpolOptions GetDefault(ISqlDialect dialect)
     {

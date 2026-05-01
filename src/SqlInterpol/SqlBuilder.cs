@@ -12,14 +12,14 @@ public class SqlBuilder : ISqlEntityRegistry
     public SqlContext Context { get; }
     public SqlSegment? LastSegment => _segments.Count > 0 ? _segments[^1] : null;
     
-    // The parser is now retrieved from the context/options
-    private ISqlParser Parser => SqlParser.Instance;
+    private ISqlParser Parser => Context.Parser;
 
     public SqlBuilder(ISqlDialect dialect, SqlInterpolOptions? options = null)
     {
         var baseOptions = options ?? SqlInterpolOptions.GetDefault(dialect);
         var finalOptions = baseOptions with { Dialect = dialect.Kind };
-        Context = new SqlContext(this, dialect, finalOptions);
+        var parser = finalOptions.Parser ?? new DefaultSqlParser();   // ← resolved once here
+        Context = new SqlContext(this, dialect, parser, finalOptions);
     }
 
     public SqlBuilder Append(string? value)
