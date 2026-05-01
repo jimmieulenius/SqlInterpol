@@ -10,10 +10,10 @@ public class BasicProjectionTests
     public void Projection_Append(SqlBuilder db, string expected)
     {
         // Arrange
-        var p = db.Entity<Product>();
+        db.Query<Product>((p) =>
+            db.Append($"SELECT {p[x => x.Id]} FROM {p}"));
         
         // Act
-        db.Append($"SELECT {p[x => x.Id]} FROM {p}");
         var result = db.Build();
 
         // Assert
@@ -47,11 +47,11 @@ public class BasicProjectionTests
     public void Projection_AppendLine(SqlBuilder db, string expected)
     {
         // Arrange
-        var p = db.Entity<Product>();
+        db.Query<Product>((p) =>
+            db.AppendLine($"SELECT {p[x => x.Id]}")
+            .Append($"FROM {p}"));
         
         // Act
-        db.AppendLine($"SELECT {p[x => x.Id]}");
-        db.Append($"FROM {p}");
         var result = db.Build();
     
         // Assert
@@ -97,14 +97,14 @@ public class BasicProjectionTests
     public void Projection_RawString(SqlBuilder db, string expected)
     {
         // Arrange
-        var p = db.Entity<Product>();
-        
-        // Act
-        db.Append($$"""
+        db.Query<Product>(p =>
+            db.Append($$"""
             SELECT
                 {{p[x => x.Id]}}
             FROM {{p}}
-            """);
+            """));
+        
+        // Act
         var result = db.Build();
 
         // Assert
