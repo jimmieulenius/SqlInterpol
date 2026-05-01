@@ -28,12 +28,11 @@ public abstract class SqlEntity<T> : ISqlEntity<T>
 
     public ISqlFragment Column(string dbColumnName)
     {
-        // We return a deferred fragment
-        return new SqlRawFragment(ctx => 
+        return new SqlDeferredFragment(ctx => 
         {
             var prefix = Reference.ToSql(ctx);
             var column = ctx.Dialect.QuoteIdentifier(dbColumnName);
-            
+
             return $"{prefix}.{column}";
         });
     }
@@ -41,8 +40,8 @@ public abstract class SqlEntity<T> : ISqlEntity<T>
     public ISqlFragment Alias(string alias)
     {
         Reference.Alias = alias;
-
-        return new SqlRawFragment(ctx => ctx.Dialect.QuoteIdentifier(alias));
+        
+        return new SqlDeferredFragment(ctx => ctx.Dialect.QuoteIdentifier(alias));
     }
 
     public ISqlReference this[Expression<Func<T, object>> propertySelector]
