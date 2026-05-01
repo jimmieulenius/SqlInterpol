@@ -7,7 +7,7 @@ namespace SqlInterpol.Metadata;
 
 public abstract class SqlEntity<T> : ISqlEntity<T>
 {
-    public string Name { get; set; }
+    public string Name { get; }
     public string? Schema { get; }
     
     public ISqlProjection? Parent { get; }
@@ -40,7 +40,7 @@ public abstract class SqlEntity<T> : ISqlEntity<T>
     public ISqlFragment Alias(string alias)
     {
         Reference.Alias = alias;
-        
+
         return new SqlDeferredFragment(ctx => ctx.Dialect.QuoteIdentifier(alias));
     }
 

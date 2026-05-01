@@ -7,12 +7,11 @@ public static class ServiceCollectionExtensions
 {
     extension (IServiceCollection services)
     {
-        public IServiceCollection AddSqlInterpol(Action<SqlInterpolOptions>? configure = null)
+        public IServiceCollection AddSqlInterpol(SqlInterpolOptions? options = null)
         {
-            var options = new SqlInterpolOptions();
-            configure?.Invoke(options);
-            services.AddSingleton(options);
-            services.AddSingleton<ISqlParser>(sp => options.Parser ?? new DefaultSqlParser());
+            var resolved = options ?? new SqlInterpolOptions();
+            services.AddSingleton(resolved);
+            services.AddSingleton<ISqlParser>(sp => resolved.Parser ?? new DefaultSqlParser());
             return services;
         }
     }

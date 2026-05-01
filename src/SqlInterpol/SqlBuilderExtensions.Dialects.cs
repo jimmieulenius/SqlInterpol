@@ -5,12 +5,6 @@ namespace SqlInterpol;
 
 public static partial class SqlBuilderExtensions
 {
-    private static readonly PostgreSqlSqlDialect _postgreSql = new();
-    private static readonly MySqlSqlDialect _mySql = new();
-    private static readonly OracleSqlDialect _oracle = new();
-    private static readonly SqLiteSqlDialect _sqLite = new();
-    private static readonly SqlServerSqlDialect _sqlServer = new();
-
     private static class DialectCache<T> where T : ISqlDialect, new()
     {
         public static readonly T Instance = new();
@@ -19,19 +13,19 @@ public static partial class SqlBuilderExtensions
     extension (SqlBuilder _)
     {
         public static SqlBuilder PostgreSql(SqlInterpolOptions? opt = null) 
-            => new(_postgreSql, opt);
+            => new(DialectCache<PostgreSqlSqlDialect>.Instance, opt);
 
         public static SqlBuilder MySql(SqlInterpolOptions? opt = null) 
-            => new(_mySql, opt);
+            => new(DialectCache<MySqlSqlDialect>.Instance, opt);
 
         public static SqlBuilder Oracle(SqlInterpolOptions? opt = null) 
-            => new(_oracle, opt);
+            => new(DialectCache<OracleSqlDialect>.Instance, opt);
 
         public static SqlBuilder SqLite(SqlInterpolOptions? opt = null) 
-            => new(_sqLite, opt);
+            => new(DialectCache<SqLiteSqlDialect>.Instance, opt);
 
         public static SqlBuilder SqlServer(SqlInterpolOptions? opt = null) 
-            => new(_sqlServer, opt);
+            => new(DialectCache<SqlServerSqlDialect>.Instance, opt);
 
         public static SqlBuilder ForDialect<TDialect>(SqlInterpolOptions? opt = null) 
             where TDialect : ISqlDialect, new()

@@ -10,7 +10,6 @@ public class SqlBuilder : ISqlEntityRegistry
     private readonly List<SqlSegment> _segments = [];
     private readonly List<ISqlEntity> _entities = [];
     public SqlContext Context { get; }
-    public SqlSegment? LastSegment => _segments.Count > 0 ? _segments[^1] : null;
     
     private ISqlParser Parser => Context.Parser;
 
