@@ -49,14 +49,13 @@ public class SqlBuilder : ISqlEntityRegistry
 
     internal SqlSegment ProcessLiteral(string value)
     {
-        // One call to the brain
         Parser.ProcessLiteral(Context, value.AsSpan());
+
         return new SqlSegment(SqlSegmentType.Literal, value);
     }
 
     internal SqlSegment ProcessValue(object? value)
     {
-        // One call to the brain
         return Parser.ProcessValue(Context, value);
     }
 
@@ -147,7 +146,7 @@ public class SqlBuilder : ISqlEntityRegistry
     {
         var entity = CreateEntity<T>(name, schema);
 
-        _entities.Add(entity); // Keep for query-wide validation/processing
+        _entities.Add(entity);
 
         return entity;
     }
@@ -156,12 +155,10 @@ public class SqlBuilder : ISqlEntityRegistry
     {
         var meta = SqlMetadataRegistry.GetMetadata<T>();
         
-        // The Factory Switch
         return meta.Type switch
         {
             SqlEntityType.View => new SqlView<T>( name ?? meta.Name, schema ?? meta.Schema),
             
-            // Default to Table for SqlEntityType.Table or if no attribute is present
             _ => new SqlTable<T>(name ?? meta.Name, schema ?? meta.Schema)
         };
     }

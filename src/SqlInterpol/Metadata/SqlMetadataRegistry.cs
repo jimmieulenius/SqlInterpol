@@ -15,16 +15,11 @@ public static class SqlMetadataRegistry
 
     private static SqlEntityMetadata InitializeMetadata(Type type)
     {
-        // 1. Look for the BASE attribute. 
-        // This captures [SqlTable] or [SqlView] correctly.
         var entityAttr = type.GetCustomAttribute<SqlEntityAttribute>(inherit: true);
-        
-        // 2. Extract properties from the attribute
         string name = entityAttr?.Name ?? type.Name;
         string? schema = entityAttr?.Schema; // This should now be populated
         SqlEntityType entityType = entityAttr?.Type ?? SqlEntityType.Table;
 
-        // 3. Map columns
         var columns = type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .ToDictionary(
                 p => (MemberInfo)p,
@@ -34,15 +29,11 @@ public static class SqlMetadataRegistry
         return new SqlEntityMetadata(name, schema, entityType, columns);
     }
 
-    // Resolves p[x => x.Name] to "[Name]"
-    // Inside SqlMetadataRegistry.cs
     public static string GetColumnName<T>(Expression<Func<T, object>> propertySelector)
     {
-        // Use your helper to get the MemberInfo
         var member = SqlExpressionHelper.GetMember(propertySelector);
         var meta = GetMetadata<T>();
 
-        // Support for [SqlColumn("custom_name")]
         if (meta.Columns.TryGetValue(member, out var columnName))
         {
             return columnName;
@@ -62,7 +53,6 @@ public static class SqlMetadataRegistry
     {
         Expression body = expression.Body;
 
-        // Handle boxing for value types: Convert(x.Id, Object)
         if (body is UnaryExpression unary && unary.NodeType == ExpressionType.Convert)
         {
             body = unary.Operand;
