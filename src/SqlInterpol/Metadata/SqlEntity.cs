@@ -84,23 +84,11 @@ public abstract class SqlEntity<T> : ISqlEntity<T>
     {
         return mode switch
         {
-            SqlRenderMode.Declaration => RenderDeclaration(context), // [Table] AS [Alias]
-            SqlRenderMode.BaseName    => context.Dialect.QuoteEntityName(Name, Schema), // [Table] (Pure)
-            SqlRenderMode.AliasOnly   => RenderReference(context), // [Alias]
-            _                         => RenderReference(context)  // [Alias] or [Table]
+            SqlRenderMode.Declaration => Declaration.ToSql(context),
+            SqlRenderMode.BaseName    => context.Dialect.QuoteEntityName(Name, Schema),
+            SqlRenderMode.AliasOnly   => RenderReference(context),
+            _                         => RenderReference(context)
         };
-    }
-
-    private string RenderDeclaration(SqlContext context)
-    {
-        var tableName = context.Dialect.QuoteEntityName(Name, Schema);
-        var alias = Reference.Alias;
-
-        if (string.IsNullOrWhiteSpace(alias))
-            return tableName;
-
-        var quotedAlias = context.Dialect.QuoteIdentifier(alias);
-        return $"{tableName} AS {quotedAlias}";
     }
 
     private string RenderReference(SqlContext context)
