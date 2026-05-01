@@ -6,6 +6,5 @@ internal class SqlParseState
     public bool IsInsideString { get; set; }
     public int ParameterCount { get; set; }
     public ISqlProjection? LastAliasableTarget { get; set; }
-    public ISqlProjection? PendingAliasCapture { get; set; }
     public bool ExpectsAliasOnly { get; set; }
 }
