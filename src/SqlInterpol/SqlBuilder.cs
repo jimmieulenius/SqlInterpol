@@ -63,24 +63,23 @@ public class SqlBuilder : ISqlEntityRegistry
     public SqlQueryResult Build()
     {
         var vsb = new ValueStringBuilder(stackalloc char[2048]);
+
         try
         {
-            foreach (var segment in _segments) RenderSegment(ref vsb, segment);
+            for (int i = 0; i < _segments.Count; i++)
+            {
+                RenderSegment(ref vsb, i, _segments[i]);
+            }
+
             return new SqlQueryResult(vsb.ToString(), Context.Parameters);
         }
-        finally { vsb.Dispose(); }
+        finally
+        {
+            vsb.Dispose();
+        }
     }
 
-    ISqlEntity<T> ISqlEntityRegistry.RegisterEntity<T>(string? name, string? schema)
-    {
-        var entity = CreateEntity<T>(name, schema);
-
-        _entities.Add(entity); // Keep for query-wide validation/processing
-
-        return entity;
-    }
-
-    private void RenderSegment(ref ValueStringBuilder vsb, SqlSegment segment)
+    private void RenderSegment(ref ValueStringBuilder vsb, int index, SqlSegment segment)
     {
         switch (segment.Type)
         {
@@ -88,9 +87,8 @@ public class SqlBuilder : ISqlEntityRegistry
             case SqlSegmentType.Reference:
                 if (segment.Value is ISqlFragment fragment)
                 {
-                    // CRITICAL: We call ToSql with the RenderMode.
-                    // This is where SqlRenderMode.BaseName finally gets to work!
-                    vsb.Append(fragment.ToSql(Context, segment.RenderMode));
+                    var mode = ResolveRenderMode(index, segment);
+                    vsb.Append(fragment.ToSql(Context, mode));
                 }
                 break;
 
@@ -101,11 +99,57 @@ public class SqlBuilder : ISqlEntityRegistry
 
             case SqlSegmentType.Raw:
                 if (segment.Value is ISqlFragment rawFrag)
-                    vsb.Append(rawFrag.ToSql(Context, segment.RenderMode));
+                    vsb.Append(rawFrag.ToSql(Context, SqlRenderMode.Default));
                 else
                     vsb.Append(segment.Value?.ToString() ?? string.Empty);
                 break;
         }
+    }
+
+    private SqlRenderMode ResolveRenderMode(int index, SqlSegment segment)
+    {
+        if (segment.IsAliasTarget)
+        {
+            return SqlRenderMode.AliasOnly;
+        }
+
+        if (segment.Value is not ISqlEntity entity)
+        {
+            return SqlRenderMode.Default;
+        }
+
+        if (index + 1 < _segments.Count)
+        {
+            var next = _segments[index + 1];
+
+            if (next.Type == SqlSegmentType.Literal)
+            {
+                var text = next.Value?.ToString()?.TrimStart();
+
+                if (text?.StartsWith("AS ", StringComparison.OrdinalIgnoreCase) == true
+                    || text?.StartsWith("AS\n", StringComparison.OrdinalIgnoreCase) == true)
+                {
+                    return SqlRenderMode.BaseName;
+                }
+            }
+            else if (next.Type == SqlSegmentType.Raw)
+            {
+                return SqlRenderMode.BaseName;
+            }
+        }
+
+        return !string.IsNullOrEmpty(entity.Reference.Alias)
+            ? SqlRenderMode.Declaration
+            : SqlRenderMode.BaseName;
+    }
+
+    ISqlEntity<T> ISqlEntityRegistry.RegisterEntity<T>(string? name, string? schema)
+    {
+        var entity = CreateEntity<T>(name, schema);
+
+        _entities.Add(entity); // Keep for query-wide validation/processing
+
+        return entity;
     }
 
     internal ISqlEntity<T> CreateEntity<T>(string? name = null, string? schema = null)

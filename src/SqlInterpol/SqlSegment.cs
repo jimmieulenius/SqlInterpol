@@ -1,17 +1,8 @@
 namespace SqlInterpol;
 
-public record SqlSegment
+public class SqlSegment(SqlSegmentType type, object? value, bool isAliasTarget = false)
 {
-    public SqlSegmentType Type { get;}
-    public object? Value { get; }
-    public SqlKeyword? Keyword { get; }
-    public SqlRenderMode RenderMode { get; set; }
-
-    public SqlSegment(SqlSegmentType type, object? value, SqlKeyword? keyword = null, SqlRenderMode mode = SqlRenderMode.Default)
-    {
-        Type = type;
-        Value = value;
-        Keyword = keyword;
-        RenderMode = mode;
-    }
+    public SqlSegmentType Type { get; } = type;
+    public object? Value { get; } = value;
+    public bool IsAliasTarget { get; } = isAliasTarget;
 }

@@ -8,7 +8,7 @@ public record SqlEntityNameFragment(ISqlEntity Entity, string Name) : ISqlFragme
     {
         // Anchor the entity in the parser state so the next 'AS' alias 
         // is captured and assigned to this entity.
-        context.State.PendingAliasCapture = Entity;
+        context.ParseState.PendingAliasCapture = Entity;
         
         return $"{context.Dialect.OpenQuote}{Name}{context.Dialect.CloseQuote}";
     }
