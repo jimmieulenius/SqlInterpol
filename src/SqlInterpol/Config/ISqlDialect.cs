@@ -9,7 +9,7 @@ public interface ISqlDialect
 
     string QuoteIdentifier(string name);
 
-    string QuoteTableName(string table, string? schema = null);
+    string QuoteEntityName(string table, string? schema = null);
     
     string GetParameterName(int index);
 

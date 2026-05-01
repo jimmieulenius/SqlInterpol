@@ -9,7 +9,7 @@ public class AliasProjectionTests
     [MemberData(nameof(AppendAliasData))]
     public void Alias_Append(SqlBuilder db, string expected)
     {
-        var (_, p) = db.Entities<Product>();
+        var (_, p) = db.Entity<Product>();
         
         db.Append($"SELECT {p[x => x.Id]} AS ProductId FROM {p} AS prd");
         
@@ -31,7 +31,7 @@ public class AliasProjectionTests
     [MemberData(nameof(AppendQuotedAliasData))]
     public void QuotedAlias_Append(SqlBuilder db, string expected)
     {
-        var (_, p) = db.Entities<Product>();
+        var (_, p) = db.Entity<Product>();
         var open = Sql.Raw(db.Context.Dialect.OpenQuote);
         var close = Sql.Raw(db.Context.Dialect.CloseQuote);
         
@@ -73,7 +73,7 @@ public class AliasProjectionTests
     [MemberData(nameof(AppendLineAliasData))]
     public void Alias_AppendLine(SqlBuilder db, string expected)
     {
-        var (_, p) = db.Entities<Product>();
+        var (_, p) = db.Entity<Product>();
         
         // Column is on line 1, Alias is discovered on line 2
         db.AppendLine($"SELECT {p[x => x.Id]} AS ProductId");
@@ -121,7 +121,7 @@ public class AliasProjectionTests
     [MemberData(nameof(RawStringAliasData))]
     public void Alias_RawString(SqlBuilder db, string expected)
     {
-        var (_, p) = db.Entities<Product>();
+        var (_, p) = db.Entity<Product>();
         
         db.Append($$"""
             SELECT 
@@ -196,7 +196,7 @@ public class AliasProjectionTests
     [MemberData(nameof(ReservedAliasData))]
     public void Alias_With_Reserved_Words_Preserves_Quotes_And_Mapping(SqlBuilder db, string expected)
     {
-        var (_, p) = db.Entities<Product>();
+        var (_, p) = db.Entity<Product>();
         
         // We use Sql.Raw to inject the dialect's quotes as syntax, not parameters.
         var open = Sql.Raw(db.Context.Dialect.OpenQuote);
@@ -247,7 +247,7 @@ public class AliasProjectionTests
     [MemberData(nameof(AliasMappingIdentityData))]
     public void Alias_Mapping_Identity(SqlBuilder db, string expected)
     {
-        var (_, p) = db.Entities<Product>();
+        var (_, p) = db.Entity<Product>();
 
         // Logic: Database column vs C# Property name toggling
         db.Append($"SELECT {p[x => x.Name]} AS {p[x => x.Name]} ")
@@ -290,7 +290,7 @@ public class AliasProjectionTests
     [MemberData(nameof(AliasMappingUnquotedData))]
     public void Alias_Mapping_Unquoted(SqlBuilder db, string expected)
     {
-        var (_, p) = db.Entities<Product>();
+        var (_, p) = db.Entity<Product>();
 
         // Logic: Database column vs C# Property name toggling
         db.Append($"SELECT {p[x => x.Name]} AS {p[x => x.Name]} ")
@@ -333,7 +333,7 @@ public class AliasProjectionTests
     [MemberData(nameof(ManualColumnData))]
     public void Manual_Column_With_Alias_Theory(SqlBuilder db, string expected)
     {
-        var (_, p) = db.Entities<Product>();
+        var (_, p) = db.Entity<Product>();
 
         // Logic: Manual DB string + Metadata Property name
         db.Append($"SELECT {p.Column("LEGACY_PROD_NAME")} AS {p[x => x.Name]} ")

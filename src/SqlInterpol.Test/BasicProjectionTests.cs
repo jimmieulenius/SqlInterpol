@@ -9,11 +9,14 @@ public class BasicProjectionTests
     [MemberData(nameof(AppendData))]
     public void Projection_Append(SqlBuilder db, string expected)
     {
-        var (_, p) = db.Entities<Product>();
+        // Arrange
+        var (_, p) = db.Entity<Product>();
         
+        // Act
         db.Append($"SELECT {p[x => x.Id]} FROM {p}");
-        
         var result = db.Build();
+
+        // Assert
         Assert.Equal(expected, result.Sql);
     }
 
@@ -43,12 +46,15 @@ public class BasicProjectionTests
     [MemberData(nameof(AppendLineData))]
     public void Projection_AppendLine(SqlBuilder db, string expected)
     {
-        var (_, p) = db.Entities<Product>();
+        // Arrange
+        var (_, p) = db.Entity<Product>();
         
+        // Act
         db.AppendLine($"SELECT {p[x => x.Id]}");
         db.Append($"FROM {p}");
-        
         var result = db.Build();
+    
+        // Assert
         Assert.Equal(expected, result.Sql);
     }
 
@@ -90,15 +96,18 @@ public class BasicProjectionTests
     [MemberData(nameof(RawStringData))]
     public void Projection_RawString(SqlBuilder db, string expected)
     {
-        var (_, p) = db.Entities<Product>();
+        // Arrange
+        var (_, p) = db.Entity<Product>();
         
+        // Act
         db.Append($$"""
             SELECT
                 {{p[x => x.Id]}}
             FROM {{p}}
             """);
-        
         var result = db.Build();
+
+        // Assert
         Assert.Equal(expected, result.Sql);
     }
 

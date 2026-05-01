@@ -4,5 +4,5 @@ namespace SqlInterpol;
 
 public interface ISqlFragment
 {
-    string ToSql(SqlContext context);
+    string ToSql(SqlContext context, SqlRenderMode mode = SqlRenderMode.Default);
 }

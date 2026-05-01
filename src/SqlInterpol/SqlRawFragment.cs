@@ -11,5 +11,5 @@ public readonly record struct SqlRawFragment(string Value) : ISqlFragment
         _renderer = renderer;
     }
 
-    public string ToSql(SqlContext context) => _renderer != null ? _renderer(context) : Value;
+    public string ToSql(SqlContext context, SqlRenderMode mode = SqlRenderMode.Default) => _renderer != null ? _renderer(context) : Value;
 }

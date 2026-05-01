@@ -1,13 +1,11 @@
-using SqlInterpol.Parsing;
-
 namespace SqlInterpol;
 
-public readonly struct SqlSegment
+public record SqlSegment
 {
-    public readonly SqlSegmentType Type;
-    public readonly object? Value;
-    public readonly SqlKeyword? Keyword;
-    public readonly SqlRenderMode RenderMode;
+    public SqlSegmentType Type { get;}
+    public object? Value { get; }
+    public SqlKeyword? Keyword { get; }
+    public SqlRenderMode RenderMode { get; set; }
 
     public SqlSegment(SqlSegmentType type, object? value, SqlKeyword? keyword = null, SqlRenderMode mode = SqlRenderMode.Default)
     {

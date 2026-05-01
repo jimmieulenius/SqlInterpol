@@ -2,18 +2,11 @@ using SqlInterpol.Parsing;
 
 namespace SqlInterpol.Config;
 
-public class SqlContext(ISqlDialect dialect, SqlInterpolOptions? options = null)
+public class SqlContext(SqlBuilder builder, ISqlDialect dialect, SqlInterpolOptions? options = null)
 {
+    public SqlBuilder Builder { get; } = builder;
     public ISqlDialect Dialect { get; } = dialect;
     public SqlInterpolOptions Options { get; } = options ?? new() { Dialect = dialect.Kind };
-    public Dictionary<string, object?> Parameters { get; } = new();
+    public Dictionary<string, object?> Parameters { get; } = [];
     internal SqlParseState State = new();
-
-    // internal struct ParseState
-    // {
-    //     public SqlKeyword? CurrentKeyword;
-    //     public bool IsInsideString;
-    //     public int ParameterCount;
-    //     public ISqlProjection? PendingAliasCapture { get; set; }
-    // }
 }

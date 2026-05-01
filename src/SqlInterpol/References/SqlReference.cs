@@ -9,7 +9,7 @@ public abstract class SqlReference(ISqlEntity parent) : ISqlReference
 
     // Every specific reference (Table vs Column) 
     // must decide how its 'Pointer' looks.
-    public abstract string ToSql(SqlContext context);
+    public abstract string ToSql(SqlContext context, SqlRenderMode mode = SqlRenderMode.Default);
 
     public override string ToString() => $"[SqlFragment: {GetType().Name}]";
 }

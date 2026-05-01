@@ -6,7 +6,7 @@ public class SqlDeclaration(ISqlReference reference) : ISqlDeclaration
 {
     public ISqlReference Reference { get; } = reference;
 
-    public string ToSql(SqlContext context)
+    public string ToSql(SqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
     {
         // The Declaration asks the projection for its 'Source' name 
         // (e.g., "Product" or "(SELECT...)"), then applies the alias 
@@ -15,6 +15,6 @@ public class SqlDeclaration(ISqlReference reference) : ISqlDeclaration
         
         // return context.Dialect.ApplyAlias(sourceSql, Reference.Alias);
 
-        return Reference.Source.ToSql(context);
+        return Reference.Source.ToSql(context, mode);
     }
 }

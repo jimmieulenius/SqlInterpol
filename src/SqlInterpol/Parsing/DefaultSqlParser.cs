@@ -9,51 +9,130 @@ public class DefaultSqlParser : ISqlParser
 {
     public SqlSegment ProcessValue(SqlContext context, object? value)
     {
-        // 1. Highest Priority: Projections (Entities/Columns)
+        SqlSegment segment;
+
         if (value is ISqlProjection projection)
         {
-            // Set for "Time Traveler" Alias Capture
             context.State.LastAliasableTarget = projection;
             
+            // If we are currently in an 'AS' context (ExpectsAliasOnly), 
+            // we must ensure the PREVIOUS table segment doesn't also render an 'AS'.
+            if (context.State.ExpectsAliasOnly)
+            {
+                DowngradeLastSegmentIfDeclaration(context);
+            }
+
             var mode = context.State.ExpectsAliasOnly ? SqlRenderMode.AliasOnly : SqlRenderMode.Default;
+            if (mode == SqlRenderMode.Default && context.State.CurrentKeyword?.ExpectsDeclaration == true)
+            {
+                mode = SqlRenderMode.Declaration;
+            }
+
             context.State.ExpectsAliasOnly = false;
-
-            return new SqlSegment(SqlSegmentType.Projection, projection, context.State.CurrentKeyword, mode);
+            segment = new SqlSegment(SqlSegmentType.Projection, projection, context.State.CurrentKeyword, mode);
         }
-
-        // 2. Collections (WHERE IN support)
-        // We exclude string because it is an IEnumerable but we want it as a parameter
-        if (value is IEnumerable collection && value is not string)
+        else
         {
-            return HandleCollection(context, collection);
+            // If the hole is a manual alias (like p.Alias("prd")), trigger the downgrade
+            if (context.State.ExpectsAliasOnly)
+            {
+                DowngradeLastSegmentIfDeclaration(context);
+            }
+            
+            segment = value is ISqlFragment frag 
+                ? new SqlSegment(SqlSegmentType.Raw, frag) 
+                : CreateParameter(context, value);
         }
 
-        // 3. Manual Fragments
-        if (value is ISqlFragment fragment)
-        {
-            return new SqlSegment(SqlSegmentType.Raw, fragment);
-        }
-
-        // 4. Default: Standard Parameter
-        return CreateParameter(context, value);
+        context.State.LastSegment = segment;
+        return segment;
     }
+
+    private void DowngradeLastSegmentIfDeclaration(SqlContext context)
+    {
+        // We check the Builder's history to support split .Append() calls
+        if (context.Builder.LastSegment is { RenderMode: SqlRenderMode.Declaration } last)
+        {
+            last.RenderMode = SqlRenderMode.BaseName;
+        }
+    }
+
+    // public SqlSegment ProcessValue(SqlContext context, object? value)
+    // {
+    //     // 1. Highest Priority: Projections (Entities/Columns)
+    //     if (value is ISqlProjection projection)
+    //     {
+    //         // Set for "Time Traveler" Alias Capture
+    //         context.State.LastAliasableTarget = projection;
+            
+    //         var mode = context.State.ExpectsAliasOnly ? SqlRenderMode.AliasOnly : SqlRenderMode.Default;
+    //         context.State.ExpectsAliasOnly = false;
+
+    //         return new SqlSegment(SqlSegmentType.Projection, projection, context.State.CurrentKeyword, mode);
+    //     }
+
+    //     // 2. Collections (WHERE IN support)
+    //     // We exclude string because it is an IEnumerable but we want it as a parameter
+    //     if (value is IEnumerable collection && value is not string)
+    //     {
+    //         return HandleCollection(context, collection);
+    //     }
+
+    //     // 3. Manual Fragments
+    //     if (value is ISqlFragment fragment)
+    //     {
+    //         return new SqlSegment(SqlSegmentType.Raw, fragment);
+    //     }
+
+    //     // 4. Default: Standard Parameter
+    //     return CreateParameter(context, value);
+    // }
 
     public void ProcessLiteral(SqlContext context, ReadOnlySpan<char> span)
     {
+        var trimmed = span.Trim();
+        if (trimmed.IsEmpty)
+        {
+            UpdateScannerState(context, span);
+            return;
+        }
+
+        // A. The "Lookback": Does this literal provide an alias for the PREVIOUS hole?
+        // Example: "{p[Id]} AS ProductId" -> span starts with "AS"
+        if (span.TrimStart().StartsWith("AS ", StringComparison.OrdinalIgnoreCase))
+        {
+            // If the previous segment was a table declaration, downgrade it to BaseName
+            var last = GetLastSegment(context);
+            
+            if (last is { RenderMode: SqlRenderMode.Declaration })
+            {
+                last.RenderMode = SqlRenderMode.BaseName;
+            }
+            
+            // Note: We do NOT set ExpectsAliasOnly = true here. 
+            // That flag is only for when the hole ITSELF is the alias.
+        }
+
+        // B. The "Lookahead": Does this literal end with "AS", meaning the NEXT hole is the alias?
+        // Example: "FROM {p} AS {p.Alias("prd")}" -> span ends with "AS"
         context.State.ExpectsAliasOnly = EndsWithAsKeyword(span);
 
-        // The "Time Traveler" Capture logic
+        // C. The "Time Traveler" Capture (Existing)
         if (context.State.LastAliasableTarget is ISqlProjection projection)
         {
             if (TryPeekAlias(context, span, out var alias))
             {
-                // 1. We check if the reference is an EntityReference (the prefix owner)
-                if (projection.Reference is EntityReference entRef)
+                if (projection.Reference is ISqlReference entRef)
                 {
                     entRef.Alias = alias;
+                    // If we captured a manual alias from the string, ensure no double AS
+                    var last = GetLastSegment(context);
+
+                    if (last is { RenderMode: SqlRenderMode.Declaration })
+                    {
+                        last.RenderMode = SqlRenderMode.BaseName;
+                    }
                 }
-                
-                // 2. Clear the target once captured
                 context.State.LastAliasableTarget = null;
             }
             else if (IsCaptureTerminated(span))
@@ -64,6 +143,40 @@ public class DefaultSqlParser : ISqlParser
 
         UpdateScannerState(context, span);
     }
+
+    private SqlSegment? GetLastSegment(SqlContext context)
+    {
+        // 1. Check the active state (current string)
+        // 2. Fallback to the builder (previous strings)
+        return context.State.LastSegment ?? context.Builder.LastSegment;
+    }
+
+    // public void ProcessLiteral(SqlContext context, ReadOnlySpan<char> span)
+    // {
+    //     context.State.ExpectsAliasOnly = EndsWithAsKeyword(span);
+
+    //     // The "Time Traveler" Capture logic
+    //     if (context.State.LastAliasableTarget is ISqlProjection projection)
+    //     {
+    //         if (TryPeekAlias(context, span, out var alias))
+    //         {
+    //             // 1. We check if the reference is an EntityReference (the prefix owner)
+    //             if (projection.Reference is EntityReference entRef)
+    //             {
+    //                 entRef.Alias = alias;
+    //             }
+                
+    //             // 2. Clear the target once captured
+    //             context.State.LastAliasableTarget = null;
+    //         }
+    //         else if (IsCaptureTerminated(span))
+    //         {
+    //             context.State.LastAliasableTarget = null;
+    //         }
+    //     }
+
+    //     UpdateScannerState(context, span);
+    // }
 
     protected virtual SqlSegment HandleCollection(SqlContext context, IEnumerable collection)
     {
@@ -99,16 +212,38 @@ public class DefaultSqlParser : ISqlParser
     private bool EndsWithAsKeyword(ReadOnlySpan<char> span)
     {
         var trimmed = span.TrimEnd();
-        if (trimmed.Length < 2) return false;
         
-        // Match " AS" at the end of the string
-        if (trimmed.EndsWith("AS", StringComparison.OrdinalIgnoreCase))
-        {
-            // Must be start of string or preceded by whitespace
-            return trimmed.Length == 2 || char.IsWhiteSpace(trimmed[^(3)]);
-        }
-        return false;
+        // 1. Must be at least "AS"
+        if (trimmed.Length < 2) return false;
+
+        // 2. Check for "AS" at the end (Case-Insensitive)
+        if (!trimmed.EndsWith("AS", StringComparison.OrdinalIgnoreCase)) 
+            return false;
+
+        // 3. If it's just "AS", it's a match
+        if (trimmed.Length == 2) return true;
+
+        // 4. Check the character immediately before the 'A'
+        // Index is (Length of "AS" + 1) from the end
+        char prefix = trimmed[trimmed.Length - 3];
+
+        // In SQL, AS can follow whitespace, a closing paren, or brackets
+        return char.IsWhiteSpace(prefix) || prefix == ')' || prefix == ']' || prefix == '"' || prefix == '`';
     }
+
+    // private bool EndsWithAsKeyword(ReadOnlySpan<char> span)
+    // {
+    //     var trimmed = span.TrimEnd();
+    //     if (trimmed.Length < 2) return false;
+        
+    //     // Match " AS" at the end of the string
+    //     if (trimmed.EndsWith("AS", StringComparison.OrdinalIgnoreCase))
+    //     {
+    //         // Must be start of string or preceded by whitespace
+    //         return trimmed.Length == 2 || char.IsWhiteSpace(trimmed[^(3)]);
+    //     }
+    //     return false;
+    // }
 
     private SqlSegment HandleProjection(SqlContext context, ISqlProjection projection)
     {

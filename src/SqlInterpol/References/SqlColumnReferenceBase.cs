@@ -17,7 +17,20 @@ public abstract class SqlColumnReferenceBase(ISqlReference sourceReference)
     // Every column must eventually provide a DB name string (e.g. "PROD_ID")
     protected abstract string GetColumnName(SqlContext context);
 
-    public override string ToSql(SqlContext context)
+    public override string ToSql(SqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
+    {
+        return mode switch
+        {
+            // The "AS [Name]" part of a SELECT
+            SqlRenderMode.AliasOnly => 
+                context.Dialect.QuoteIdentifier(PropertyName),
+
+            // The "WHERE [prd].[PROD_NAME]" part
+            _ => RenderFullReference(context)
+        };
+    }
+
+    private string RenderFullReference(SqlContext context)
     {
         // 1. Get the prefix (e.g., "[p]")
         var sourcePointer = SourceReference.ToSql(context);

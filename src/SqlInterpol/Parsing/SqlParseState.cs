@@ -1,6 +1,6 @@
 namespace SqlInterpol.Parsing;
 
-internal struct SqlParseState
+internal class SqlParseState
 {
     public SqlKeyword? CurrentKeyword;
     public bool IsInsideString;
@@ -8,4 +8,5 @@ internal struct SqlParseState
     public ISqlProjection? PendingAliasCapture { get; set; }
     public bool ExpectsAliasOnly { get; set; }
     public ISqlProjection? LastAliasableTarget { get; set; }
+    public SqlSegment? LastSegment;
 }

@@ -5,10 +5,12 @@ using SqlInterpol.Parsing;
 
 namespace SqlInterpol;
 
-public class SqlBuilder
+public class SqlBuilder : ISqlEntityRegistry
 {
     private readonly List<SqlSegment> _segments = [];
+    private readonly List<ISqlEntity> _entities = [];
     public SqlContext Context { get; }
+    public SqlSegment? LastSegment => _segments.Count > 0 ? _segments[^1] : null;
     
     // The parser is now retrieved from the context/options
     private ISqlParser Parser => SqlParser.Instance;
@@ -17,7 +19,7 @@ public class SqlBuilder
     {
         var baseOptions = options ?? SqlInterpolOptions.GetDefault(dialect);
         var finalOptions = baseOptions with { Dialect = dialect.Kind };
-        Context = new SqlContext(dialect, finalOptions);
+        Context = new SqlContext(this, dialect, finalOptions);
     }
 
     public SqlBuilder Append(string? value)
@@ -69,65 +71,102 @@ public class SqlBuilder
         finally { vsb.Dispose(); }
     }
 
+    ISqlEntity<T> ISqlEntityRegistry.RegisterEntity<T>(string? name, string? schema)
+    {
+        var entity = CreateEntity<T>(name, schema);
+
+        _entities.Add(entity); // Keep for query-wide validation/processing
+
+        return entity;
+    }
+
     private void RenderSegment(ref ValueStringBuilder vsb, SqlSegment segment)
     {
         switch (segment.Type)
         {
-            case SqlSegmentType.Literal:
-                vsb.Append((string)segment.Value!);
-                break;
-
             case SqlSegmentType.Projection:
-                var proj = (ISqlProjection)segment.Value!;
-                
-                if (segment.RenderMode == SqlRenderMode.AliasOnly)
-                {
-                    vsb.Append(Context.Dialect.OpenQuote);
-                    vsb.Append(proj.PropertyName);
-                    vsb.Append(Context.Dialect.CloseQuote);
-                }
-                else
-                {
-                    // Call ToSql on the Reference or Declaration
-                    vsb.Append(segment.Keyword?.ExpectsDeclaration == true 
-                        ? proj.Declaration.ToSql(Context) 
-                        : proj.Reference.ToSql(Context));
-                }
-                break;
-
             case SqlSegmentType.Reference:
-                vsb.Append(((ISqlReference)segment.Value!).ToSql(Context));
+                if (segment.Value is ISqlFragment fragment)
+                {
+                    // CRITICAL: We call ToSql with the RenderMode.
+                    // This is where SqlRenderMode.BaseName finally gets to work!
+                    vsb.Append(fragment.ToSql(Context, segment.RenderMode));
+                }
                 break;
 
+            case SqlSegmentType.Literal:
             case SqlSegmentType.Parameter:
-                vsb.Append((string)segment.Value!);
+                vsb.Append(segment.Value?.ToString() ?? string.Empty);
                 break;
 
             case SqlSegmentType.Raw:
-                // Check if it's a fragment (p.Column("X")) or just a raw string
-                if (segment.Value is ISqlFragment frag)
-                {
-                    vsb.Append(frag.ToSql(Context));
-                }
+                if (segment.Value is ISqlFragment rawFrag)
+                    vsb.Append(rawFrag.ToSql(Context, segment.RenderMode));
                 else
-                {
                     vsb.Append(segment.Value?.ToString() ?? string.Empty);
-                }
                 break;
         }
     }
 
-    internal ISqlEntity<T> CreateEntity<T>()
+    // private void RenderSegment(ref ValueStringBuilder vsb, SqlSegment segment)
+    // {
+    //     switch (segment.Type)
+    //     {
+    //         case SqlSegmentType.Literal:
+    //             vsb.Append((string)segment.Value!);
+    //             break;
+
+    //         case SqlSegmentType.Projection:
+    //             var proj = (ISqlProjection)segment.Value!;
+                
+    //             if (segment.RenderMode == SqlRenderMode.AliasOnly)
+    //             {
+    //                 vsb.Append(Context.Dialect.OpenQuote);
+    //                 vsb.Append(proj.PropertyName);
+    //                 vsb.Append(Context.Dialect.CloseQuote);
+    //             }
+    //             else
+    //             {
+    //                 // Call ToSql on the Reference or Declaration
+    //                 vsb.Append(segment.Keyword?.ExpectsDeclaration == true 
+    //                     ? proj.Declaration.ToSql(Context) 
+    //                     : proj.Reference.ToSql(Context));
+    //             }
+    //             break;
+
+    //         case SqlSegmentType.Reference:
+    //             vsb.Append(((ISqlReference)segment.Value!).ToSql(Context));
+    //             break;
+
+    //         case SqlSegmentType.Parameter:
+    //             vsb.Append((string)segment.Value!);
+    //             break;
+
+    //         case SqlSegmentType.Raw:
+    //             // Check if it's a fragment (p.Column("X")) or just a raw string
+    //             if (segment.Value is ISqlFragment frag)
+    //             {
+    //                 vsb.Append(frag.ToSql(Context));
+    //             }
+    //             else
+    //             {
+    //                 vsb.Append(segment.Value?.ToString() ?? string.Empty);
+    //             }
+    //             break;
+    //     }
+    // }
+
+    internal ISqlEntity<T> CreateEntity<T>(string? name = null, string? schema = null)
     {
         var meta = SqlMetadataRegistry.GetMetadata<T>();
         
         // The Factory Switch
         return meta.Type switch
         {
-            SqlEntityType.View => new SqlView<T>(meta.Name, meta.Schema),
+            SqlEntityType.View => new SqlView<T>( name ?? meta.Name, schema ?? meta.Schema),
             
             // Default to Table for SqlEntityType.Table or if no attribute is present
-            _ => new SqlTable<T>(meta.Name, meta.Schema)
+            _ => new SqlTable<T>(name ?? meta.Name, schema ?? meta.Schema)
         };
     }
 }

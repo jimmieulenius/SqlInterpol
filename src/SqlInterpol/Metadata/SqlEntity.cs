@@ -87,6 +87,38 @@ public abstract class SqlEntity<T> : ISqlEntity<T>
         => new SqlRawColumnReference(Reference, columnName);
 
     // ISqlFragment implementation
-    public virtual string ToSql(SqlContext context) 
-        => context.Dialect.QuoteTableName(Name, Schema);
+    // public virtual string ToSql(SqlContext context) 
+    //     => context.Dialect.QuoteTableName(Name, Schema);
+
+    public virtual string ToSql(SqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
+    {
+        return mode switch
+        {
+            SqlRenderMode.Declaration => RenderDeclaration(context), // [Table] AS [Alias]
+            SqlRenderMode.BaseName    => context.Dialect.QuoteEntityName(Name, Schema), // [Table] (Pure)
+            SqlRenderMode.AliasOnly   => RenderReference(context), // [Alias]
+            _                         => RenderReference(context)  // [Alias] or [Table]
+        };
+    }
+
+    private string RenderDeclaration(SqlContext context)
+    {
+        var tableName = context.Dialect.QuoteEntityName(Name, Schema);
+        var alias = Reference.Alias;
+
+        if (string.IsNullOrWhiteSpace(alias))
+            return tableName;
+
+        var quotedAlias = context.Dialect.QuoteIdentifier(alias);
+        return $"{tableName} AS {quotedAlias}";
+    }
+
+    private string RenderReference(SqlContext context)
+    {
+        // If the user has set an alias, the reference IS the alias.
+        // If not, the reference is the full table name.
+        return !string.IsNullOrWhiteSpace(Reference.Alias)
+            ? context.Dialect.QuoteIdentifier(Reference.Alias)
+            : context.Dialect.QuoteEntityName(Name, Schema);
+    }
 }

@@ -33,7 +33,7 @@ public abstract class SqlDialectBase : ISqlDialect
         return trimmed;
     }
 
-    public virtual string QuoteTableName(string table, string? schema = null)
+    public virtual string QuoteEntityName(string table, string? schema = null)
     {
         var quotedTable = QuoteIdentifier(table);
 
