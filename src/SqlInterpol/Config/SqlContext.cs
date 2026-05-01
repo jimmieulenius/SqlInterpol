@@ -9,5 +9,5 @@ public class SqlContext(SqlBuilder builder, ISqlDialect dialect, ISqlParser pars
     public ISqlParser Parser { get; } = parser;
     public SqlInterpolOptions Options { get; } = options ?? new() { Dialect = dialect.Kind };
     public Dictionary<string, object?> Parameters { get; } = [];
-    internal SqlParseState ParseState = new();
+    internal SqlParseState ParseState { get; } = new();
 }
