@@ -10,7 +10,7 @@ public class BasicProjectionTests
     public void Projection_Append(SqlBuilder db, string expected)
     {
         // Arrange
-        var (_, p) = db.Entity<Product>();
+        var p = db.Entity<Product>();
         
         // Act
         db.Append($"SELECT {p[x => x.Id]} FROM {p}");
@@ -47,7 +47,7 @@ public class BasicProjectionTests
     public void Projection_AppendLine(SqlBuilder db, string expected)
     {
         // Arrange
-        var (_, p) = db.Entity<Product>();
+        var p = db.Entity<Product>();
         
         // Act
         db.AppendLine($"SELECT {p[x => x.Id]}");
@@ -97,7 +97,7 @@ public class BasicProjectionTests
     public void Projection_RawString(SqlBuilder db, string expected)
     {
         // Arrange
-        var (_, p) = db.Entity<Product>();
+        var p = db.Entity<Product>();
         
         // Act
         db.Append($$"""
