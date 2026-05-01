@@ -108,54 +108,6 @@ public class SqlBuilder : ISqlEntityRegistry
         }
     }
 
-    // private void RenderSegment(ref ValueStringBuilder vsb, SqlSegment segment)
-    // {
-    //     switch (segment.Type)
-    //     {
-    //         case SqlSegmentType.Literal:
-    //             vsb.Append((string)segment.Value!);
-    //             break;
-
-    //         case SqlSegmentType.Projection:
-    //             var proj = (ISqlProjection)segment.Value!;
-                
-    //             if (segment.RenderMode == SqlRenderMode.AliasOnly)
-    //             {
-    //                 vsb.Append(Context.Dialect.OpenQuote);
-    //                 vsb.Append(proj.PropertyName);
-    //                 vsb.Append(Context.Dialect.CloseQuote);
-    //             }
-    //             else
-    //             {
-    //                 // Call ToSql on the Reference or Declaration
-    //                 vsb.Append(segment.Keyword?.ExpectsDeclaration == true 
-    //                     ? proj.Declaration.ToSql(Context) 
-    //                     : proj.Reference.ToSql(Context));
-    //             }
-    //             break;
-
-    //         case SqlSegmentType.Reference:
-    //             vsb.Append(((ISqlReference)segment.Value!).ToSql(Context));
-    //             break;
-
-    //         case SqlSegmentType.Parameter:
-    //             vsb.Append((string)segment.Value!);
-    //             break;
-
-    //         case SqlSegmentType.Raw:
-    //             // Check if it's a fragment (p.Column("X")) or just a raw string
-    //             if (segment.Value is ISqlFragment frag)
-    //             {
-    //                 vsb.Append(frag.ToSql(Context));
-    //             }
-    //             else
-    //             {
-    //                 vsb.Append(segment.Value?.ToString() ?? string.Empty);
-    //             }
-    //             break;
-    //     }
-    // }
-
     internal ISqlEntity<T> CreateEntity<T>(string? name = null, string? schema = null)
     {
         var meta = SqlMetadataRegistry.GetMetadata<T>();

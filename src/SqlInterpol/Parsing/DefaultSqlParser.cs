@@ -1,7 +1,6 @@
 using System.Collections;
 using System.Text;
 using SqlInterpol.Config;
-using SqlInterpol.References;
 
 namespace SqlInterpol.Parsing;
 
@@ -57,37 +56,6 @@ public class DefaultSqlParser : ISqlParser
         }
     }
 
-    // public SqlSegment ProcessValue(SqlContext context, object? value)
-    // {
-    //     // 1. Highest Priority: Projections (Entities/Columns)
-    //     if (value is ISqlProjection projection)
-    //     {
-    //         // Set for "Time Traveler" Alias Capture
-    //         context.State.LastAliasableTarget = projection;
-            
-    //         var mode = context.State.ExpectsAliasOnly ? SqlRenderMode.AliasOnly : SqlRenderMode.Default;
-    //         context.State.ExpectsAliasOnly = false;
-
-    //         return new SqlSegment(SqlSegmentType.Projection, projection, context.State.CurrentKeyword, mode);
-    //     }
-
-    //     // 2. Collections (WHERE IN support)
-    //     // We exclude string because it is an IEnumerable but we want it as a parameter
-    //     if (value is IEnumerable collection && value is not string)
-    //     {
-    //         return HandleCollection(context, collection);
-    //     }
-
-    //     // 3. Manual Fragments
-    //     if (value is ISqlFragment fragment)
-    //     {
-    //         return new SqlSegment(SqlSegmentType.Raw, fragment);
-    //     }
-
-    //     // 4. Default: Standard Parameter
-    //     return CreateParameter(context, value);
-    // }
-
     public void ProcessLiteral(SqlContext context, ReadOnlySpan<char> span)
     {
         var trimmed = span.Trim();
@@ -103,7 +71,7 @@ public class DefaultSqlParser : ISqlParser
         {
             // If the previous segment was a table declaration, downgrade it to BaseName
             var last = GetLastSegment(context);
-            
+
             if (last is { RenderMode: SqlRenderMode.Declaration })
             {
                 last.RenderMode = SqlRenderMode.BaseName;
@@ -150,33 +118,6 @@ public class DefaultSqlParser : ISqlParser
         // 2. Fallback to the builder (previous strings)
         return context.State.LastSegment ?? context.Builder.LastSegment;
     }
-
-    // public void ProcessLiteral(SqlContext context, ReadOnlySpan<char> span)
-    // {
-    //     context.State.ExpectsAliasOnly = EndsWithAsKeyword(span);
-
-    //     // The "Time Traveler" Capture logic
-    //     if (context.State.LastAliasableTarget is ISqlProjection projection)
-    //     {
-    //         if (TryPeekAlias(context, span, out var alias))
-    //         {
-    //             // 1. We check if the reference is an EntityReference (the prefix owner)
-    //             if (projection.Reference is EntityReference entRef)
-    //             {
-    //                 entRef.Alias = alias;
-    //             }
-                
-    //             // 2. Clear the target once captured
-    //             context.State.LastAliasableTarget = null;
-    //         }
-    //         else if (IsCaptureTerminated(span))
-    //         {
-    //             context.State.LastAliasableTarget = null;
-    //         }
-    //     }
-
-    //     UpdateScannerState(context, span);
-    // }
 
     protected virtual SqlSegment HandleCollection(SqlContext context, IEnumerable collection)
     {
@@ -231,63 +172,12 @@ public class DefaultSqlParser : ISqlParser
         return char.IsWhiteSpace(prefix) || prefix == ')' || prefix == ']' || prefix == '"' || prefix == '`';
     }
 
-    // private bool EndsWithAsKeyword(ReadOnlySpan<char> span)
-    // {
-    //     var trimmed = span.TrimEnd();
-    //     if (trimmed.Length < 2) return false;
-        
-    //     // Match " AS" at the end of the string
-    //     if (trimmed.EndsWith("AS", StringComparison.OrdinalIgnoreCase))
-    //     {
-    //         // Must be start of string or preceded by whitespace
-    //         return trimmed.Length == 2 || char.IsWhiteSpace(trimmed[^(3)]);
-    //     }
-    //     return false;
-    // }
-
     private SqlSegment HandleProjection(SqlContext context, ISqlProjection projection)
     {
         // Mark that the next literal might contain an alias for this projection
         context.State.PendingAliasCapture = projection;
         return new SqlSegment(SqlSegmentType.Projection, projection, context.State.CurrentKeyword);
     }
-
-    // protected virtual SqlSegment HandleCollection(SqlContext context, IEnumerable collection)
-    // {
-    //     var sb = new StringBuilder();
-    //     bool first = true;
-
-    //     foreach (var item in collection)
-    //     {
-    //         if (!first) sb.Append(", ");
-            
-    //         // Create a parameter for each item and get its full key (e.g., @p0)
-    //         var paramSegment = CreateParameter(context, item);
-    //         sb.Append(paramSegment.Value); 
-            
-    //         first = false;
-    //     }
-
-    //     if (first) sb.Append("NULL");
-
-    //     // Return as Raw because the string already contains the final parameter names
-    //     return new SqlSegment(SqlSegmentType.Raw, sb.ToString());
-    // }
-
-    // protected virtual SqlSegment CreateParameter(SqlContext context, object? value)
-    // {
-    //     int index = context.Options.ParameterIndexStart + context.State.ParameterCount;
-    //     string prefix = context.Options.ParameterPrefixOverride ?? context.Dialect.ParameterPrefix;
-        
-    //     // This is the FINAL identifier (e.g. "@p0", "$1", "!!100")
-    //     string paramKey = $"{prefix}{index}";
-        
-    //     context.Parameters[paramKey] = value ?? DBNull.Value;
-    //     context.State.ParameterCount++;
-        
-    //     // The Renderer should append this Value exactly as is
-    //     return new SqlSegment(SqlSegmentType.Parameter, paramKey);
-    // }
 
     protected virtual bool TryPeekAlias(SqlContext context, ReadOnlySpan<char> span, out string? alias)
     {

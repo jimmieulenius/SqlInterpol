@@ -2,7 +2,7 @@ using SqlInterpol.Config;
 
 namespace SqlInterpol.References;
 
-public class EntityReference(ISqlEntity parent) : ISqlReference
+public class SqlEntityReference(ISqlEntity parent) : ISqlReference
 {
     private readonly ISqlEntity _parent = parent;
     
@@ -24,28 +24,3 @@ public class EntityReference(ISqlEntity parent) : ISqlReference
         return _parent.ToSql(context, mode);
     }
 }
-
-// public class EntityReference(ISqlEntity entity) : ISqlReference
-// {
-//     public ISqlProjection Source => Entity;
-//     public ISqlEntity Entity => entity;
-//     public string? Alias { get; set; }
-
-//     public string ToSql(SqlContext context)
-//     {
-//         var open = context.Dialect.OpenQuote;
-//         var close = context.Dialect.CloseQuote;
-
-//         // For a subquery, Name is empty, so Alias is mandatory.
-//         string identifier = Alias ?? Entity.Name;
-
-//         if (string.IsNullOrEmpty(identifier))
-//         {
-//             // This would only happen if someone forgot to alias a subquery.
-//             // Most DBs (SQL Server/Postgres) will throw an error anyway.
-//             return string.Empty; 
-//         }
-        
-//         return $"{open}{identifier}{close}";
-//     }
-// }

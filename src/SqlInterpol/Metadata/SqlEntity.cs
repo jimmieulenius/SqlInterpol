@@ -7,11 +7,9 @@ namespace SqlInterpol.Metadata;
 
 public abstract class SqlEntity<T> : ISqlEntity<T>
 {
-    // ISqlEntity implementation
     public string Name { get; set; }
     public string? Schema { get; }
     
-    // Internal state
     public ISqlProjection? Parent { get; }
     public ISqlReference Reference { get; protected set; }
     public ISqlDeclaration Declaration { get; protected set; }
@@ -19,7 +17,7 @@ public abstract class SqlEntity<T> : ISqlEntity<T>
     // ISqlProjection implementation
     // For an entity, the PropertyName is the 'Identity' in C#. 
     // We use the Alias if set, otherwise the Table Name.
-    public string PropertyName => (Reference as EntityReference)?.Alias ?? Name;
+    public string PropertyName => (Reference as SqlEntityReference)?.Alias ?? Name;
 
     protected SqlEntity(string name, string? schema, ISqlProjection? parent = null)
     {
@@ -29,13 +27,11 @@ public abstract class SqlEntity<T> : ISqlEntity<T>
 
         // 1. Reference acts as the 'Smart Pointer' (Alias ?? Name)
         // We cast 'this' to ISqlEntity to pass it to the reference
-        Reference = new EntityReference(this); 
+        Reference = new SqlEntityReference(this); 
         
         // 2. Declaration represents the source (e.g. [Schema].[Table] AS [Alias])
         Declaration = new SqlDeclaration(Reference);
     }
-
-    // --- Semantic Helpers ---
 
     public ISqlFragment Entity(string name) => new SqlEntityNameFragment(this, name);
 
@@ -66,8 +62,6 @@ public abstract class SqlEntity<T> : ISqlEntity<T>
         return new SqlRawFragment(ctx => ctx.Dialect.QuoteIdentifier(alias));
     }
 
-    // --- Indexers ---
-
     public ISqlReference this[Expression<Func<T, object>> propertySelector]
     {
         get
@@ -85,10 +79,6 @@ public abstract class SqlEntity<T> : ISqlEntity<T>
 
     public ISqlReference this[string columnName] 
         => new SqlRawColumnReference(Reference, columnName);
-
-    // ISqlFragment implementation
-    // public virtual string ToSql(SqlContext context) 
-    //     => context.Dialect.QuoteTableName(Name, Schema);
 
     public virtual string ToSql(SqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
     {
