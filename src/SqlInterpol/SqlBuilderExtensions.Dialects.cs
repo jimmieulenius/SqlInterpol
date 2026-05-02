@@ -3,13 +3,13 @@ using SqlInterpol.Dialects;
 
 namespace SqlInterpol;
 
+public static class DialectCache<T> where T : ISqlDialect, new()
+{
+    public static readonly T Instance = new();
+}
+
 public static partial class SqlBuilderExtensions
 {
-    private static class DialectCache<T> where T : ISqlDialect, new()
-    {
-        public static readonly T Instance = new();
-    }
-
     extension (SqlBuilder _)
     {
         public static SqlBuilder PostgreSql(SqlInterpolOptions? opt = null) 
@@ -27,7 +27,7 @@ public static partial class SqlBuilderExtensions
         public static SqlBuilder SqlServer(SqlInterpolOptions? opt = null) 
             => new(DialectCache<SqlServerSqlDialect>.Instance, opt);
 
-        public static SqlBuilder ForDialect<TDialect>(SqlInterpolOptions? opt = null) 
+        public static SqlBuilder Dialect<TDialect>(SqlInterpolOptions? opt = null) 
             where TDialect : ISqlDialect, new()
             => new(DialectCache<TDialect>.Instance, opt);
     }

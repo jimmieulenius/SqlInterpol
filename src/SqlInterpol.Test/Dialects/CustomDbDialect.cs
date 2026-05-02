@@ -26,11 +26,9 @@ public class CustomDbSqlDialect : SqlDialectBase
 // 3. SqlBuilder
 public static partial class SqlBuilderExtensions
 {
-    private static readonly CustomDbSqlDialect _customDb = new();
-
     extension (SqlBuilder _)
     {
         public static SqlBuilder CustomDb(SqlInterpolOptions? opt = null) 
-            => new(_customDb, opt);
+            => new(DialectCache<CustomDbSqlDialect>.Instance, opt);
     }
 }

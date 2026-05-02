@@ -1,3 +1,4 @@
+using SqlInterpol.Config;
 using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
 
@@ -6,8 +7,8 @@ namespace SqlInterpol.Tests;
 public class AliasProjectionTests
 {
     [Theory]
-    [MemberData(nameof(AppendAliasData))]
-    public void Alias_Append(SqlBuilder db, string expected)
+    [MemberData(nameof(AppendLiteralAliasData))]
+    public void Literal_Alias_Append(string _,SqlBuilder db, string expected)
     {
         // Arrange
         db.Query<Product>(p =>
@@ -20,37 +21,141 @@ public class AliasProjectionTests
         Assert.Equal(expected, result.Sql);
     }
 
-    public static TheoryData<SqlBuilder, string> AppendAliasData => new()
+    public static TheoryData<string, SqlBuilder, string> AppendLiteralAliasData => new()
     {
         {
+            SqlDialectKind.CustomDb,
             SqlBuilder.CustomDb(),
             "SELECT <<prd>>.<<Id>> AS ProductId FROM <<dbo>>.<<Products>> AS prd"
         },
         {
+            SqlDialectKind.MySql,
             SqlBuilder.MySql(),
             "SELECT `prd`.`Id` AS ProductId FROM `dbo`.`Products` AS prd"
         },
         {
+            SqlDialectKind.Oracle,
             SqlBuilder.Oracle(),
             "SELECT \"prd\".\"Id\" AS ProductId FROM \"dbo\".\"Products\" AS prd"
         },
         {
+            SqlDialectKind.PostgreSql,
             SqlBuilder.PostgreSql(),
             "SELECT \"prd\".\"Id\" AS ProductId FROM \"dbo\".\"Products\" AS prd"
         },
         {
+            SqlDialectKind.SqLite,
             SqlBuilder.SqLite(),
             "SELECT \"prd\".\"Id\" AS ProductId FROM \"dbo\".\"Products\" AS prd"
         },
         {
+            SqlDialectKind.SqlServer,
             SqlBuilder.SqlServer(),
             "SELECT [prd].[Id] AS ProductId FROM [dbo].[Products] AS prd"
         }
     };
 
     [Theory]
+    [MemberData(nameof(AliasExplicitIsQuotedData))]
+    public void Alias_Explicit_IsQuoted(string _,SqlBuilder db, string expected)
+    {
+        // Arrange
+        db.Query<Product>(p =>
+            db.Append($"SELECT {p[x => x.Id]} FROM {p} AS {p.Alias("prd")}"));
+        
+        // Act
+        var result = db.Build();
+
+        // Assert
+        Assert.Equal(expected, result.Sql);
+    }
+
+    public static TheoryData<string, SqlBuilder, string> AliasExplicitIsQuotedData => new()
+    {
+        {
+            SqlDialectKind.CustomDb,
+            SqlBuilder.CustomDb(),
+            "SELECT <<prd>>.<<Id>> FROM <<dbo>>.<<Products>> AS <<prd>>"
+        },
+        {
+            SqlDialectKind.MySql,
+            SqlBuilder.MySql(),
+            "SELECT `prd`.`Id` FROM `dbo`.`Products` AS `prd`"
+        },
+        {
+            SqlDialectKind.Oracle,
+            SqlBuilder.Oracle(),
+            "SELECT \"prd\".\"Id\" FROM \"dbo\".\"Products\" AS \"prd\""
+        },
+        {
+            SqlDialectKind.PostgreSql,
+            SqlBuilder.PostgreSql(),
+            "SELECT \"prd\".\"Id\" FROM \"dbo\".\"Products\" AS \"prd\""
+        },
+        {
+            SqlDialectKind.SqLite,
+            SqlBuilder.SqLite(),
+            "SELECT \"prd\".\"Id\" FROM \"dbo\".\"Products\" AS \"prd\""
+        },
+        {
+            SqlDialectKind.SqlServer,
+            SqlBuilder.SqlServer(),
+            "SELECT [prd].[Id] FROM [dbo].[Products] AS [prd]"
+        }
+    };
+
+    [Theory]
+    [MemberData(nameof(AliasLiteralInSqlIsNotQuotedData))]
+    public void Alias_LiteralInSql_IsNotQuoted(string _,SqlBuilder db, string expected)
+    {
+        // Arrange
+        db.Query<Product>(p =>
+            db.Append($"SELECT {p[x => x.Id]} FROM {p} AS prd"));
+        
+        // Act
+        var result = db.Build();
+
+        // Assert
+        Assert.Equal(expected, result.Sql);
+    }
+
+    public static TheoryData<string, SqlBuilder, string> AliasLiteralInSqlIsNotQuotedData => new()
+    {
+        {
+            SqlDialectKind.CustomDb,
+            SqlBuilder.CustomDb(),
+            "SELECT <<prd>>.<<Id>> FROM <<dbo>>.<<Products>> AS prd"
+        },
+        {
+            SqlDialectKind.MySql,
+            SqlBuilder.MySql(),
+            "SELECT `prd`.`Id` FROM `dbo`.`Products` AS prd"
+        },
+        {
+            SqlDialectKind.Oracle,
+            SqlBuilder.Oracle(),
+            "SELECT \"prd\".\"Id\" FROM \"dbo\".\"Products\" AS prd"
+        },
+        {
+            SqlDialectKind.PostgreSql,
+            SqlBuilder.PostgreSql(),
+            "SELECT \"prd\".\"Id\" FROM \"dbo\".\"Products\" AS prd"
+        },
+        {
+            SqlDialectKind.SqLite,
+            SqlBuilder.SqLite(),
+            "SELECT \"prd\".\"Id\" FROM \"dbo\".\"Products\" AS prd"
+        },
+        {
+            SqlDialectKind.SqlServer,
+            SqlBuilder.SqlServer(),
+            "SELECT [prd].[Id] FROM [dbo].[Products] AS prd"
+        }
+    };
+
+    [Theory]
     [MemberData(nameof(AppendQuotedAliasData))]
-    public void QuotedAlias_Append(SqlBuilder db, string expected)
+    public void QuotedAlias_Append(string _, SqlBuilder db, string expected)
     {
         // Arrange
         var open = Sql.Raw(db.Context.Dialect.OpenQuote);
@@ -66,29 +171,35 @@ public class AliasProjectionTests
         Assert.Equal(expected, result.Sql);
     }
 
-    public static TheoryData<SqlBuilder, string> AppendQuotedAliasData => new()
+    public static TheoryData<string, SqlBuilder, string> AppendQuotedAliasData => new()
     {
         {
+            SqlDialectKind.CustomDb,
             SqlBuilder.CustomDb(),
             "SELECT <<prd>>.<<Id>> AS <<ProductId>> FROM <<dbo>>.<<Products>> AS <<prd>>"
         },
         {
+            SqlDialectKind.MySql,
             SqlBuilder.MySql(),
             "SELECT `prd`.`Id` AS `ProductId` FROM `dbo`.`Products` AS `prd`"
         },
         {
+            SqlDialectKind.Oracle,
             SqlBuilder.Oracle(),
             "SELECT \"prd\".\"Id\" AS \"ProductId\" FROM \"dbo\".\"Products\" AS \"prd\""
         },
         {
+            SqlDialectKind.PostgreSql,
             SqlBuilder.PostgreSql(),
             "SELECT \"prd\".\"Id\" AS \"ProductId\" FROM \"dbo\".\"Products\" AS \"prd\""
         },
         {
+            SqlDialectKind.SqLite,
             SqlBuilder.SqLite(),
             "SELECT \"prd\".\"Id\" AS \"ProductId\" FROM \"dbo\".\"Products\" AS \"prd\""
         },
         {
+            SqlDialectKind.SqlServer,
             SqlBuilder.SqlServer(),
             "SELECT [prd].[Id] AS [ProductId] FROM [dbo].[Products] AS [prd]"
         }
@@ -96,7 +207,7 @@ public class AliasProjectionTests
 
     [Theory]
     [MemberData(nameof(AppendLineAliasData))]
-    public void Alias_AppendLine(SqlBuilder db, string expected)
+    public void Alias_AppendLine(string _, SqlBuilder db, string expected)
     {
         // Arrange
         db.Query<Product>(p =>
@@ -110,34 +221,40 @@ public class AliasProjectionTests
         Assert.Equal(expected, result.Sql);
     }
 
-    public static TheoryData<SqlBuilder, string> AppendLineAliasData => new()
+    public static TheoryData<string, SqlBuilder, string> AppendLineAliasData => new()
     {
         { 
+            SqlDialectKind.CustomDb,
             SqlBuilder.CustomDb(), 
             $"SELECT <<prd>>.<<Id>> AS ProductId{Environment.NewLine
             }FROM <<dbo>>.<<Products>> AS prd" 
         },
         { 
+            SqlDialectKind.MySql,
             SqlBuilder.MySql(), 
             $"SELECT `prd`.`Id` AS ProductId{Environment.NewLine
             }FROM `dbo`.`Products` AS prd" 
         },
-        { 
+        {
+            SqlDialectKind.Oracle,
             SqlBuilder.Oracle(), 
             $"SELECT \"prd\".\"Id\" AS ProductId{Environment.NewLine
             }FROM \"dbo\".\"Products\" AS prd" 
         },
-        { 
+        {
+            SqlDialectKind.PostgreSql,
             SqlBuilder.PostgreSql(), 
             $"SELECT \"prd\".\"Id\" AS ProductId{Environment.NewLine
             }FROM \"dbo\".\"Products\" AS prd" 
         },
-        { 
+        {
+            SqlDialectKind.SqLite,
             SqlBuilder.SqLite(), 
             $"SELECT \"prd\".\"Id\" AS ProductId{Environment.NewLine
             }FROM \"dbo\".\"Products\" AS prd" 
         },
         { 
+            SqlDialectKind.SqlServer,
             SqlBuilder.SqlServer(), 
             $"SELECT [prd].[Id] AS ProductId{Environment.NewLine
             }FROM [dbo].[Products] AS prd" 
@@ -146,7 +263,7 @@ public class AliasProjectionTests
 
     [Theory]
     [MemberData(nameof(RawStringAliasData))]
-    public void Alias_RawString(SqlBuilder db, string expected)
+    public void Alias_RawString(string _, SqlBuilder db, string expected)
     {
         // Arrange
         db.Query<Product>(p =>
@@ -164,9 +281,10 @@ public class AliasProjectionTests
         Assert.Equal(expected, result.Sql);
     }
 
-    public static TheoryData<SqlBuilder, string> RawStringAliasData => new()
+    public static TheoryData<string, SqlBuilder, string> RawStringAliasData => new()
     {
         { 
+            SqlDialectKind.CustomDb,
             SqlBuilder.CustomDb(), 
             """
             SELECT 
@@ -175,7 +293,8 @@ public class AliasProjectionTests
             FROM <<dbo>>.<<Products>> AS prd
             """ 
         },
-        { 
+        {
+            SqlDialectKind.MySql,
             SqlBuilder.MySql(), 
             """
             SELECT 
@@ -184,7 +303,8 @@ public class AliasProjectionTests
             FROM `dbo`.`Products` AS prd
             """ 
         },
-        { 
+        {
+            SqlDialectKind.Oracle,
             SqlBuilder.Oracle(), 
             """
             SELECT 
@@ -193,7 +313,8 @@ public class AliasProjectionTests
             FROM "dbo"."Products" AS prd
             """ 
         },
-        { 
+        {
+            SqlDialectKind.PostgreSql,
             SqlBuilder.PostgreSql(), 
             """
             SELECT 
@@ -202,7 +323,8 @@ public class AliasProjectionTests
             FROM "dbo"."Products" AS prd
             """ 
         },
-        { 
+        {
+            SqlDialectKind.SqLite,
             SqlBuilder.SqLite(), 
             """
             SELECT 
@@ -211,7 +333,8 @@ public class AliasProjectionTests
             FROM "dbo"."Products" AS prd
             """ 
         },
-        { 
+        {
+            SqlDialectKind.SqlServer,
             SqlBuilder.SqlServer(), 
             """
             SELECT 
@@ -224,7 +347,7 @@ public class AliasProjectionTests
 
     [Theory]
     [MemberData(nameof(ReservedAliasData))]
-    public void Alias_With_Reserved_Words_Preserves_Quotes_And_Mapping(SqlBuilder db, string expected)
+    public void Alias_With_Reserved_Words_Preserves_Quotes_And_Mapping(string _, SqlBuilder db, string expected)
     {
         // Arrange
         var open = Sql.Raw(db.Context.Dialect.OpenQuote);
@@ -240,29 +363,35 @@ public class AliasProjectionTests
         Assert.Equal(expected, result.Sql);
     }
 
-    public static TheoryData<SqlBuilder, string> ReservedAliasData => new()
+    public static TheoryData<string, SqlBuilder, string> ReservedAliasData => new()
     {
         { 
+            SqlDialectKind.CustomDb,
             SqlBuilder.CustomDb(),   
             "SELECT <<Group>>.<<Id>> AS <<Order>> FROM <<dbo>>.<<Products>> AS <<Group>>" 
         },
         { 
+            SqlDialectKind.MySql,
             SqlBuilder.MySql(),      
             "SELECT `Group`.`Id` AS `Order` FROM `dbo`.`Products` AS `Group`" 
         },
-        { 
+        {
+            SqlDialectKind.Oracle,
             SqlBuilder.Oracle(),    
             "SELECT \"Group\".\"Id\" AS \"Order\" FROM \"dbo\".\"Products\" AS \"Group\"" 
         },
         { 
+            SqlDialectKind.PostgreSql,
             SqlBuilder.PostgreSql(),    
             "SELECT \"Group\".\"Id\" AS \"Order\" FROM \"dbo\".\"Products\" AS \"Group\"" 
         },
         { 
+            SqlDialectKind.SqLite,
             SqlBuilder.SqLite(),    
             "SELECT \"Group\".\"Id\" AS \"Order\" FROM \"dbo\".\"Products\" AS \"Group\"" 
         },
-        { 
+        {
+            SqlDialectKind.SqlServer,
             SqlBuilder.SqlServer(), 
             "SELECT [Group].[Id] AS [Order] FROM [dbo].[Products] AS [Group]" 
         }
@@ -270,7 +399,7 @@ public class AliasProjectionTests
 
     [Theory]
     [MemberData(nameof(AliasMappingIdentityData))]
-    public void Alias_Mapping_Identity(SqlBuilder db, string expected)
+    public void Alias_Mapping_Identity(string _, SqlBuilder db, string expected)
     {
         // Arrange
         db.Query<Product>(p =>
@@ -284,29 +413,35 @@ public class AliasProjectionTests
         Assert.Equal(expected, result.Sql);
     }
 
-    public static TheoryData<SqlBuilder, string> AliasMappingIdentityData => new()
+    public static TheoryData<string, SqlBuilder, string> AliasMappingIdentityData => new()
     {
         {
+            SqlDialectKind.CustomDb,
             SqlBuilder.CustomDb(),
             "SELECT <<prd>>.<<PROD_NAME>> AS <<Name>> FROM <<dbo>>.<<Products>> AS <<prd>>"
         },
         {
+            SqlDialectKind.MySql,
             SqlBuilder.MySql(),
             "SELECT `prd`.`PROD_NAME` AS `Name` FROM `dbo`.`Products` AS `prd`"
         },
         {
+            SqlDialectKind.Oracle,
             SqlBuilder.Oracle(),
             "SELECT \"prd\".\"PROD_NAME\" AS \"Name\" FROM \"dbo\".\"Products\" AS \"prd\""
         },
         {
+            SqlDialectKind.PostgreSql,
             SqlBuilder.PostgreSql(),
             "SELECT \"prd\".\"PROD_NAME\" AS \"Name\" FROM \"dbo\".\"Products\" AS \"prd\""
         },
         {
+            SqlDialectKind.SqLite,
             SqlBuilder.SqLite(),
             "SELECT \"prd\".\"PROD_NAME\" AS \"Name\" FROM \"dbo\".\"Products\" AS \"prd\""
         },
         {
+            SqlDialectKind.SqlServer,
             SqlBuilder.SqlServer(),
             "SELECT [prd].[PROD_NAME] AS [Name] FROM [dbo].[Products] AS [prd]"
         }
@@ -314,7 +449,7 @@ public class AliasProjectionTests
 
     [Theory]
     [MemberData(nameof(AliasMappingUnquotedData))]
-    public void Alias_Mapping_Unquoted(SqlBuilder db, string expected)
+    public void Alias_Mapping_Unquoted(string _, SqlBuilder db, string expected)
     {
         // Arrange
         db.Query<Product>(p =>
@@ -328,29 +463,35 @@ public class AliasProjectionTests
         Assert.Equal(expected, result.Sql);
     }
 
-    public static TheoryData<SqlBuilder, string> AliasMappingUnquotedData => new()
+    public static TheoryData<string, SqlBuilder, string> AliasMappingUnquotedData => new()
     {
         {
+            SqlDialectKind.CustomDb,
             SqlBuilder.CustomDb(),
             "SELECT <<prd>>.<<PROD_NAME>> AS <<Name>> FROM <<dbo>>.<<Products>> AS prd"
         },
         {
+            SqlDialectKind.MySql,
             SqlBuilder.MySql(),
             "SELECT `prd`.`PROD_NAME` AS `Name` FROM `dbo`.`Products` AS prd"
         },
         {
+            SqlDialectKind.Oracle,
             SqlBuilder.Oracle(),
             "SELECT \"prd\".\"PROD_NAME\" AS \"Name\" FROM \"dbo\".\"Products\" AS prd"
         },
         {
+            SqlDialectKind.PostgreSql,
             SqlBuilder.PostgreSql(),
             "SELECT \"prd\".\"PROD_NAME\" AS \"Name\" FROM \"dbo\".\"Products\" AS prd"
         },
         {
+            SqlDialectKind.SqLite,
             SqlBuilder.SqLite(),
             "SELECT \"prd\".\"PROD_NAME\" AS \"Name\" FROM \"dbo\".\"Products\" AS prd"
         },
         {
+            SqlDialectKind.SqlServer,
             SqlBuilder.SqlServer(),
             "SELECT [prd].[PROD_NAME] AS [Name] FROM [dbo].[Products] AS prd"
         }
@@ -358,7 +499,7 @@ public class AliasProjectionTests
 
     [Theory]
     [MemberData(nameof(ManualColumnData))]
-    public void Manual_Column_With_Alias_Theory(SqlBuilder db, string expected)
+    public void Manual_Column_With_Alias_Theory(string _,SqlBuilder db, string expected)
     {
         // Arrange
         db.Query<Product>(p =>
@@ -372,24 +513,35 @@ public class AliasProjectionTests
         Assert.Equal(expected, result.Sql);
     }
 
-    public static TheoryData<SqlBuilder, string> ManualColumnData => new()
+    public static TheoryData<string, SqlBuilder, string> ManualColumnData => new()
     {
         {
+            SqlDialectKind.CustomDb,
             SqlBuilder.CustomDb(),
-            "SELECT <<prd>>.<<LEGACY_PROD_NAME>> AS <<Name>> FROM <<dbo>>.<<Products>> AS <<prd>>" },
+            "SELECT <<prd>>.<<LEGACY_PROD_NAME>> AS <<Name>> FROM <<dbo>>.<<Products>> AS <<prd>>"
+        },
         {
+            SqlDialectKind.MySql,
             SqlBuilder.MySql(),
-            "SELECT `prd`.`LEGACY_PROD_NAME` AS `Name` FROM `dbo`.`Products` AS `prd`" },
+            "SELECT `prd`.`LEGACY_PROD_NAME` AS `Name` FROM `dbo`.`Products` AS `prd`"
+        },
         {
+            SqlDialectKind.Oracle,
             SqlBuilder.Oracle(),
-            "SELECT \"prd\".\"LEGACY_PROD_NAME\" AS \"Name\" FROM \"dbo\".\"Products\" AS \"prd\"" },
+            "SELECT \"prd\".\"LEGACY_PROD_NAME\" AS \"Name\" FROM \"dbo\".\"Products\" AS \"prd\""
+        },
         {
+            SqlDialectKind.PostgreSql,
             SqlBuilder.PostgreSql(),
-            "SELECT \"prd\".\"LEGACY_PROD_NAME\" AS \"Name\" FROM \"dbo\".\"Products\" AS \"prd\"" },
+            "SELECT \"prd\".\"LEGACY_PROD_NAME\" AS \"Name\" FROM \"dbo\".\"Products\" AS \"prd\""
+        },
         {
+            SqlDialectKind.SqLite,
             SqlBuilder.SqLite(),
-            "SELECT \"prd\".\"LEGACY_PROD_NAME\" AS \"Name\" FROM \"dbo\".\"Products\" AS \"prd\"" },
+            "SELECT \"prd\".\"LEGACY_PROD_NAME\" AS \"Name\" FROM \"dbo\".\"Products\" AS \"prd\""
+        },
         {
+            SqlDialectKind.SqlServer,
             SqlBuilder.SqlServer(),
             "SELECT [prd].[LEGACY_PROD_NAME] AS [Name] FROM [dbo].[Products] AS [prd]"
         }

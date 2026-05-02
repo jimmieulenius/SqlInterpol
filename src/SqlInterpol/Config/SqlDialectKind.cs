@@ -9,4 +9,6 @@ public readonly record struct SqlDialectKind(string Value)
     public static SqlDialectKind SqlServer { get; } = new("SqlServer");
     
     public override string ToString() => Value;
+
+    public static implicit operator string(SqlDialectKind kind) => kind.Value;
 }

@@ -1,3 +1,4 @@
+using SqlInterpol.Config;
 using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
 
@@ -7,7 +8,7 @@ public class BasicProjectionTests
 {
     [Theory]
     [MemberData(nameof(AppendData))]
-    public void Projection_Append(SqlBuilder db, string expected)
+    public void Projection_Append(string _, SqlBuilder db, string expected)
     {
         // Arrange
         db.Query<Product>((p) =>
@@ -20,31 +21,37 @@ public class BasicProjectionTests
         Assert.Equal(expected, result.Sql);
     }
 
-    public static TheoryData<SqlBuilder, string> AppendData => new()
+    public static TheoryData<string, SqlBuilder, string> AppendData => new()
     {
         {
+            SqlDialectKind.CustomDb,
             SqlBuilder.CustomDb(),
             "SELECT <<dbo>>.<<Products>>.<<Id>> FROM <<dbo>>.<<Products>>" },
         {
+            SqlDialectKind.MySql,
             SqlBuilder.MySql(),
             "SELECT `dbo`.`Products`.`Id` FROM `dbo`.`Products`" },
         {
+            SqlDialectKind.Oracle,
             SqlBuilder.Oracle(),
             "SELECT \"dbo\".\"Products\".\"Id\" FROM \"dbo\".\"Products\"" },
         {
+            SqlDialectKind.PostgreSql,
             SqlBuilder.PostgreSql(),
             "SELECT \"dbo\".\"Products\".\"Id\" FROM \"dbo\".\"Products\"" },
         {
+            SqlDialectKind.SqLite,
             SqlBuilder.SqLite(),
             "SELECT \"dbo\".\"Products\".\"Id\" FROM \"dbo\".\"Products\"" },
         {
+            SqlDialectKind.SqlServer,
             SqlBuilder.SqlServer(),
             "SELECT [dbo].[Products].[Id] FROM [dbo].[Products]" }
     };
 
     [Theory]
     [MemberData(nameof(AppendLineData))]
-    public void Projection_AppendLine(SqlBuilder db, string expected)
+    public void Projection_AppendLine(string _,SqlBuilder db, string expected)
     {
         // Arrange
         db.Query<Product>((p) =>
@@ -58,34 +65,40 @@ public class BasicProjectionTests
         Assert.Equal(expected, result.Sql);
     }
 
-    public static TheoryData<SqlBuilder, string> AppendLineData => new()
+    public static TheoryData<string, SqlBuilder, string> AppendLineData => new()
     {
         {
+            SqlDialectKind.CustomDb,
             SqlBuilder.CustomDb(),
             $"SELECT <<dbo>>.<<Products>>.<<Id>>{Environment.NewLine
             }FROM <<dbo>>.<<Products>>"
         },
         {
+            SqlDialectKind.MySql,
             SqlBuilder.MySql(),
             $"SELECT `dbo`.`Products`.`Id`{Environment.NewLine
             }FROM `dbo`.`Products`"
         },
         {
+            SqlDialectKind.Oracle,
             SqlBuilder.Oracle(),
             $"SELECT \"dbo\".\"Products\".\"Id\"{Environment.NewLine
             }FROM \"dbo\".\"Products\""
         },
         {
+            SqlDialectKind.PostgreSql,
             SqlBuilder.PostgreSql(),
             $"SELECT \"dbo\".\"Products\".\"Id\"{Environment.NewLine
             }FROM \"dbo\".\"Products\""
         },
         {
+            SqlDialectKind.SqLite,
             SqlBuilder.SqLite(),
             $"SELECT \"dbo\".\"Products\".\"Id\"{Environment.NewLine
             }FROM \"dbo\".\"Products\""
         },
         {
+            SqlDialectKind.SqlServer,
             SqlBuilder.SqlServer(),
             $"SELECT [dbo].[Products].[Id]{Environment.NewLine
             }FROM [dbo].[Products]"
@@ -94,7 +107,7 @@ public class BasicProjectionTests
 
     [Theory]
     [MemberData(nameof(RawStringData))]
-    public void Projection_RawString(SqlBuilder db, string expected)
+    public void Projection_RawString(string _, SqlBuilder db, string expected)
     {
         // Arrange
         db.Query<Product>(p =>
@@ -111,9 +124,10 @@ public class BasicProjectionTests
         Assert.Equal(expected, result.Sql);
     }
 
-    public static TheoryData<SqlBuilder, string> RawStringData => new()
+    public static TheoryData<string, SqlBuilder, string> RawStringData => new()
     {
         { 
+            SqlDialectKind.CustomDb,
             SqlBuilder.CustomDb(), 
             """
             SELECT
@@ -122,6 +136,7 @@ public class BasicProjectionTests
             """ 
         },
         { 
+            SqlDialectKind.MySql,
             SqlBuilder.MySql(), 
             """
             SELECT
@@ -130,6 +145,7 @@ public class BasicProjectionTests
             """ 
         },
         { 
+            SqlDialectKind.Oracle,
             SqlBuilder.Oracle(), 
             """
             SELECT
@@ -138,6 +154,7 @@ public class BasicProjectionTests
             """ 
         },
         { 
+            SqlDialectKind.PostgreSql,
             SqlBuilder.PostgreSql(), 
             """
             SELECT
@@ -146,6 +163,7 @@ public class BasicProjectionTests
             """ 
         },
         { 
+            SqlDialectKind.SqLite,
             SqlBuilder.SqLite(), 
             """
             SELECT
@@ -153,7 +171,8 @@ public class BasicProjectionTests
             FROM "dbo"."Products"
             """ 
         },
-        { 
+        {
+            SqlDialectKind.SqlServer,
             SqlBuilder.SqlServer(), 
             """
             SELECT
