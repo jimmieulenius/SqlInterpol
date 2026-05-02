@@ -71,11 +71,6 @@ public class SqlBuilder : ISqlEntityRegistry
                 vsb.Append(Renderer.Render(Context, _segments[i], i, _segments) ?? string.Empty);
             }
 
-            // for (int i = 0; i < _segments.Count; i++)
-            // {
-            //     RenderSegment(ref vsb, i, _segments[i]);
-            // }
-
             return new SqlQueryResult(vsb.ToString(), Context.Parameters);
         }
         finally
