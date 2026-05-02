@@ -105,8 +105,8 @@ public class AliasProjectionTests
     };
 
     [Theory]
-    [MemberData(nameof(AliasLiteralInSqlIsNotQuotedData))]
-    public void Alias_LiteralInSql_IsNotQuoted(string _,SqlBuilder db, string expected)
+    [MemberData(nameof(AliasLiteralInSqlIsUnquotedData))]
+    public void Alias_LiteralInSql_IsUnquoted(string _,SqlBuilder db, string expected)
     {
         // Arrange
         db.Query<Product>(p =>
@@ -119,7 +119,7 @@ public class AliasProjectionTests
         Assert.Equal(expected, result.Sql);
     }
 
-    public static TheoryData<string, SqlBuilder, string> AliasLiteralInSqlIsNotQuotedData => new()
+    public static TheoryData<string, SqlBuilder, string> AliasLiteralInSqlIsUnquotedData => new()
     {
         {
             SqlDialectKind.CustomDb,
@@ -158,11 +158,8 @@ public class AliasProjectionTests
     public void QuotedAlias_Append(string _, SqlBuilder db, string expected)
     {
         // Arrange
-        var open = Sql.Raw(db.Context.Dialect.OpenQuote);
-        var close = Sql.Raw(db.Context.Dialect.CloseQuote);
-
         db.Query<Product>(p =>
-             db.Append($"SELECT {p[x => x.Id]} AS {open}ProductId{close} FROM {p} AS {open}prd{close}"));
+             db.Append($"SELECT {p[x => x.Id]} AS {Sql.OpenQuote()}ProductId{Sql.CloseQuote()} FROM {p} AS {Sql.OpenQuote()}prd{Sql.CloseQuote()}"));
 
         // Act
         var result = db.Build();
@@ -349,12 +346,8 @@ public class AliasProjectionTests
     [MemberData(nameof(ReservedAliasData))]
     public void Alias_With_Reserved_Words_Preserves_Quotes_And_Mapping(string _, SqlBuilder db, string expected)
     {
-        // Arrange
-        var open = Sql.Raw(db.Context.Dialect.OpenQuote);
-        var close = Sql.Raw(db.Context.Dialect.CloseQuote);
-
         db.Query<Product>(p =>
-            db.Append($@"SELECT {p[x => x.Id]} AS {open}Order{close} FROM {p} AS {open}Group{close}"));
+            db.Append($@"SELECT {p[x => x.Id]} AS {Sql.OpenQuote()}Order{Sql.CloseQuote()} FROM {p} AS {Sql.OpenQuote()}Group{Sql.CloseQuote()}"));
         
         // Act
         var result = db.Build();

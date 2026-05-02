@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using SqlInterpol.Config;
 using SqlInterpol.Metadata;
 using SqlInterpol.Parsing;
+using SqlInterpol.Rendering;
 
 namespace SqlInterpol;
 
@@ -10,15 +11,16 @@ public class SqlBuilder : ISqlEntityRegistry
     private readonly List<SqlSegment> _segments = [];
     private readonly List<ISqlEntity> _entities = [];
     public SqlContext Context { get; }
-    
     private ISqlParser Parser => Context.Parser;
+    private ISqlSegmentRenderer Renderer => Context.Renderer;
 
     public SqlBuilder(ISqlDialect dialect, SqlInterpolOptions? options = null)
     {
         var baseOptions = options ?? SqlInterpolOptions.GetDefault(dialect);
         var finalOptions = baseOptions with { Dialect = dialect.Kind };
-        var parser = finalOptions.Parser ?? new DefaultSqlParser();   // ← resolved once here
-        Context = new SqlContext(this, dialect, parser, finalOptions);
+        var parser = finalOptions.Parser ?? new DefaultSqlParser();
+        var renderer = options?.Renderer ?? DefaultSqlSegmentRenderer.Instance;
+        Context = new SqlContext(this, dialect, parser, renderer, finalOptions);
     }
 
     public SqlBuilder Append(string? value)
@@ -66,8 +68,13 @@ public class SqlBuilder : ISqlEntityRegistry
         {
             for (int i = 0; i < _segments.Count; i++)
             {
-                RenderSegment(ref vsb, i, _segments[i]);
+                vsb.Append(Renderer.Render(Context, _segments[i], i, _segments) ?? string.Empty);
             }
+
+            // for (int i = 0; i < _segments.Count; i++)
+            // {
+            //     RenderSegment(ref vsb, i, _segments[i]);
+            // }
 
             return new SqlQueryResult(vsb.ToString(), Context.Parameters);
         }
@@ -75,70 +82,6 @@ public class SqlBuilder : ISqlEntityRegistry
         {
             vsb.Dispose();
         }
-    }
-
-    private void RenderSegment(ref ValueStringBuilder vsb, int index, SqlSegment segment)
-    {
-        switch (segment.Type)
-        {
-            case SqlSegmentType.Projection:
-            case SqlSegmentType.Reference:
-                if (segment.Value is ISqlFragment fragment)
-                {
-                    var mode = ResolveRenderMode(index, segment);
-                    vsb.Append(fragment.ToSql(Context, mode));
-                }
-                break;
-
-            case SqlSegmentType.Literal:
-            case SqlSegmentType.Parameter:
-                vsb.Append(segment.Value?.ToString() ?? string.Empty);
-                break;
-
-            case SqlSegmentType.Raw:
-                if (segment.Value is ISqlFragment rawFrag)
-                    vsb.Append(rawFrag.ToSql(Context, SqlRenderMode.Default));
-                else
-                    vsb.Append(segment.Value?.ToString() ?? string.Empty);
-                break;
-        }
-    }
-
-    private SqlRenderMode ResolveRenderMode(int index, SqlSegment segment)
-    {
-        if (segment.IsAliasTarget)
-        {
-            return SqlRenderMode.AliasOnly;
-        }
-
-        if (segment.Value is not ISqlEntity entity)
-        {
-            return SqlRenderMode.Default;
-        }
-
-        if (index + 1 < _segments.Count)
-        {
-            var next = _segments[index + 1];
-
-            if (next.Type == SqlSegmentType.Literal)
-            {
-                var text = next.Value?.ToString()?.TrimStart();
-
-                if (text?.StartsWith("AS ", StringComparison.OrdinalIgnoreCase) == true
-                    || text?.StartsWith("AS\n", StringComparison.OrdinalIgnoreCase) == true)
-                {
-                    return SqlRenderMode.BaseName;
-                }
-            }
-            else if (next.Type == SqlSegmentType.Raw)
-            {
-                return SqlRenderMode.BaseName;
-            }
-        }
-
-        return !string.IsNullOrEmpty(entity.Reference.Alias)
-            ? SqlRenderMode.Declaration
-            : SqlRenderMode.BaseName;
     }
 
     ISqlEntity<T> ISqlEntityRegistry.RegisterEntity<T>(string? name, string? schema)

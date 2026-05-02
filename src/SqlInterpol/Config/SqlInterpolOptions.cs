@@ -8,6 +8,7 @@ public record SqlInterpolOptions
     public int ParameterIndexStart { get; init; } = 0;
     public string? ParameterPrefixOverride { get; init; }
     public ISqlParser? Parser { get; init; }
+    public ISqlSegmentRenderer? Renderer { get; init; }
 
     public static SqlInterpolOptions GetDefault(ISqlDialect dialect)
     {

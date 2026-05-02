@@ -1,12 +1,10 @@
-using System.Collections;
-using System.Text;
 using SqlInterpol.Config;
 
 namespace SqlInterpol.Parsing;
 
 public class DefaultSqlParser : ISqlParser
 {
-    public SqlSegment ProcessValue(SqlContext context, object? value)
+    public virtual SqlSegment ProcessValue(SqlContext context, object? value)
     {
         bool isAlias = context.ParseState.ExpectsAliasOnly;
         context.ParseState.ExpectsAliasOnly = false; // consume immediately
@@ -29,7 +27,7 @@ public class DefaultSqlParser : ISqlParser
         return CreateParameter(context, value);
     }
 
-    public void ProcessLiteral(SqlContext context, ReadOnlySpan<char> span)
+    public virtual void ProcessLiteral(SqlContext context, ReadOnlySpan<char> span)
     {
         var trimmed = span.Trim();
 
