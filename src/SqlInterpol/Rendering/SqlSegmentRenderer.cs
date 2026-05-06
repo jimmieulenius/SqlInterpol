@@ -1,9 +1,9 @@
 using SqlInterpol.Config;
 
 namespace SqlInterpol.Rendering;
-public class DefaultSqlSegmentRenderer : ISqlSegmentRenderer
+public class SqlSegmentRenderer : ISqlSegmentRenderer
 {
-    public static readonly DefaultSqlSegmentRenderer Instance = new();
+    public static readonly SqlSegmentRenderer Instance = new();
 
     public string? Render(SqlContext context, SqlSegment segment, int index, IReadOnlyList<SqlSegment> segments)
     {

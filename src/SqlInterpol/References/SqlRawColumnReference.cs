@@ -8,5 +8,5 @@ public class SqlRawColumnReference(ISqlReference sourceReference, string columnN
     // For raw columns, the PropertyName falls back to the column name
     public override string PropertyName => columnName;
 
-    protected override string GetColumnName(SqlContext context) => columnName;
+    protected override string GetColumnName(ISqlContext context) => columnName;
 }

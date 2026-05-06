@@ -8,7 +8,7 @@ public static partial class SqlDialectKindExtensions
 {
     extension (SqlDialectKind)
     {
-        public static SqlDialectKind CustomDb => new("Custom");
+        public static SqlDialectKind CustomDb => new("CustomDb");
     }
 }
 
@@ -29,6 +29,6 @@ public static partial class SqlBuilderExtensions
     extension (SqlBuilder _)
     {
         public static SqlBuilder CustomDb(SqlInterpolOptions? opt = null) 
-            => new(DialectCache<CustomDbSqlDialect>.Instance, opt);
+            => new(SqlDialectCache<CustomDbSqlDialect>.Instance, opt);
     }
 }

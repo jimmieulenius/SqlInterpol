@@ -9,5 +9,5 @@ public class SqlColumnReference(ISqlReference sourceReference, string columnName
     public override string PropertyName => propertyName;
 
     // The DB name (e.g., "PROD_ID")
-    protected override string GetColumnName(SqlContext context) => columnName;
+    protected override string GetColumnName(ISqlContext context) => columnName;
 }

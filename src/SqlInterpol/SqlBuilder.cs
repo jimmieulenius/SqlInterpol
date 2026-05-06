@@ -11,15 +11,15 @@ public class SqlBuilder : ISqlEntityRegistry
     private readonly List<SqlSegment> _segments = [];
     private readonly List<ISqlEntity> _entities = [];
     public SqlContext Context { get; }
-    private ISqlParser Parser => Context.Parser;
+    private ISqlInterpolationParser Parser => Context.Parser;
     private ISqlSegmentRenderer Renderer => Context.Renderer;
 
     public SqlBuilder(ISqlDialect dialect, SqlInterpolOptions? options = null)
     {
         var baseOptions = options ?? SqlInterpolOptions.GetDefault(dialect);
         var finalOptions = baseOptions with { Dialect = dialect.Kind };
-        var parser = finalOptions.Parser ?? new DefaultSqlParser();
-        var renderer = options?.Renderer ?? DefaultSqlSegmentRenderer.Instance;
+        var parser = finalOptions.Parser ?? SqlInterpolationParser.Instance;
+        var renderer = options?.Renderer ?? SqlSegmentRenderer.Instance;
         Context = new SqlContext(this, dialect, parser, renderer, finalOptions);
     }
 
@@ -71,7 +71,7 @@ public class SqlBuilder : ISqlEntityRegistry
                 vsb.Append(Renderer.Render(Context, _segments[i], i, _segments) ?? string.Empty);
             }
 
-            return new SqlQueryResult(vsb.ToString(), Context.Parameters);
+            return new SqlQueryResult(vsb.ToString(), Context.Parameters.AsReadOnly());
         }
         finally
         {

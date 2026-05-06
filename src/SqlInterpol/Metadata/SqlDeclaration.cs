@@ -6,7 +6,7 @@ public class SqlDeclaration(ISqlReference reference) : ISqlDeclaration
 {
     public ISqlReference Reference { get; } = reference;
 
-    public string ToSql(SqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
+    public string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
     {
         var sourceSql = Reference.Source.ToSql(context, SqlRenderMode.BaseName);
 

@@ -7,9 +7,10 @@ public class SqlEntityReference(ISqlFragment parent) : ISqlReference
     private readonly ISqlFragment _parent = parent;
     
     public string? Alias { get; set; }
+    public required string FallbackAlias { get; set; }
     public ISqlFragment Source => _parent;
 
-    public string ToSql(SqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
+    public string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
     {
         if (!string.IsNullOrEmpty(Alias))
         {

@@ -4,6 +4,6 @@ namespace SqlInterpol.Metadata;
 
 public record SqlEntityNameFragment(ISqlEntity Entity, string Name) : ISqlFragment
 {
-    public string ToSql(SqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
+    public string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
         => $"{context.Dialect.OpenQuote}{Name}{context.Dialect.CloseQuote}";
 }

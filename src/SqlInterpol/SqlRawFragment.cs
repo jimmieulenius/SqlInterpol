@@ -4,5 +4,5 @@ namespace SqlInterpol;
 
 public readonly record struct SqlRawFragment(string Value) : ISqlFragment
 {
-    public string ToSql(SqlContext context, SqlRenderMode mode = SqlRenderMode.Default) => Value;
+    public string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default) => Value;
 }

@@ -2,8 +2,8 @@ using SqlInterpol.Config;
 
 namespace SqlInterpol;
 
-internal sealed class SqlDeferredFragment(Func<SqlContext, string> renderer) : ISqlFragment
+internal sealed class SqlDeferredFragment(Func<ISqlContext, string> renderer) : ISqlFragment
 {
-    public string ToSql(SqlContext context, SqlRenderMode mode = SqlRenderMode.Default) 
+    public string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default) 
         => renderer(context);
 }

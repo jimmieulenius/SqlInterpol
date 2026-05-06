@@ -11,7 +11,7 @@ public static class ServiceCollectionExtensions
         {
             var resolved = options ?? new SqlInterpolOptions();
             services.AddSingleton(resolved);
-            services.AddSingleton<ISqlParser>(sp => resolved.Parser ?? new DefaultSqlParser());
+            services.AddSingleton<ISqlInterpolationParser>(sp => resolved.Parser ?? new SqlInterpolationParser());
             return services;
         }
     }

@@ -11,4 +11,5 @@ public readonly record struct SqlDialectKind(string Value)
     public override string ToString() => Value;
 
     public static implicit operator string(SqlDialectKind kind) => kind.Value;
+    public static implicit operator SqlDialectKind(string value) => new(value);
 }

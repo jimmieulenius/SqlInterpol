@@ -1,19 +1,26 @@
-using SqlInterpol.Config;
-
 namespace SqlInterpol.Parsing;
 
-public class DefaultSqlParser : ISqlParser
+public class SqlInterpolationParser : ISqlInterpolationParser
 {
-    public virtual SqlSegment ProcessValue(SqlContext context, object? value)
+    public static readonly SqlInterpolationParser Instance = new();
+
+    public virtual SqlSegment ProcessValue(ISqlParserContext context, object? value)
     {
-        bool isAlias = context.ParseState.ExpectsAliasOnly;
-        context.ParseState.ExpectsAliasOnly = false; // consume immediately
+        bool isAlias = context.ParserState.ExpectsAliasOnly;
+        context.ParserState.ExpectsAliasOnly = false; // consume immediately
 
         if (value is ISqlProjection projection)
         {
             if (!isAlias)
             {
-                context.ParseState.LastAliasableTarget = projection;
+                context.ParserState.LastAliasableTarget = projection;
+            }
+            else
+            {
+                if (projection.Reference is ISqlReference entRef && entRef.Alias == null)
+                {
+                    entRef.Alias = entRef.FallbackAlias;
+                }
             }
 
             return new SqlSegment(SqlSegmentType.Projection, projection, isAliasTarget: isAlias);
@@ -27,7 +34,7 @@ public class DefaultSqlParser : ISqlParser
         return CreateParameter(context, value);
     }
 
-    public virtual void ProcessLiteral(SqlContext context, ReadOnlySpan<char> span)
+    public virtual void ProcessLiteral(ISqlParserContext context, ReadOnlySpan<char> span)
     {
         var trimmed = span.Trim();
 
@@ -39,7 +46,7 @@ public class DefaultSqlParser : ISqlParser
         }
 
         // Alias Capture
-        if (context.ParseState.LastAliasableTarget is ISqlProjection projection)
+        if (context.ParserState.LastAliasableTarget is ISqlProjection projection)
         {
             if (TryPeekAlias(context, span, out var alias))
             {
@@ -48,33 +55,33 @@ public class DefaultSqlParser : ISqlParser
                     entRef.Alias = alias;
                 }
 
-                context.ParseState.LastAliasableTarget = null;
+                context.ParserState.LastAliasableTarget = null;
             }
             else if (IsCaptureTerminated(span))
             {
-                context.ParseState.LastAliasableTarget = null;
+                context.ParserState.LastAliasableTarget = null;
             }
         }
 
         // Signal that the NEXT hole is an alias label if this literal ends with "AS"
-        context.ParseState.ExpectsAliasOnly = EndsWithAsKeyword(span); // ← this line was missing
+        context.ParserState.ExpectsAliasOnly = EndsWithAsKeyword(span); // ← this line was missing
 
         UpdateScannerState(context, span);
     }
 
-    protected virtual SqlSegment CreateParameter(SqlContext context, object? value)
+    protected virtual SqlSegment CreateParameter(ISqlParserContext context, object? value)
     {
-        int index = context.Options.ParameterIndexStart + context.ParseState.ParameterCount;
+        int index = context.Options.ParameterIndexStart + context.ParserState.ParameterCount;
         string prefix = context.Options.ParameterPrefixOverride ?? context.Dialect.ParameterPrefix;
         string paramKey = $"{prefix}{index}";
         
         context.Parameters[paramKey] = value ?? DBNull.Value;
-        context.ParseState.ParameterCount++;
+        context.ParserState.ParameterCount++;
         
         return new SqlSegment(SqlSegmentType.Parameter, paramKey);
     }
 
-    protected virtual bool TryPeekAlias(SqlContext context, ReadOnlySpan<char> span, out string? alias)
+    protected virtual bool TryPeekAlias(ISqlParserContext context, ReadOnlySpan<char> span, out string? alias)
     {
         alias = null;
         var current = span;
@@ -153,7 +160,7 @@ public class DefaultSqlParser : ISqlParser
         return char.IsWhiteSpace(prefix) || prefix == ')' || prefix == ']' || prefix == '"' || prefix == '`';
     }
 
-    private void UpdateScannerState(SqlContext context, ReadOnlySpan<char> span)
+    private void UpdateScannerState(ISqlParserContext context, ReadOnlySpan<char> span)
     {
         for (int i = 0; i < span.Length; i++)
         {
@@ -162,10 +169,10 @@ public class DefaultSqlParser : ISqlParser
             // String Tracking
             if (span[i] == '\'' && (i == 0 || span[i - 1] != '\\'))
             {
-                context.ParseState.IsInsideString = !context.ParseState.IsInsideString;
+                context.ParserState.IsInsideString = !context.ParserState.IsInsideString;
                 continue;
             }
-            if (context.ParseState.IsInsideString) continue;
+            if (context.ParserState.IsInsideString) continue;
 
             // Comment Tracking
             if (slice.StartsWith("--"))
@@ -184,7 +191,7 @@ public class DefaultSqlParser : ISqlParser
                     {
                         if (slice.Length == keyword.Value.Length || !char.IsLetterOrDigit(slice[keyword.Value.Length]))
                         {
-                            context.ParseState.CurrentKeyword = keyword;
+                            context.ParserState.CurrentKeyword = keyword;
                             i += keyword.Value.Length - 1;
                             break;
                         }

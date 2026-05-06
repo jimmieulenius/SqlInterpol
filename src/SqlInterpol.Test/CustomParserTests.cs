@@ -1,53 +1,82 @@
-// using SqlInterpol.Config;
-// using SqlInterpol.Parsing;
+using SqlInterpol.Config;
+using SqlInterpol.Test.Dialects;
+using SqlInterpol.Test.Models;
 
-// namespace SqlInterpol.Tests;
+namespace SqlInterpol.Test;
 
-// public class CustomParserTests
-// {
-// // A custom parser that prefixes every literal to prove it's being used
-//     private class PrefixingParser : DefaultSqlParser
-//     {
-//         public override void ProcessLiteral(SqlContext context, ReadOnlySpan<char> span)
-//         {
-//             var prefixed = "/* CUSTOM */ " + span.ToString();
-//             base.ProcessLiteral(context, prefixed.AsSpan());
-//         }
-//     }
+public class CustomParserTests
+{
+    private static readonly SqlInterpolOptions _options = new() { Parser = new CustomSqlParser() };
 
-//     [Theory]
-//     [MemberData(nameof(CustomParserData))]
-//     public void Builder_Uses_Custom_Parser_From_Options(string _, SqlBuilder db, string expected)
-//     {
-//         // Act
-//         db.Append("SELECT 1");
-//         var result = db.Build();
+    [Theory]
+    [MemberData(nameof(CustomParserData))]
+    public void Builder_WithCustomParser_ShouldRenderCollectionCorrectly(SqlTestCase testCase)
+    {
+        // Arrange
+        var activeIds = new List<int> { 10, 20, 30 };
+        var db = testCase.CreateBuilder(_options with { Dialect = testCase.Dialect });
+        db.Append($$"""
+            SELECT *
+            FROM Users
+            WHERE RoleId CUSTOM_IN {{activeIds}}
+            """);
 
-//         // Assert
-//         Assert.StartsWith("/* CUSTOM */", result.Sql);
-//         Assert.Equal(expected, result.Sql);
-//     }
+        // Act
+        var result = db.Build();
 
-//     public static TheoryData<string, SqlBuilder, string> CustomParserData()
-//     {
-//         var data = new TheoryData<string, SqlBuilder, string>();
-        
-//         // Define options with our custom parser
-//         var options = new SqlInterpolOptions { Parser = new PrefixingParser() };
+        // Assert
+        Assert.Equal(testCase.ExpectedSql, result.Sql);
+    }
 
-//         // We create builders manually using the dialect and our options
-//         data.Add(
-//             SqlDialectKind.SqlServer.ToString(),
-//             new SqlBuilder(new SqlServerSqlDialect(), options),
-//             "/* CUSTOM */ SELECT 1"
-//         );
-
-//         data.Add(
-//             SqlDialectKind.CustomDb.ToString(),
-//             new SqlBuilder(new CustomDbDialect(), options),
-//             "/* CUSTOM */ SELECT 1"
-//         );
-
-//         return data;
-//     }
-// }
+    public static TheoryData<SqlTestCase> CustomParserData =>
+    [
+        new SqlTestCase(
+            SqlDialectKind.CustomDb,
+            """
+            SELECT *
+            FROM Users
+            WHERE RoleId CUSTOM_IN (!!0, !!1, !!2)
+            """
+        ),
+        new SqlTestCase(
+            SqlDialectKind.MySql,
+            """
+            SELECT *
+            FROM Users
+            WHERE RoleId CUSTOM_IN (@p0, @p1, @p2)
+            """
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Oracle,
+            """
+            SELECT *
+            FROM Users
+            WHERE RoleId CUSTOM_IN (:0, :1, :2)
+            """
+        ),
+        new SqlTestCase(
+            SqlDialectKind.PostgreSql,
+            """
+            SELECT *
+            FROM Users
+            WHERE RoleId CUSTOM_IN ($0, $1, $2)
+            """
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqLite,
+            """
+            SELECT *
+            FROM Users
+            WHERE RoleId CUSTOM_IN (?0, ?1, ?2)
+            """
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqlServer,
+            """
+            SELECT *
+            FROM Users
+            WHERE RoleId CUSTOM_IN (@p0, @p1, @p2)
+            """
+        )
+    ];
+}

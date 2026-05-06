@@ -1,60 +1,61 @@
 using SqlInterpol.Config;
 using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
-using Xunit;
 
-namespace SqlInterpol.Tests;
+namespace SqlInterpol.Test;
 
 public class SqlBuilderTests
 {
     [Theory]
     [MemberData(nameof(AppendData))]
-    public void Projection_Append(string _, SqlBuilder db, string expected)
+    public void Projection_Append(SqlTestCase testCase)
     {
         // Arrange
+        var db = testCase.CreateBuilder();
         db.Query<Product>((p) =>
-            db.Append($"SELECT {p[x => x.Id]} FROM {p}"));
+            db.Append($"SELECT {p[x => x.Id]}").Append($" FROM {p}"));
         
         // Act
         var result = db.Build();
 
         // Assert
-        Assert.Equal(expected, result.Sql);
+        Assert.Equal(testCase.ExpectedSql, result.Sql);
     }
 
-    public static TheoryData<string, SqlBuilder, string> AppendData => new()
-    {
-        {
+    public static TheoryData<SqlTestCase> AppendData =>
+    [
+        new SqlTestCase(
             SqlDialectKind.CustomDb,
-            SqlBuilder.CustomDb(),
-            "SELECT <<dbo>>.<<Products>>.<<Id>> FROM <<dbo>>.<<Products>>" },
-        {
+            "SELECT <<dbo>>.<<Products>>.<<Id>> FROM <<dbo>>.<<Products>>"
+        ),
+        new SqlTestCase(
             SqlDialectKind.MySql,
-            SqlBuilder.MySql(),
-            "SELECT `dbo`.`Products`.`Id` FROM `dbo`.`Products`" },
-        {
+            "SELECT `dbo`.`Products`.`Id` FROM `dbo`.`Products`"
+        ),
+        new SqlTestCase(
             SqlDialectKind.Oracle,
-            SqlBuilder.Oracle(),
-            "SELECT \"dbo\".\"Products\".\"Id\" FROM \"dbo\".\"Products\"" },
-        {
+            "SELECT \"dbo\".\"Products\".\"Id\" FROM \"dbo\".\"Products\""
+        ),
+        new SqlTestCase(
             SqlDialectKind.PostgreSql,
-            SqlBuilder.PostgreSql(),
-            "SELECT \"dbo\".\"Products\".\"Id\" FROM \"dbo\".\"Products\"" },
-        {
+            "SELECT \"dbo\".\"Products\".\"Id\" FROM \"dbo\".\"Products\""
+        ),
+        new SqlTestCase(
             SqlDialectKind.SqLite,
-            SqlBuilder.SqLite(),
-            "SELECT \"dbo\".\"Products\".\"Id\" FROM \"dbo\".\"Products\"" },
-        {
+            "SELECT \"dbo\".\"Products\".\"Id\" FROM \"dbo\".\"Products\""
+        ),
+        new SqlTestCase(
             SqlDialectKind.SqlServer,
-            SqlBuilder.SqlServer(),
-            "SELECT [dbo].[Products].[Id] FROM [dbo].[Products]" }
-    };
+            "SELECT [dbo].[Products].[Id] FROM [dbo].[Products]"
+        )
+    ];
 
     [Theory]
     [MemberData(nameof(AppendLineData))]
-    public void Projection_AppendLine(string _, SqlBuilder db, string expected)
+    public void Projection_AppendLine(SqlTestCase testCase)
     {
         // Arrange
+        var db = testCase.CreateBuilder();
         db.Query<Product>((p) =>
             db.AppendLine($"SELECT {p[x => x.Id]}")
             .Append($"FROM {p}"));
@@ -63,48 +64,43 @@ public class SqlBuilderTests
         var result = db.Build();
     
         // Assert
-        Assert.Equal(expected, result.Sql);
+        Assert.Equal(testCase.ExpectedSql, result.Sql);
     }
 
-    public static TheoryData<string, SqlBuilder, string> AppendLineData => new()
+    public static TheoryData<SqlTestCase> AppendLineData => new()
     {
-        {
+        new SqlTestCase(
             SqlDialectKind.CustomDb,
-            SqlBuilder.CustomDb(),
             $"SELECT <<dbo>>.<<Products>>.<<Id>>{Environment.NewLine}FROM <<dbo>>.<<Products>>"
-        },
-        {
+        ),
+        new SqlTestCase(
             SqlDialectKind.MySql,
-            SqlBuilder.MySql(),
             $"SELECT `dbo`.`Products`.`Id`{Environment.NewLine}FROM `dbo`.`Products`"
-        },
-        {
+        ),
+        new SqlTestCase(
             SqlDialectKind.Oracle,
-            SqlBuilder.Oracle(),
             $"SELECT \"dbo\".\"Products\".\"Id\"{Environment.NewLine}FROM \"dbo\".\"Products\""
-        },
-        {
+        ),
+        new SqlTestCase(
             SqlDialectKind.PostgreSql,
-            SqlBuilder.PostgreSql(),
             $"SELECT \"dbo\".\"Products\".\"Id\"{Environment.NewLine}FROM \"dbo\".\"Products\""
-        },
-        {
+        ),
+        new SqlTestCase(
             SqlDialectKind.SqLite,
-            SqlBuilder.SqLite(),
             $"SELECT \"dbo\".\"Products\".\"Id\"{Environment.NewLine}FROM \"dbo\".\"Products\""
-        },
-        {
+        ),
+        new SqlTestCase(
             SqlDialectKind.SqlServer,
-            SqlBuilder.SqlServer(),
             $"SELECT [dbo].[Products].[Id]{Environment.NewLine}FROM [dbo].[Products]"
-        }
+        )
     };
 
     [Theory]
     [MemberData(nameof(RawStringData))]
-    public void Projection_RawString(string _, SqlBuilder db, string expected)
+    public void Projection_RawString(SqlTestCase testCase)
     {
         // Arrange
+        var db = testCase.CreateBuilder();
         db.Query<Product>(p =>
             db.Append($$"""
             SELECT
@@ -116,64 +112,58 @@ public class SqlBuilderTests
         var result = db.Build();
 
         // Assert
-        Assert.Equal(expected, result.Sql);
+        Assert.Equal(testCase.ExpectedSql, result.Sql);
     }
 
-    public static TheoryData<string, SqlBuilder, string> RawStringData => new()
-    {
-        { 
+    public static TheoryData<SqlTestCase> RawStringData =>
+    [
+        new SqlTestCase(
             SqlDialectKind.CustomDb,
-            SqlBuilder.CustomDb(), 
             """
             SELECT
                 <<dbo>>.<<Products>>.<<Id>>
             FROM <<dbo>>.<<Products>>
             """ 
-        },
-        { 
+        ),
+        new SqlTestCase(
             SqlDialectKind.MySql,
-            SqlBuilder.MySql(), 
             """
             SELECT
                 `dbo`.`Products`.`Id`
             FROM `dbo`.`Products`
             """ 
-        },
-        { 
+        ),
+        new SqlTestCase(
             SqlDialectKind.Oracle,
-            SqlBuilder.Oracle(), 
             """
             SELECT
                 "dbo"."Products"."Id"
             FROM "dbo"."Products"
             """ 
-        },
-        { 
+        ),
+        new SqlTestCase(
             SqlDialectKind.PostgreSql,
-            SqlBuilder.PostgreSql(), 
             """
             SELECT
                 "dbo"."Products"."Id"
             FROM "dbo"."Products"
             """ 
-        },
-        { 
+        ),
+        new SqlTestCase(
             SqlDialectKind.SqLite,
-            SqlBuilder.SqLite(), 
             """
             SELECT
                 "dbo"."Products"."Id"
             FROM "dbo"."Products"
             """ 
-        },
-        {
+        ),
+        new SqlTestCase(
             SqlDialectKind.SqlServer,
-            SqlBuilder.SqlServer(), 
             """
             SELECT
                 [dbo].[Products].[Id]
             FROM [dbo].[Products]
             """ 
-        }
-    };
+        )
+    ];
 }

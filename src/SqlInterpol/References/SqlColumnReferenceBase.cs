@@ -10,9 +10,9 @@ public abstract class SqlColumnReferenceBase(ISqlReference sourceReference)
 
     public abstract string PropertyName { get; }
 
-    protected abstract string GetColumnName(SqlContext context);
+    protected abstract string GetColumnName(ISqlContext context);
 
-    public override string ToSql(SqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
+    public override string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
     {
         return mode switch
         {
@@ -23,7 +23,7 @@ public abstract class SqlColumnReferenceBase(ISqlReference sourceReference)
         };
     }
 
-    private string RenderFullReference(SqlContext context)
+    private string RenderFullReference(ISqlContext context)
     {
         var sourcePointer = SourceReference.ToSql(context);
         var columnName = GetColumnName(context);

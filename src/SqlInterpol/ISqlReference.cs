@@ -5,4 +5,5 @@ public interface ISqlReference : ISqlFragment
     ISqlFragment Source { get; }
 
     string? Alias { get; set; }
+    string FallbackAlias { get; }
 }

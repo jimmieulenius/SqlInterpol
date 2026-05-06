@@ -20,7 +20,10 @@ public abstract class SqlEntity<T> : ISqlEntity<T>
         Name = name;
         Schema = schema;
         Parent = parent;
-        Reference = new SqlEntityReference(this); 
+        Reference = new SqlEntityReference(this) 
+        { 
+            FallbackAlias = typeof(T).Name 
+        };
         Declaration = new SqlDeclaration(Reference);
     }
 
@@ -62,18 +65,18 @@ public abstract class SqlEntity<T> : ISqlEntity<T>
     public ISqlReference this[string columnName] 
         => new SqlRawColumnReference(Reference, columnName);
 
-    public virtual string ToSql(SqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
+    public virtual string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
     {
         return mode switch
         {
             SqlRenderMode.Declaration => Declaration.ToSql(context),
-            SqlRenderMode.BaseName    => context.Dialect.QuoteEntityName(Name, Schema),
-            SqlRenderMode.AliasOnly   => RenderReference(context),
-            _                         => RenderReference(context)
+            SqlRenderMode.BaseName => context.Dialect.QuoteEntityName(Name, Schema),
+            SqlRenderMode.AliasOnly => context.Dialect.QuoteIdentifier(Reference.Alias ?? typeof(T).Name),
+            _ => RenderReference(context)
         };
     }
 
-    private string RenderReference(SqlContext context)
+    private string RenderReference(ISqlContext context)
     {
         return !string.IsNullOrWhiteSpace(Reference.Alias)
             ? context.Dialect.QuoteIdentifier(Reference.Alias)
