@@ -293,14 +293,14 @@ public class JoinAsTests
         var db = testCase.CreateBuilder();
         db.Entity<Product>(name: "Archive_Products", schema: "history")
         .Entity<OrderLine>()
-        .Query((p, o) =>
+        .Query((p, ol) =>
             db.Append($$"""
             SELECT
                 {{p[x => x.Id]}},
-                {{o[x => x.OrderId]}}
+                {{ol[x => x.OrderId]}}
             FROM {{p}}
-            JOIN {{o}}
-                ON {{p[x => x.Id]}} = {{o[x => x.ProductItemNumber]}}
+            JOIN {{ol}}
+                ON {{p[x => x.Id]}} = {{ol[x => x.ProductItemNumber]}}
             """));
         
         // Act
