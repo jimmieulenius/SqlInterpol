@@ -20,7 +20,7 @@ public class SelectSubqueryTests
         var result = db.Entity<Product>().Query(p =>
         {
             // 1. Define subquery inline. It securely captures the 'p' reference!
-            ISqlQuery categorySubquery = db.Entity<Category>().Query(c => 
+            var categorySubquery = db.Entity<Category>().Query(c => 
                 db.Append($$"""
                 SELECT
                     {{c[x => x.Name]}}
@@ -88,6 +88,15 @@ public class SelectSubqueryTests
         Assert.Equal(testCase.ExpectedSql[0], result1.Sql);
         Assert.Equal(testCase.ExpectedSql[1], result2.Sql);
     }
+
+    ISqlQuery BuildCategorySubquery(SqlBuilder db, ISqlEntity<Product> p, bool activeStatus) => 
+        db.Entity<Category>().Query(c => 
+            db.Append($$"""
+            SELECT
+                {{c[x => x.Name]}}
+            FROM {{c}}
+            WHERE {{c[x => x.Id]}} = {{p[x => x.CategoryId]}} AND {{c[x => x.IsActive]}} = {{activeStatus}}
+            """));
 
     public static TheoryData<SqlTestCase> SelectSubqueryData =>
     [
@@ -266,13 +275,4 @@ public class SelectSubqueryTests
             ]
         )
     ];
-
-    ISqlQuery BuildCategorySubquery(SqlBuilder db, ISqlEntity<Product> p, bool activeStatus) => 
-        db.Entity<Category>().Query(c => 
-            db.Append($$"""
-            SELECT
-                {{c[x => x.Name]}}
-            FROM {{c}}
-            WHERE {{c[x => x.Id]}} = {{p[x => x.CategoryId]}} AND {{c[x => x.IsActive]}} = {{activeStatus}}
-            """));
 }

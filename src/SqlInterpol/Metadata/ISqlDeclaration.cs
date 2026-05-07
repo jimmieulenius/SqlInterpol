@@ -2,5 +2,5 @@ namespace SqlInterpol.Metadata;
 
 public interface ISqlDeclaration : ISqlFragment
 {
-    ISqlReference Reference { get; }
+    ISqlEntityBase Entity { get; }
 }

@@ -8,6 +8,6 @@ public interface ISqlParserState
     bool IsInsideString { get; set; }
     int ParameterCount { get; set; }
     bool ExpectsAliasOnly { get; set; }
-    ISqlProjection? LastAliasableTarget { get; set; }
+    ISqlFragment? LastAliasableTarget { get; set; }
     SqlSegment? LastSegment { get; set; }
 }

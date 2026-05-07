@@ -29,7 +29,7 @@ public class SqlBuilder : ISqlEntityRegistry
         {
             return this;
         }
-        
+
         _segments.Add(ProcessLiteral(value));
 
 
@@ -110,24 +110,25 @@ public class SqlBuilder : ISqlEntityRegistry
         return Parser.ProcessValue(Context, value);
     }
 
-    ISqlEntity<T> ISqlEntityRegistry.RegisterEntity<T>(string? name, string? schema)
+    ISqlEntity<T> ISqlEntityRegistry.RegisterEntity<T>(string? name, string? schema, string? alias)
     {
-        var entity = CreateEntity<T>(name, schema);
-
+        var entity = CreateEntity<T>(name, schema, alias);
         _entities.Add(entity);
-
+        
         return entity;
     }
 
-    internal ISqlEntity<T> CreateEntity<T>(string? name = null, string? schema = null)
+    internal ISqlEntity<T> CreateEntity<T>(string? name = null, string? schema = null, string? alias = null)
     {
         var meta = SqlMetadataRegistry.GetMetadata<T>();
         
+        string physicalName = name ?? meta.Name;
+        string? physicalSchema = schema ?? meta.Schema;
+
         return meta.Type switch
         {
-            SqlEntityType.View => new SqlView<T>( name ?? meta.Name, schema ?? meta.Schema),
-            
-            _ => new SqlTable<T>(name ?? meta.Name, schema ?? meta.Schema)
+            SqlEntityType.View => new SqlView<T>(physicalName, physicalSchema, alias),
+            _ => new SqlTable<T>(physicalName, physicalSchema, alias)
         };
     }
 }

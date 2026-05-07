@@ -1,79 +1,57 @@
-using System.Linq.Expressions;
 using SqlInterpol.Config;
 using SqlInterpol.References;
-using SqlInterpol.Metadata;
 
 namespace SqlInterpol.Metadata;
 
-public abstract class SqlEntity<T> : ISqlEntity<T>
+public abstract class SqlEntity<T> : SqlEntityBase<T>, ISqlEntity<T>
 {
     public string Name { get; }
     public string? Schema { get; }
-    
-    public ISqlProjection? Parent { get; }
-    public ISqlReference Reference { get; protected set; }
-    public ISqlDeclaration Declaration { get; protected set; }
-    public string PropertyName => (Reference as SqlEntityReference)?.Alias ?? Name;
 
-    protected SqlEntity(string name, string? schema, ISqlProjection? parent = null)
+    protected SqlEntity(string name, string? schema, string? alias = null)
     {
         Name = name;
         Schema = schema;
-        Parent = parent;
+        
+        // Initialize the reference with the provided alias and the Type name as fallback
         Reference = new SqlEntityReference(this) 
         { 
+            Alias = alias,
             FallbackAlias = typeof(T).Name 
         };
-        Declaration = new SqlDeclaration(Reference);
+        
+        // Declaration points to this entity to render the 'Table AS Alias' string
+        Declaration = new SqlDeclaration(this);
     }
 
-    public ISqlFragment Entity(string name) => new SqlEntityNameFragment(this, name);
-
-    public ISqlFragment Column(string dbColumnName)
-    {
-        return new SqlDeferredFragment(ctx => 
-        {
-            var prefix = Reference.ToSql(ctx);
-            var column = ctx.Dialect.QuoteIdentifier(dbColumnName);
-
-            return $"{prefix}.{column}";
-        });
-    }
-
-    public ISqlFragment Alias(string alias)
-    {
-        Reference.Alias = alias;
-
-        return new SqlDeferredFragment(ctx => ctx.Dialect.QuoteIdentifier(alias));
-    }
-
-    public ISqlReference this[Expression<Func<T, object>> propertySelector]
-    {
-        get
-        {
-            string propertyName = SqlMetadataRegistry.GetPropertyName(propertySelector);
-            string columnName = SqlMetadataRegistry.GetColumnName(propertySelector);
-
-            return new SqlColumnReference(
-                sourceReference: this.Reference, 
-                columnName: columnName, 
-                propertyName: propertyName
-            );
-        }
-    }
-
-    public ISqlReference this[string columnName] 
-        => new SqlRawColumnReference(Reference, columnName);
-
-    public virtual string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
+    public override string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
     {
         return mode switch
         {
-            SqlRenderMode.Declaration => Declaration.ToSql(context),
+            // We render the declaration directly here instead of calling Declaration.ToSql()
+            // to prevent the infinite recursion loop.
+            SqlRenderMode.Declaration => RenderDeclaration(context),
+            
             SqlRenderMode.BaseName => context.Dialect.QuoteEntityName(Name, Schema),
+            
             SqlRenderMode.AliasOnly => context.Dialect.QuoteIdentifier(Reference.Alias ?? typeof(T).Name),
+            
             _ => RenderReference(context)
         };
+    }
+
+    private string RenderDeclaration(ISqlContext context)
+    {
+        var baseName = context.Dialect.QuoteEntityName(Name, Schema);
+        
+        // If no alias is defined, just return the physical name (e.g., [dbo].[Products])
+        if (string.IsNullOrWhiteSpace(Reference.Alias))
+        {
+            return baseName;
+        }
+
+        // Return the full declaration (e.g., [dbo].[Products] AS [p])
+        return $"{baseName} AS {context.Dialect.QuoteIdentifier(Reference.Alias)}";
     }
 
     private string RenderReference(ISqlContext context)
