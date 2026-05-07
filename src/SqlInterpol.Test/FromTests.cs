@@ -30,52 +30,64 @@ public class FromTests
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql, result.Sql);
+        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
     }
 
     public static TheoryData<SqlTestCase> FromSingleEntityData =>
     [
         new SqlTestCase(
             SqlDialectKind.CustomDb,
-            """
-            SELECT *
-            FROM <<OrderLine>>
-            """
+            [
+                """
+                SELECT *
+                FROM <<OrderLine>>
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.MySql,
-            """
-            SELECT *
-            FROM `OrderLine`
-            """
+            [
+                """
+                SELECT *
+                FROM `OrderLine`
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.Oracle,
-            """
-            SELECT *
-            FROM "OrderLine"
-            """
+            [
+                """
+                SELECT *
+                FROM "OrderLine"
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.PostgreSql,
-            """
-            SELECT *
-            FROM "OrderLine"
-            """
+            [
+                """
+                SELECT *
+                FROM "OrderLine"
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.SqLite,
-            """
-            SELECT *
-            FROM "OrderLine"
-            """
+            [
+                """
+                SELECT *
+                FROM "OrderLine"
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.SqlServer,
-            """
-            SELECT *
-            FROM [OrderLine]
-            """
+            [
+                """
+                SELECT *
+                FROM [OrderLine]
+                """
+            ]
         )
     ];
 
@@ -95,52 +107,64 @@ public class FromTests
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql, result.Sql);
+        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
     }
 
     public static TheoryData<SqlTestCase> FromTableNameOnlyData =>
     [
         new SqlTestCase(
             SqlDialectKind.CustomDb,
-            """
-            SELECT *
-            FROM <<MyTable>>
-            """
+            [
+                """
+                SELECT *
+                FROM <<MyTable>>
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.MySql,
-            """
-            SELECT *
-            FROM `MyTable`
-            """
+            [
+                """
+                SELECT *
+                FROM `MyTable`
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.Oracle,
-            """
-            SELECT *
-            FROM "MyTable"
-            """
+            [
+                """
+                SELECT *
+                FROM "MyTable"
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.PostgreSql,
-            """
-            SELECT *
-            FROM "MyTable"
-            """
+            [
+                """
+                SELECT *
+                FROM "MyTable"
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.SqLite,
-            """
-            SELECT *
-            FROM "MyTable"
-            """
+            [
+                """
+                SELECT *
+                FROM "MyTable"
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.SqlServer,
-            """
-            SELECT *
-            FROM [MyTable]
-            """
+            [
+                """
+                SELECT *
+                FROM [MyTable]
+                """
+            ]
         )
     ];
 
@@ -160,52 +184,64 @@ public class FromTests
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql, result.Sql);
+        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
     }
 
     public static TheoryData<SqlTestCase> FromTableNameAndSchemaData =>
     [
         new SqlTestCase(
             SqlDialectKind.CustomDb,
-            """
-            SELECT *
-            FROM <<MySchema>>.<<MyTable>>
-            """
+            [
+                """
+                SELECT *
+                FROM <<MySchema>>.<<MyTable>>
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.MySql,
-            """
-            SELECT *
-            FROM `MySchema`.`MyTable`
-            """
+            [
+                """
+                SELECT *
+                FROM `MySchema`.`MyTable`
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.Oracle,
-            """
-            SELECT *
-            FROM "MySchema"."MyTable"
-            """
+            [
+                """
+                SELECT *
+                FROM "MySchema"."MyTable"
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.PostgreSql,
-            """
-            SELECT *
-            FROM "MySchema"."MyTable"
-            """
+            [
+                """
+                SELECT *
+                FROM "MySchema"."MyTable"
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.SqLite,
-            """
-            SELECT *
-            FROM "MySchema"."MyTable"
-            """
+            [
+                """
+                SELECT *
+                FROM "MySchema"."MyTable"
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.SqlServer,
-            """
-            SELECT *
-            FROM [MySchema].[MyTable]
-            """
+            [
+                """
+                SELECT *
+                FROM [MySchema].[MyTable]
+                """
+            ]
         )
     ];
 }

@@ -25,58 +25,70 @@ public class CustomParserTests
         var result = db.Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql, result.Sql);
+        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
     }
 
     public static TheoryData<SqlTestCase> CustomParserData =>
     [
         new SqlTestCase(
             SqlDialectKind.CustomDb,
-            """
-            SELECT *
-            FROM Users
-            WHERE RoleId CUSTOM_IN (!!0, !!1, !!2)
-            """
+            [
+                """
+                SELECT *
+                FROM Users
+                WHERE RoleId CUSTOM_IN (!!0, !!1, !!2)
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.MySql,
-            """
-            SELECT *
-            FROM Users
-            WHERE RoleId CUSTOM_IN (@p0, @p1, @p2)
-            """
+            [
+                """
+                SELECT *
+                FROM Users
+                WHERE RoleId CUSTOM_IN (@p0, @p1, @p2)
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.Oracle,
-            """
-            SELECT *
-            FROM Users
-            WHERE RoleId CUSTOM_IN (:0, :1, :2)
-            """
+            [
+                """
+                SELECT *
+                FROM Users
+                WHERE RoleId CUSTOM_IN (:0, :1, :2)
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.PostgreSql,
-            """
-            SELECT *
-            FROM Users
-            WHERE RoleId CUSTOM_IN ($0, $1, $2)
-            """
+            [
+                """
+                SELECT *
+                FROM Users
+                WHERE RoleId CUSTOM_IN ($0, $1, $2)
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.SqLite,
-            """
-            SELECT *
-            FROM Users
-            WHERE RoleId CUSTOM_IN (?0, ?1, ?2)
-            """
+            [
+                """
+                SELECT *
+                FROM Users
+                WHERE RoleId CUSTOM_IN (?0, ?1, ?2)
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.SqlServer,
-            """
-            SELECT *
-            FROM Users
-            WHERE RoleId CUSTOM_IN (@p0, @p1, @p2)
-            """
+            [
+                """
+                SELECT *
+                FROM Users
+                WHERE RoleId CUSTOM_IN (@p0, @p1, @p2)
+                """
+            ]
         )
     ];
 }

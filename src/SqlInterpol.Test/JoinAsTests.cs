@@ -26,76 +26,88 @@ public class JoinAsTests
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql, result.Sql);
+        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
     }
 
     public static TheoryData<SqlTestCase> JoinWithLiteralAliasesData =>
     [
         new SqlTestCase(
-            SqlDialectKind.CustomDb, 
-            """
-            SELECT
-                <<p>>.<<Id>>,
-                <<ol>>.<<OrderId>>
-            FROM <<dbo>>.<<Products>> AS p
-            JOIN <<OrderLine>> AS ol
-                ON <<p>>.<<Id>> = <<ol>>.<<ProductItemNumber>>
-            """
+            SqlDialectKind.CustomDb,
+            [
+                """
+                SELECT
+                    <<p>>.<<Id>>,
+                    <<ol>>.<<OrderId>>
+                FROM <<dbo>>.<<Products>> AS p
+                JOIN <<OrderLine>> AS ol
+                    ON <<p>>.<<Id>> = <<ol>>.<<ProductItemNumber>>
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.MySql, 
-            """
-            SELECT
-                `p`.`Id`,
-                `ol`.`OrderId`
-            FROM `dbo`.`Products` AS p
-            JOIN `OrderLine` AS ol
-                ON `p`.`Id` = `ol`.`ProductItemNumber`
-            """
+            [
+                """
+                SELECT
+                    `p`.`Id`,
+                    `ol`.`OrderId`
+                FROM `dbo`.`Products` AS p
+                JOIN `OrderLine` AS ol
+                    ON `p`.`Id` = `ol`.`ProductItemNumber`
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.Oracle, 
-            """
-            SELECT
-                "p"."Id",
-                "ol"."OrderId"
-            FROM "dbo"."Products" AS p
-            JOIN "OrderLine" AS ol
-                ON "p"."Id" = "ol"."ProductItemNumber"
-            """
+            [
+                """
+                SELECT
+                    "p"."Id",
+                    "ol"."OrderId"
+                FROM "dbo"."Products" AS p
+                JOIN "OrderLine" AS ol
+                    ON "p"."Id" = "ol"."ProductItemNumber"
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.PostgreSql, 
-            """
-            SELECT
-                "p"."Id",
-                "ol"."OrderId"
-            FROM "dbo"."Products" AS p
-            JOIN "OrderLine" AS ol
-                ON "p"."Id" = "ol"."ProductItemNumber"
-            """
+            [
+                """
+                SELECT
+                    "p"."Id",
+                    "ol"."OrderId"
+                FROM "dbo"."Products" AS p
+                JOIN "OrderLine" AS ol
+                    ON "p"."Id" = "ol"."ProductItemNumber"
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.SqLite,
-            """
-            SELECT
-                "p"."Id",
-                "ol"."OrderId"
-            FROM "dbo"."Products" AS p
-            JOIN "OrderLine" AS ol
-                ON "p"."Id" = "ol"."ProductItemNumber"
-            """
+            [
+                """
+                SELECT
+                    "p"."Id",
+                    "ol"."OrderId"
+                FROM "dbo"."Products" AS p
+                JOIN "OrderLine" AS ol
+                    ON "p"."Id" = "ol"."ProductItemNumber"
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.SqlServer, 
-            """
-            SELECT
-                [p].[Id],
-                [ol].[OrderId]
-            FROM [dbo].[Products] AS p
-            JOIN [OrderLine] AS ol
-                ON [p].[Id] = [ol].[ProductItemNumber]
-            """
+            [
+                """
+                SELECT
+                    [p].[Id],
+                    [ol].[OrderId]
+                FROM [dbo].[Products] AS p
+                JOIN [OrderLine] AS ol
+                    ON [p].[Id] = [ol].[ProductItemNumber]
+                """
+            ]
         )
     ];
 
@@ -119,76 +131,88 @@ public class JoinAsTests
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql, result.Sql);
+        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
     }
 
     public static TheoryData<SqlTestCase> JoinWithExplicitApiAliasesData =>
     [
         new SqlTestCase(
             SqlDialectKind.CustomDb, 
-            """
-            SELECT
-                <<prod>>.<<Id>>,
-                <<OrderLine>>.<<OrderId>>
-            FROM dbo.Products AS <<prod>>
-            JOIN order_lines AS <<OrderLine>>
-                ON <<prod>>.<<Id>> = <<OrderLine>>.<<ProductItemNumber>>
-            """
+            [
+                """
+                SELECT
+                    <<prod>>.<<Id>>,
+                    <<OrderLine>>.<<OrderId>>
+                FROM dbo.Products AS <<prod>>
+                JOIN order_lines AS <<OrderLine>>
+                    ON <<prod>>.<<Id>> = <<OrderLine>>.<<ProductItemNumber>>
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.MySql, 
-            """
-            SELECT
-                `prod`.`Id`,
-                `OrderLine`.`OrderId`
-            FROM dbo.Products AS `prod`
-            JOIN order_lines AS `OrderLine`
-                ON `prod`.`Id` = `OrderLine`.`ProductItemNumber`
-            """
+            [
+                """
+                SELECT
+                    `prod`.`Id`,
+                    `OrderLine`.`OrderId`
+                FROM dbo.Products AS `prod`
+                JOIN order_lines AS `OrderLine`
+                    ON `prod`.`Id` = `OrderLine`.`ProductItemNumber`
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.Oracle, 
-            """
-            SELECT
-                "prod"."Id",
-                "OrderLine"."OrderId"
-            FROM dbo.Products AS "prod"
-            JOIN order_lines AS "OrderLine"
-                ON "prod"."Id" = "OrderLine"."ProductItemNumber"
-            """
+            [
+                """
+                SELECT
+                    "prod"."Id",
+                    "OrderLine"."OrderId"
+                FROM dbo.Products AS "prod"
+                JOIN order_lines AS "OrderLine"
+                    ON "prod"."Id" = "OrderLine"."ProductItemNumber"
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.PostgreSql, 
-            """
-            SELECT
-                "prod"."Id",
-                "OrderLine"."OrderId"
-            FROM dbo.Products AS "prod"
-            JOIN order_lines AS "OrderLine"
-                ON "prod"."Id" = "OrderLine"."ProductItemNumber"
-            """
+            [
+                """
+                SELECT
+                    "prod"."Id",
+                    "OrderLine"."OrderId"
+                FROM dbo.Products AS "prod"
+                JOIN order_lines AS "OrderLine"
+                    ON "prod"."Id" = "OrderLine"."ProductItemNumber"
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.SqLite,
-            """
-            SELECT
-                "prod"."Id",
-                "OrderLine"."OrderId"
-            FROM dbo.Products AS "prod"
-            JOIN order_lines AS "OrderLine"
-                ON "prod"."Id" = "OrderLine"."ProductItemNumber"
-            """
+            [
+                """
+                SELECT
+                    "prod"."Id",
+                    "OrderLine"."OrderId"
+                FROM dbo.Products AS "prod"
+                JOIN order_lines AS "OrderLine"
+                    ON "prod"."Id" = "OrderLine"."ProductItemNumber"
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.SqlServer, 
-            """
-            SELECT
-                [prod].[Id],
-                [OrderLine].[OrderId]
-            FROM dbo.Products AS [prod]
-            JOIN order_lines AS [OrderLine]
-                ON [prod].[Id] = [OrderLine].[ProductItemNumber]
-            """
+            [
+                """
+                SELECT
+                    [prod].[Id],
+                    [OrderLine].[OrderId]
+                FROM dbo.Products AS [prod]
+                JOIN order_lines AS [OrderLine]
+                    ON [prod].[Id] = [OrderLine].[ProductItemNumber]
+                """
+            ]
         )
     ];
 
@@ -212,76 +236,88 @@ public class JoinAsTests
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql, result.Sql);
+        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
     }
 
     public static TheoryData<SqlTestCase> SelfJoinData =>
     [
         new SqlTestCase(
             SqlDialectKind.CustomDb, 
-            """
-            SELECT
-                <<original>>.<<Id>>,
-                <<related>>.<<Id>>
-            FROM <<dbo>>.<<Products>> AS original
-            JOIN <<dbo>>.<<Products>> AS related
-                ON <<original>>.<<CategoryId>> = <<related>>.<<CategoryId>>
-            """
+            [
+                """
+                SELECT
+                    <<original>>.<<Id>>,
+                    <<related>>.<<Id>>
+                FROM <<dbo>>.<<Products>> AS original
+                JOIN <<dbo>>.<<Products>> AS related
+                    ON <<original>>.<<CategoryId>> = <<related>>.<<CategoryId>>
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.MySql, 
-            """
-            SELECT
-                `original`.`Id`,
-                `related`.`Id`
-            FROM `dbo`.`Products` AS original
-            JOIN `dbo`.`Products` AS related
-                ON `original`.`CategoryId` = `related`.`CategoryId`
-            """
+            [
+                """
+                SELECT
+                    `original`.`Id`,
+                    `related`.`Id`
+                FROM `dbo`.`Products` AS original
+                JOIN `dbo`.`Products` AS related
+                    ON `original`.`CategoryId` = `related`.`CategoryId`
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.Oracle, 
-            """
-            SELECT
-                "original"."Id",
-                "related"."Id"
-            FROM "dbo"."Products" AS original
-            JOIN "dbo"."Products" AS related
-                ON "original"."CategoryId" = "related"."CategoryId"
-            """
+            [
+                """
+                SELECT
+                    "original"."Id",
+                    "related"."Id"
+                FROM "dbo"."Products" AS original
+                JOIN "dbo"."Products" AS related
+                    ON "original"."CategoryId" = "related"."CategoryId"
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.PostgreSql, 
-            """
-            SELECT
-                "original"."Id",
-                "related"."Id"
-            FROM "dbo"."Products" AS original
-            JOIN "dbo"."Products" AS related
-                ON "original"."CategoryId" = "related"."CategoryId"
-            """
+            [
+                """
+                SELECT
+                    "original"."Id",
+                    "related"."Id"
+                FROM "dbo"."Products" AS original
+                JOIN "dbo"."Products" AS related
+                    ON "original"."CategoryId" = "related"."CategoryId"
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.SqLite, 
-            """
-            SELECT
-                "original"."Id",
-                "related"."Id"
-            FROM "dbo"."Products" AS original
-            JOIN "dbo"."Products" AS related
-                ON "original"."CategoryId" = "related"."CategoryId"
-            """
+            [
+                """
+                SELECT
+                    "original"."Id",
+                    "related"."Id"
+                FROM "dbo"."Products" AS original
+                JOIN "dbo"."Products" AS related
+                    ON "original"."CategoryId" = "related"."CategoryId"
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.SqlServer, 
-            """
-            SELECT
-                [original].[Id],
-                [related].[Id]
-            FROM [dbo].[Products] AS original
-            JOIN [dbo].[Products] AS related
-                ON [original].[CategoryId] = [related].[CategoryId]
-            """
+            [
+                """
+                SELECT
+                    [original].[Id],
+                    [related].[Id]
+                FROM [dbo].[Products] AS original
+                JOIN [dbo].[Products] AS related
+                    ON [original].[CategoryId] = [related].[CategoryId]
+                """
+            ]
         )
     ];
 
@@ -307,76 +343,88 @@ public class JoinAsTests
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql, result.Sql);
+        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
     }
 
     public static TheoryData<SqlTestCase> JoinWithConfigOverrideData =>
     [
         new SqlTestCase(
-            SqlDialectKind.CustomDb, 
-            """
-            SELECT
-                <<history>>.<<Archive_Products>>.<<Id>>,
-                <<OrderLine>>.<<OrderId>>
-            FROM <<history>>.<<Archive_Products>>
-            JOIN <<OrderLine>>
-                ON <<history>>.<<Archive_Products>>.<<Id>> = <<OrderLine>>.<<ProductItemNumber>>
-            """
+            SqlDialectKind.CustomDb,
+            [
+                """
+                SELECT
+                    <<history>>.<<Archive_Products>>.<<Id>>,
+                    <<OrderLine>>.<<OrderId>>
+                FROM <<history>>.<<Archive_Products>>
+                JOIN <<OrderLine>>
+                    ON <<history>>.<<Archive_Products>>.<<Id>> = <<OrderLine>>.<<ProductItemNumber>>
+                """
+            ]
         ),
         new SqlTestCase(
-            SqlDialectKind.MySql, 
-            """
-            SELECT
-                `history`.`Archive_Products`.`Id`,
-                `OrderLine`.`OrderId`
-            FROM `history`.`Archive_Products`
-            JOIN `OrderLine`
-                ON `history`.`Archive_Products`.`Id` = `OrderLine`.`ProductItemNumber`
-            """
+            SqlDialectKind.MySql,
+            [
+                """
+                SELECT
+                    `history`.`Archive_Products`.`Id`,
+                    `OrderLine`.`OrderId`
+                FROM `history`.`Archive_Products`
+                JOIN `OrderLine`
+                    ON `history`.`Archive_Products`.`Id` = `OrderLine`.`ProductItemNumber`
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.Oracle, 
-            """
-            SELECT
-                "history"."Archive_Products"."Id",
-                "OrderLine"."OrderId"
-            FROM "history"."Archive_Products"
-            JOIN "OrderLine"
-                ON "history"."Archive_Products"."Id" = "OrderLine"."ProductItemNumber"
-            """
+            [
+                """
+                SELECT
+                    "history"."Archive_Products"."Id",
+                    "OrderLine"."OrderId"
+                FROM "history"."Archive_Products"
+                JOIN "OrderLine"
+                    ON "history"."Archive_Products"."Id" = "OrderLine"."ProductItemNumber"
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.PostgreSql, 
-            """
-            SELECT
-                "history"."Archive_Products"."Id",
-                "OrderLine"."OrderId"
-            FROM "history"."Archive_Products"
-            JOIN "OrderLine"
-                ON "history"."Archive_Products"."Id" = "OrderLine"."ProductItemNumber"
-            """
+            [
+                """
+                SELECT
+                    "history"."Archive_Products"."Id",
+                    "OrderLine"."OrderId"
+                FROM "history"."Archive_Products"
+                JOIN "OrderLine"
+                    ON "history"."Archive_Products"."Id" = "OrderLine"."ProductItemNumber"
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.SqLite, 
-            """
-            SELECT
-                "history"."Archive_Products"."Id",
-                "OrderLine"."OrderId"
-            FROM "history"."Archive_Products"
-            JOIN "OrderLine"
-                ON "history"."Archive_Products"."Id" = "OrderLine"."ProductItemNumber"
-            """
+            [
+                """
+                SELECT
+                    "history"."Archive_Products"."Id",
+                    "OrderLine"."OrderId"
+                FROM "history"."Archive_Products"
+                JOIN "OrderLine"
+                    ON "history"."Archive_Products"."Id" = "OrderLine"."ProductItemNumber"
+                """
+            ]
         ),
         new SqlTestCase(
-            SqlDialectKind.SqlServer, 
-            """
-            SELECT
-                [history].[Archive_Products].[Id],
-                [OrderLine].[OrderId]
-            FROM [history].[Archive_Products]
-            JOIN [OrderLine]
-                ON [history].[Archive_Products].[Id] = [OrderLine].[ProductItemNumber]
-            """
+            SqlDialectKind.SqlServer,
+            [
+                """
+                SELECT
+                    [history].[Archive_Products].[Id],
+                    [OrderLine].[OrderId]
+                FROM [history].[Archive_Products]
+                JOIN [OrderLine]
+                    ON [history].[Archive_Products].[Id] = [OrderLine].[ProductItemNumber]
+                """
+            ]
         )
     ];
 }

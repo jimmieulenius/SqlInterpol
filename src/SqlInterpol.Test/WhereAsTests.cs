@@ -25,64 +25,76 @@ public class WhereAsTests
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql, result.Sql);
+        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
     }
 
     public static TheoryData<SqlTestCase> WhereWithAliasedEntityData =>
     [
         new SqlTestCase(
             SqlDialectKind.CustomDb, 
-            """
-            SELECT
-                <<p>>.<<Id>>
-            FROM <<dbo>>.<<Products>> AS p
-            WHERE <<p>>.<<CategoryId>> = !!100
-            """
+            [
+                """
+                SELECT
+                    <<p>>.<<Id>>
+                FROM <<dbo>>.<<Products>> AS p
+                WHERE <<p>>.<<CategoryId>> = !!100
+                """
+            ]
         ),
         new SqlTestCase(
-            SqlDialectKind.MySql, 
-            """
-            SELECT
-                `p`.`Id`
-            FROM `dbo`.`Products` AS p
-            WHERE `p`.`CategoryId` = @p0
-            """
+            SqlDialectKind.MySql,
+            [
+                """
+                SELECT
+                    `p`.`Id`
+                FROM `dbo`.`Products` AS p
+                WHERE `p`.`CategoryId` = @p0
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.Oracle, 
-            """
-            SELECT
-                "p"."Id"
-            FROM "dbo"."Products" AS p
-            WHERE "p"."CategoryId" = :0
-            """
+            [
+                """
+                SELECT
+                    "p"."Id"
+                FROM "dbo"."Products" AS p
+                WHERE "p"."CategoryId" = :0
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.PostgreSql, 
-            """
-            SELECT
-                "p"."Id"
-            FROM "dbo"."Products" AS p
-            WHERE "p"."CategoryId" = $1
-            """
+            [
+                """
+                SELECT
+                    "p"."Id"
+                FROM "dbo"."Products" AS p
+                WHERE "p"."CategoryId" = $1
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.SqLite, 
-            """
-            SELECT
-                "p"."Id"
-            FROM "dbo"."Products" AS p
-            WHERE "p"."CategoryId" = ?0
-            """
+            [
+                """
+                SELECT
+                    "p"."Id"
+                FROM "dbo"."Products" AS p
+                WHERE "p"."CategoryId" = ?0
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.SqlServer, 
-            """
-            SELECT
-                [p].[Id]
-            FROM [dbo].[Products] AS p
-            WHERE [p].[CategoryId] = @p0
-            """
+            [
+                """
+                SELECT
+                    [p].[Id]
+                FROM [dbo].[Products] AS p
+                WHERE [p].[CategoryId] = @p0
+                """
+            ]
         )
     ];
 }

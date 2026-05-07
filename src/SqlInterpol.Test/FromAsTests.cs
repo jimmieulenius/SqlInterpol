@@ -23,58 +23,70 @@ public class FromAsTests
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql, result.Sql);
+        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
     }
 
     public static TheoryData<SqlTestCase> FromEntityWithManualAliasData =>
     [
         new SqlTestCase(
-            SqlDialectKind.CustomDb, 
-            """
-            SELECT
-                <<p>>.<<Id>>
-            FROM <<dbo>>.<<Products>> AS p
-            """
+            SqlDialectKind.CustomDb,
+            [
+                """
+                SELECT
+                    <<p>>.<<Id>>
+                FROM <<dbo>>.<<Products>> AS p
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.MySql, 
-            """
-            SELECT
-                `p`.`Id`
-            FROM `dbo`.`Products` AS p
-            """
+            [
+                """
+                SELECT
+                    `p`.`Id`
+                FROM `dbo`.`Products` AS p
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.Oracle, 
-            """
-            SELECT
-                "p"."Id"
-            FROM "dbo"."Products" AS p
-            """
+            [
+                """
+                SELECT
+                    "p"."Id"
+                FROM "dbo"."Products" AS p
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.PostgreSql, 
-            """
-            SELECT
-                "p"."Id"
-            FROM "dbo"."Products" AS p
-            """
+            [
+                """
+                SELECT
+                    "p"."Id"
+                FROM "dbo"."Products" AS p
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.SqLite,
-            """
-            SELECT
-                "p"."Id"
-            FROM "dbo"."Products" AS p
-            """
+            [
+                """
+                SELECT
+                    "p"."Id"
+                FROM "dbo"."Products" AS p
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.SqlServer, 
-            """
-            SELECT
-                [p].[Id]
-            FROM [dbo].[Products] AS p
-            """
+            [
+                """
+                SELECT
+                    [p].[Id]
+                FROM [dbo].[Products] AS p
+                """
+            ]
         )
     ];
 
@@ -95,58 +107,70 @@ public class FromAsTests
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql, result.Sql);
+        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
     }
 
     public static TheoryData<SqlTestCase> FromEntityWithSqlTableAttributeData =>
     [
         new SqlTestCase(
-            SqlDialectKind.CustomDb, 
-            """
-            SELECT
-                <<prod>>.<<Id>>
-            FROM <<dbo>>.<<Products>> AS prod
-            """
+            SqlDialectKind.CustomDb,
+            [
+                """
+                SELECT
+                    <<prod>>.<<Id>>
+                FROM <<dbo>>.<<Products>> AS prod
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.MySql, 
-            """
-            SELECT
-                `prod`.`Id`
-            FROM `dbo`.`Products` AS prod
-            """
+            [
+                """
+                SELECT
+                    `prod`.`Id`
+                FROM `dbo`.`Products` AS prod
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.Oracle, 
-            """
-            SELECT
-                "prod"."Id"
-            FROM "dbo"."Products" AS prod
-            """
+            [
+                """
+                SELECT
+                    "prod"."Id"
+                FROM "dbo"."Products" AS prod
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.PostgreSql, 
-            """
-            SELECT
-                "prod"."Id"
-            FROM "dbo"."Products" AS prod
-            """
+            [
+                """
+                SELECT
+                    "prod"."Id"
+                FROM "dbo"."Products" AS prod
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.SqLite,
-            """
-            SELECT
-                "prod"."Id"
-            FROM "dbo"."Products" AS prod
-            """
+            [
+                """
+                SELECT
+                    "prod"."Id"
+                FROM "dbo"."Products" AS prod
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.SqlServer, 
-            """
-            SELECT
-                [prod].[Id]
-            FROM [dbo].[Products] AS prod
-            """
+            [
+                """
+                SELECT
+                    [prod].[Id]
+                FROM [dbo].[Products] AS prod
+                """
+            ]
         )
     ];
 
@@ -167,58 +191,70 @@ public class FromAsTests
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql, result.Sql);
+        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
     }
 
     public static TheoryData<SqlTestCase> FromLiteralAsEntityWithoutAttributeData =>
     [
         new SqlTestCase(
             SqlDialectKind.CustomDb, 
-            """
-            SELECT
-                <<OrderLine>>.<<OrderId>>
-            FROM ORDER_LINES AS <<OrderLine>>
-            """
+            [
+                """
+                SELECT
+                    <<OrderLine>>.<<OrderId>>
+                FROM ORDER_LINES AS <<OrderLine>>
+                """
+            ]
         ),
         new SqlTestCase(
-            SqlDialectKind.MySql, 
-            """
-            SELECT
-                `OrderLine`.`OrderId`
-            FROM ORDER_LINES AS `OrderLine`
-            """
+            SqlDialectKind.MySql,
+            [
+                """
+                SELECT
+                    `OrderLine`.`OrderId`
+                FROM ORDER_LINES AS `OrderLine`
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.Oracle, 
-            """
-            SELECT
-                "OrderLine"."OrderId"
-            FROM ORDER_LINES AS "OrderLine"
-            """
+            [
+                """
+                SELECT
+                    "OrderLine"."OrderId"
+                FROM ORDER_LINES AS "OrderLine"
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.PostgreSql, 
-            """
-            SELECT
-                "OrderLine"."OrderId"
-            FROM ORDER_LINES AS "OrderLine"
-            """
+            [
+                """
+                SELECT
+                    "OrderLine"."OrderId"
+                FROM ORDER_LINES AS "OrderLine"
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.SqLite,
-            """
-            SELECT
-                "OrderLine"."OrderId"
-            FROM ORDER_LINES AS "OrderLine"
-            """
+            [
+                """
+                SELECT
+                    "OrderLine"."OrderId"
+                FROM ORDER_LINES AS "OrderLine"
+                """
+            ]
         ),
         new SqlTestCase(
-            SqlDialectKind.SqlServer, 
-            """
-            SELECT
-                [OrderLine].[OrderId]
-            FROM ORDER_LINES AS [OrderLine]
-            """
+            SqlDialectKind.SqlServer,
+            [
+                """
+                SELECT
+                    [OrderLine].[OrderId]
+                FROM ORDER_LINES AS [OrderLine]
+                """
+            ]
         )
     ];
 
@@ -239,58 +275,70 @@ public class FromAsTests
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql, result.Sql);
+        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
     }
 
     public static TheoryData<SqlTestCase> FromLiteralAsExplicitAliasedEntityData =>
     [
         new SqlTestCase(
             SqlDialectKind.CustomDb, 
-            """
-            SELECT
-                <<prod>>.<<Id>>
-            FROM products AS <<prod>>
-            """
+            [
+                """
+                SELECT
+                    <<prod>>.<<Id>>
+                FROM products AS <<prod>>
+                """
+            ]
         ),
         new SqlTestCase(
-            SqlDialectKind.MySql, 
-            """
-            SELECT
-                `prod`.`Id`
-            FROM products AS `prod`
-            """
+            SqlDialectKind.MySql,
+            [
+                """
+                SELECT
+                    `prod`.`Id`
+                FROM products AS `prod`
+                """
+            ]
         ),
         new SqlTestCase(
-            SqlDialectKind.Oracle, 
-            """
-            SELECT
-                "prod"."Id"
-            FROM products AS "prod"
-            """
+            SqlDialectKind.Oracle,
+            [
+                """
+                SELECT
+                    "prod"."Id"
+                FROM products AS "prod"
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.PostgreSql, 
-            """
-            SELECT
-                "prod"."Id"
-            FROM products AS "prod"
-            """
+            [
+                """
+                SELECT
+                    "prod"."Id"
+                FROM products AS "prod"
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.SqLite,
-            """
-            SELECT
-                "prod"."Id"
-            FROM products AS "prod"
-            """
+            [
+                """
+                SELECT
+                    "prod"."Id"
+                FROM products AS "prod"
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.SqlServer, 
-            """
-            SELECT
-                [prod].[Id]
-            FROM products AS [prod]
-            """
+            [
+                """
+                SELECT
+                    [prod].[Id]
+                FROM products AS [prod]
+                """
+            ]
         )
     ];
 
@@ -311,58 +359,70 @@ public class FromAsTests
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql, result.Sql);
+        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
     }
 
     public static TheoryData<SqlTestCase> FromEntityAsEntityWithSchemaData =>
     [
         new SqlTestCase(
             SqlDialectKind.CustomDb, 
-            """
-            SELECT
-                <<Product>>.<<Id>>
-            FROM <<dbo>>.<<Products>> AS <<Product>>
-            """
+            [
+                """
+                SELECT
+                    <<Product>>.<<Id>>
+                FROM <<dbo>>.<<Products>> AS <<Product>>
+                """
+            ]
         ),
         new SqlTestCase(
-            SqlDialectKind.MySql, 
-            """
-            SELECT
-                `Product`.`Id`
-            FROM `dbo`.`Products` AS `Product`
-            """
+            SqlDialectKind.MySql,
+            [
+                """
+                SELECT
+                    `Product`.`Id`
+                FROM `dbo`.`Products` AS `Product`
+                """
+            ]
         ),
         new SqlTestCase(
-            SqlDialectKind.Oracle, 
-            """
-            SELECT
-                "Product"."Id"
-            FROM "dbo"."Products" AS "Product"
-            """
+            SqlDialectKind.Oracle,
+            [
+                """
+                SELECT
+                    "Product"."Id"
+                FROM "dbo"."Products" AS "Product"
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.PostgreSql, 
-            """
-            SELECT
-                "Product"."Id"
-            FROM "dbo"."Products" AS "Product"
-            """
+            [
+                """
+                SELECT
+                    "Product"."Id"
+                FROM "dbo"."Products" AS "Product"
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.SqLite,
-            """
-            SELECT
-                "Product"."Id"
-            FROM "dbo"."Products" AS "Product"
-            """
+            [
+                """
+                SELECT
+                    "Product"."Id"
+                FROM "dbo"."Products" AS "Product"
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.SqlServer, 
-            """
-            SELECT
-                [Product].[Id]
-            FROM [dbo].[Products] AS [Product]
-            """
+            [
+                """
+                SELECT
+                    [Product].[Id]
+                FROM [dbo].[Products] AS [Product]
+                """
+            ]
         )
     ];
 }

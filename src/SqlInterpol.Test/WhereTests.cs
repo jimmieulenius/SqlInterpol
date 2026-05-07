@@ -25,7 +25,7 @@ public class WhereTests
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql, result.Sql);
+        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
         Assert.Single(result.Parameters);
         Assert.Equal(42, result.Parameters.Values.First());
     }
@@ -33,58 +33,70 @@ public class WhereTests
     public static TheoryData<SqlTestCase> WhereSimpleParameterData =>
     [
         new SqlTestCase(
-            SqlDialectKind.CustomDb, 
-            """
-            SELECT
-                <<dbo>>.<<Products>>.<<Id>>
-            FROM <<dbo>>.<<Products>>
-            WHERE <<dbo>>.<<Products>>.<<Id>> = !!100
-            """
+            SqlDialectKind.CustomDb,
+            [
+                """
+                SELECT
+                    <<dbo>>.<<Products>>.<<Id>>
+                FROM <<dbo>>.<<Products>>
+                WHERE <<dbo>>.<<Products>>.<<Id>> = !!100
+                """
+            ]
         ),
         new SqlTestCase(
-            SqlDialectKind.MySql, 
-            """
-            SELECT
-                `dbo`.`Products`.`Id`
-            FROM `dbo`.`Products`
-            WHERE `dbo`.`Products`.`Id` = @p0
-            """
+            SqlDialectKind.MySql,
+            [
+                """
+                SELECT
+                    `dbo`.`Products`.`Id`
+                FROM `dbo`.`Products`
+                WHERE `dbo`.`Products`.`Id` = @p0
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.Oracle, 
-            """
-            SELECT
-                "dbo"."Products"."Id"
-            FROM "dbo"."Products"
-            WHERE "dbo"."Products"."Id" = :0
-            """
+            [
+                """
+                SELECT
+                    "dbo"."Products"."Id"
+                FROM "dbo"."Products"
+                WHERE "dbo"."Products"."Id" = :0
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.PostgreSql, 
-            """
-            SELECT
-                "dbo"."Products"."Id"
-            FROM "dbo"."Products"
-            WHERE "dbo"."Products"."Id" = $1
-            """
+            [
+                """
+                SELECT
+                    "dbo"."Products"."Id"
+                FROM "dbo"."Products"
+                WHERE "dbo"."Products"."Id" = $1
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.SqLite,
-            """
-            SELECT
-                "dbo"."Products"."Id"
-            FROM "dbo"."Products"
-            WHERE "dbo"."Products"."Id" = ?0
-            """
+            [
+                """
+                SELECT
+                    "dbo"."Products"."Id"
+                FROM "dbo"."Products"
+                WHERE "dbo"."Products"."Id" = ?0
+                """
+            ]
         ),
         new SqlTestCase(
-            SqlDialectKind.SqlServer, 
-            """
-            SELECT
-                [dbo].[Products].[Id]
-            FROM [dbo].[Products]
-            WHERE [dbo].[Products].[Id] = @p0
-            """
+            SqlDialectKind.SqlServer,
+            [
+                """
+                SELECT
+                    [dbo].[Products].[Id]
+                FROM [dbo].[Products]
+                WHERE [dbo].[Products].[Id] = @p0
+                """
+            ]
         )
     ];
 
@@ -107,7 +119,7 @@ public class WhereTests
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql, result.Sql);
+        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
         Assert.Equal(3, result.Parameters.Count);
         
         var paramValues = result.Parameters.Values.ToList();
@@ -120,57 +132,69 @@ public class WhereTests
     [
         new SqlTestCase(
             SqlDialectKind.CustomDb, 
-            """
-            SELECT
-                <<dbo>>.<<Products>>.<<Id>>
-            FROM <<dbo>>.<<Products>>
-            WHERE <<dbo>>.<<Products>>.<<CategoryId>> IN (!!100, !!101, !!102)
-            """
+            [
+                """
+                SELECT
+                    <<dbo>>.<<Products>>.<<Id>>
+                FROM <<dbo>>.<<Products>>
+                WHERE <<dbo>>.<<Products>>.<<CategoryId>> IN (!!100, !!101, !!102)
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.MySql, 
-            """
-            SELECT
-                `dbo`.`Products`.`Id`
-            FROM `dbo`.`Products`
-            WHERE `dbo`.`Products`.`CategoryId` IN (@p0, @p1, @p2)
-            """
+            [
+                """
+                SELECT
+                    `dbo`.`Products`.`Id`
+                FROM `dbo`.`Products`
+                WHERE `dbo`.`Products`.`CategoryId` IN (@p0, @p1, @p2)
+                """
+            ]
         ),
         new SqlTestCase(
-            SqlDialectKind.Oracle, 
-            """
-            SELECT
-                "dbo"."Products"."Id"
-            FROM "dbo"."Products"
-            WHERE "dbo"."Products"."CategoryId" IN (:0, :1, :2)
-            """
+            SqlDialectKind.Oracle,
+            [
+                """
+                SELECT
+                    "dbo"."Products"."Id"
+                FROM "dbo"."Products"
+                WHERE "dbo"."Products"."CategoryId" IN (:0, :1, :2)
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.PostgreSql, 
-            """
-            SELECT
-                "dbo"."Products"."Id"
-            FROM "dbo"."Products"
-            WHERE "dbo"."Products"."CategoryId" IN ($1, $2, $3)
-            """
+            [
+                """
+                SELECT
+                    "dbo"."Products"."Id"
+                FROM "dbo"."Products"
+                WHERE "dbo"."Products"."CategoryId" IN ($1, $2, $3)
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.SqLite,
-            """
-            SELECT
-                "dbo"."Products"."Id"
-            FROM "dbo"."Products"
-            WHERE "dbo"."Products"."CategoryId" IN (?0, ?1, ?2)
-            """
+            [
+                """
+                SELECT
+                    "dbo"."Products"."Id"
+                FROM "dbo"."Products"
+                WHERE "dbo"."Products"."CategoryId" IN (?0, ?1, ?2)
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.SqlServer, 
-            """
-            SELECT
-                [dbo].[Products].[Id]
-            FROM [dbo].[Products]
-            WHERE [dbo].[Products].[CategoryId] IN (@p0, @p1, @p2)
-            """
+            [
+                """
+                SELECT
+                    [dbo].[Products].[Id]
+                FROM [dbo].[Products]
+                WHERE [dbo].[Products].[CategoryId] IN (@p0, @p1, @p2)
+                """
+            ]
         )
     ];
 }

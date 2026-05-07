@@ -10,18 +10,7 @@ public class SqlQuery(SqlBuilder builder, IReadOnlyList<SqlSegment> segments) : 
 
     public string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
     {
-        var sb = new StringBuilder();
-        
-        foreach (var segment in Segments)
-        {
-            if (segment.Type == SqlSegmentType.Literal)
-                sb.Append(segment.Value);
-            else if (segment.Value is ISqlFragment fragment)
-                sb.Append(fragment.ToSql(context, mode));
-            else
-                sb.Append(segment.Value);
-        }
-        return sb.ToString();
+        return Builder.Build(this).Sql;
     }
 
     public SqlQueryResult Build()
