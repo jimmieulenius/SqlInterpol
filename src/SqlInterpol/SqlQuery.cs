@@ -54,32 +54,21 @@ public class SqlQuery<T> : SqlEntityBase<T>, ISqlQuery<T>
 
     public override string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
     {
-        // Build the inner query. We return it raw (from column 0).
-        // The SqlSegmentRenderer will detect the parent's indent and shift it.
-        var result = Builder.Build(_innerQuery);
-        var innerSql = result.Sql;
-
         var aliasToUse = Reference.Alias ?? typeof(T).Name;
         var escapedAlias = context.Dialect.QuoteIdentifier(aliasToUse);
 
+        // Short-circuit: these modes don't need the inner SQL built
+        if (mode == SqlRenderMode.AliasOnly) return escapedAlias;
+        if (mode == SqlRenderMode.AsAlias) return $"AS {escapedAlias}";
+
+        // Build the inner query.
+        var innerSql = Builder.Build(_innerQuery).Sql;
+
         return mode switch
         {
-            // FROM {{sub}}
             SqlRenderMode.Declaration => $"({innerSql}) AS {escapedAlias}",
-            
-            // FROM {{sub}} AS alias
             SqlRenderMode.BaseName => $"({innerSql})",
-            
-            // {{sub[x => x.Id]}}
-            SqlRenderMode.AliasOnly => escapedAlias,
-
-            // ) AS [stats]
-            SqlRenderMode.AsAlias => $"AS {escapedAlias}",
-            
-            // Default (SELECT/WHERE) 
-            // We return it WITHOUT parentheses to honor WYSIWYG 
-            // if the user typed their own in the raw SQL.
-            _ => innerSql 
+            _ => innerSql
         };
     }
 
