@@ -12,11 +12,11 @@ public class SqlBuilderTests
     {
         // Arrange
         var db = testCase.CreateBuilder();
-        db.Query<Product>((p) =>
-            db.Append($"SELECT {p[x => x.Id]}").Append($" FROM {p}"));
         
         // Act
-        var result = db.Build();
+        var result = db.Query<Product>((p) =>
+            db.Append($"SELECT {p[x => x.Id]}").Append($" FROM {p}"))
+            .Build();
 
         // Assert
         Assert.Equal(testCase.ExpectedSql, result.Sql);
@@ -56,12 +56,12 @@ public class SqlBuilderTests
     {
         // Arrange
         var db = testCase.CreateBuilder();
-        db.Query<Product>((p) =>
-            db.AppendLine($"SELECT {p[x => x.Id]}")
-            .Append($"FROM {p}"));
         
         // Act
-        var result = db.Build();
+        var result = db.Query<Product>((p) =>
+            db.AppendLine($"SELECT {p[x => x.Id]}")
+            .Append($"FROM {p}"))
+            .Build();
     
         // Assert
         Assert.Equal(testCase.ExpectedSql, result.Sql);
@@ -101,15 +101,14 @@ public class SqlBuilderTests
     {
         // Arrange
         var db = testCase.CreateBuilder();
-        db.Query<Product>(p =>
+        
+        // Act
+        var result = db.Query<Product>(p =>
             db.Append($$"""
             SELECT
                 {{p[x => x.Id]}}
             FROM {{p}}
-            """));
-        
-        // Act
-        var result = db.Build();
+            """)).Build();
 
         // Assert
         Assert.Equal(testCase.ExpectedSql, result.Sql);

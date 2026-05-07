@@ -8,7 +8,7 @@ namespace SqlInterpol;
 
 public class SqlBuilder : ISqlEntityRegistry
 {
-    private readonly List<SqlSegment> _segments = [];
+    private List<SqlSegment> _segments = [];
     private readonly List<ISqlEntity> _entities = [];
     public SqlContext Context { get; }
     private ISqlInterpolationParser Parser => Context.Parser;
@@ -25,14 +25,21 @@ public class SqlBuilder : ISqlEntityRegistry
 
     public SqlBuilder Append(string? value)
     {
-        if (string.IsNullOrEmpty(value)) return this;
+        if (string.IsNullOrEmpty(value))
+        {
+            return this;
+        }
+        
         _segments.Add(ProcessLiteral(value));
+
+
         return this;
     }
 
     public SqlBuilder Append([InterpolatedStringHandlerArgument("")] ref SqlQueryInterpolatedStringHandler handler)
     {
         handler.TransferSegments(_segments);
+
         return this;
     }
 
@@ -45,7 +52,50 @@ public class SqlBuilder : ISqlEntityRegistry
     public SqlBuilder AppendLine([InterpolatedStringHandlerArgument("")] ref SqlQueryInterpolatedStringHandler handler)
     {
         Append(ref handler);
+
         return AppendLine();
+    }
+
+    public ISqlQuery Query(Action action)
+    {
+        var mainSegments = _segments;
+        var scopedSegments = new List<SqlSegment>();
+
+        try
+        {
+            _segments = scopedSegments;
+
+            action();
+        }
+        finally
+        {
+            _segments = mainSegments;
+        }
+
+        return new SqlQuery(this, scopedSegments);
+    }
+
+    public SqlQueryResult Build() => BuildSegments(_segments);
+
+    public SqlQueryResult Build(ISqlQuery query) => BuildSegments(query.Segments);
+
+    private SqlQueryResult BuildSegments(IReadOnlyList<SqlSegment> segmentsToBuild)
+    {
+        var vsb = new ValueStringBuilder(stackalloc char[2048]);
+
+        try
+        {
+            for (int i = 0; i < segmentsToBuild.Count; i++)
+            {
+                vsb.Append(Renderer.Render(Context, segmentsToBuild[i], i, segmentsToBuild) ?? string.Empty);
+            }
+
+            return new SqlQueryResult(vsb.ToString(), Context.Parameters.AsReadOnly());
+        }
+        finally
+        {
+            vsb.Dispose();
+        }
     }
 
     internal SqlSegment ProcessLiteral(string value)
@@ -58,25 +108,6 @@ public class SqlBuilder : ISqlEntityRegistry
     internal SqlSegment ProcessValue(object? value)
     {
         return Parser.ProcessValue(Context, value);
-    }
-
-    public SqlQueryResult Build()
-    {
-        var vsb = new ValueStringBuilder(stackalloc char[2048]);
-
-        try
-        {
-            for (int i = 0; i < _segments.Count; i++)
-            {
-                vsb.Append(Renderer.Render(Context, _segments[i], i, _segments) ?? string.Empty);
-            }
-
-            return new SqlQueryResult(vsb.ToString(), Context.Parameters.AsReadOnly());
-        }
-        finally
-        {
-            vsb.Dispose();
-        }
     }
 
     ISqlEntity<T> ISqlEntityRegistry.RegisterEntity<T>(string? name, string? schema)

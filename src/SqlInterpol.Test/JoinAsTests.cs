@@ -12,7 +12,9 @@ public class JoinAsTests
     {
         // Arrange
         var db = testCase.CreateBuilder();
-        db.Query<Product, OrderLine>((p, ol) =>
+        
+        // Act
+        var result = db.Query<Product, OrderLine>((p, ol) =>
             db.Append($$"""
             SELECT
                 {{p[x => x.Id]}},
@@ -20,10 +22,8 @@ public class JoinAsTests
             FROM {{p}} AS p
             JOIN {{ol}} AS ol
                 ON {{p[x => x.Id]}} = {{ol[x => x.ProductItemNumber]}}
-            """));
-        
-        // Act
-        var result = db.Build();
+            """))
+            .Build();
 
         // Assert
         Assert.Equal(testCase.ExpectedSql, result.Sql);
@@ -105,7 +105,9 @@ public class JoinAsTests
     {
         // Arrange
         var db = testCase.CreateBuilder();
-        db.Query<Product, OrderLine>((p, ol) =>
+        
+        // Act
+        var result = db.Query<Product, OrderLine>((p, ol) =>
             db.Append($$"""
             SELECT
                 {{p[x => x.Id]}},
@@ -113,10 +115,8 @@ public class JoinAsTests
             FROM dbo.Products AS {{p.Alias("prod")}}
             JOIN order_lines AS {{ol}}
                 ON {{p[x => x.Id]}} = {{ol[x => x.ProductItemNumber]}}
-            """));
-        
-        // Act
-        var result = db.Build();
+            """))
+            .Build();
 
         // Assert
         Assert.Equal(testCase.ExpectedSql, result.Sql);
@@ -198,7 +198,9 @@ public class JoinAsTests
     {
         // Arrange
         var db = testCase.CreateBuilder();
-        db.Query<Product, Product>((p1, p2) =>
+
+        // Act
+        var result = db.Query<Product, Product>((p1, p2) =>
             db.Append($$"""
             SELECT
                 {{p1[x => x.Id]}},
@@ -206,10 +208,8 @@ public class JoinAsTests
             FROM {{p1}} AS original
             JOIN {{p2}} AS related
                 ON {{p1[x => x.CategoryId]}} = {{p2[x => x.CategoryId]}}
-            """));
-
-        // Act
-        var result = db.Build();
+            """))
+            .Build();
 
         // Assert
         Assert.Equal(testCase.ExpectedSql, result.Sql);
@@ -291,7 +291,9 @@ public class JoinAsTests
     {
         // Arrange
         var db = testCase.CreateBuilder();
-        db.Entity<Product>(name: "Archive_Products", schema: "history")
+        
+        // Act
+        var result = db.Entity<Product>(name: "Archive_Products", schema: "history")
         .Entity<OrderLine>()
         .Query((p, ol) =>
             db.Append($$"""
@@ -301,10 +303,8 @@ public class JoinAsTests
             FROM {{p}}
             JOIN {{ol}}
                 ON {{p[x => x.Id]}} = {{ol[x => x.ProductItemNumber]}}
-            """));
-        
-        // Act
-        var result = db.Build();
+            """))
+            .Build();
 
         // Assert
         Assert.Equal(testCase.ExpectedSql, result.Sql);

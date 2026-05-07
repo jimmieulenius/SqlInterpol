@@ -12,15 +12,15 @@ public class FromAsTests
     {
         // Arrange
         var db = testCase.CreateBuilder();
-        db.Query<Product>(p =>
+
+        // Act
+        var result = db.Query<Product>(p =>
             db.Append($$"""
             SELECT
                 {{p[x => x.Id]}}
             FROM {{p}} AS p
-            """));
-        
-        // Act
-        var result = db.Build();
+            """))
+            .Build();
 
         // Assert
         Assert.Equal(testCase.ExpectedSql, result.Sql);
@@ -84,15 +84,15 @@ public class FromAsTests
     {
         // Arrange
         var db = testCase.CreateBuilder();
-        db.Query<Product>(p =>
+        
+        // Act
+        var result = db.Query<Product>(p =>
             db.Append($$"""
             SELECT
                 {{p[x => x.Id]}}
             FROM {{p}} AS prod
-            """));
-        
-        // Act
-        var result = db.Build();
+            """))
+            .Build();
 
         // Assert
         Assert.Equal(testCase.ExpectedSql, result.Sql);
@@ -156,15 +156,15 @@ public class FromAsTests
     {
         // Arrange
         var db = testCase.CreateBuilder();
-        db.Query<OrderLine>(ol =>
+
+        // Act
+        var result = db.Query<OrderLine>(ol =>
             db.Append($$"""
             SELECT
                 {{ol[x => x.OrderId]}}
             FROM ORDER_LINES AS {{ol}}
-            """));
-        
-        // Act
-        var result = db.Build();
+            """))
+            .Build();
 
         // Assert
         Assert.Equal(testCase.ExpectedSql, result.Sql);
@@ -228,15 +228,15 @@ public class FromAsTests
     {
         // Arrange
         var db = testCase.CreateBuilder();
-        db.Query<Product>(p =>
+
+        // Act
+        var result = db.Query<Product>(p =>
             db.Append($$"""
             SELECT
                 {{p[x => x.Id]}}
             FROM products AS {{p.Alias("prod")}}
-            """));
-        
-        // Act
-        var result = db.Build();
+            """))
+            .Build();
 
         // Assert
         Assert.Equal(testCase.ExpectedSql, result.Sql);
@@ -300,15 +300,15 @@ public class FromAsTests
     {
         // Arrange
         var db = testCase.CreateBuilder();
-        db.Query<Product>(p =>
+
+        // Act
+        var result = db.Query<Product>(p =>
             db.Append($$"""
             SELECT
                 {{p[x => x.Id]}}
             FROM {{p}} AS {{p}}
-            """));
-        
-        // Act
-        var result = db.Build();
+            """))
+            .Build();
 
         // Assert
         Assert.Equal(testCase.ExpectedSql, result.Sql);

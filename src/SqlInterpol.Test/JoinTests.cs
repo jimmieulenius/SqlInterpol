@@ -12,7 +12,9 @@ public class JoinTests
     {
         // Arrange
         var db = testCase.CreateBuilder();
-        db.Query<Product, OrderLine>((p, o) =>
+        
+        // Act
+        var result = db.Query<Product, OrderLine>((p, o) =>
             db.Append($$"""
             SELECT
                 {{p[x => x.Id]}},
@@ -20,10 +22,8 @@ public class JoinTests
             FROM {{p}}
             JOIN {{o}}
                 ON {{p[x => x.Id]}} = {{o[x => x.ProductItemNumber]}}
-            """));
-        
-        // Act
-        var result = db.Build();
+            """))
+            .Build();
 
         // Assert
         Assert.Equal(testCase.ExpectedSql, result.Sql);

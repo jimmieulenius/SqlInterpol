@@ -20,14 +20,14 @@ public class FromTests
     {
         // Arrange
         var db = testCase.CreateBuilder();
-        db.Query<OrderLine>(ol =>
+        
+        // Act
+        var result = db.Query<OrderLine>(ol =>
             db.Append($$"""
             SELECT *
             FROM {{ol}}
-            """));
-        
-        // Act
-        var result = db.Build();
+            """))
+            .Build();
 
         // Assert
         Assert.Equal(testCase.ExpectedSql, result.Sql);
@@ -85,14 +85,14 @@ public class FromTests
     {
         // Arrange
         var db = testCase.CreateBuilder();
-        db.Query<TableOnlyModel>(m =>
+        
+        // Act
+        var result = db.Query<TableOnlyModel>(m =>
             db.Append($$"""
             SELECT *
             FROM {{m}}
-            """));
-        
-        // Act
-        var result = db.Build();
+            """))
+            .Build();
 
         // Assert
         Assert.Equal(testCase.ExpectedSql, result.Sql);
@@ -150,14 +150,14 @@ public class FromTests
     {
         // Arrange
         var db = testCase.CreateBuilder();
-        db.Query<TableAndSchemaModel>(m =>
+
+        // Act
+        var result = db.Query<TableAndSchemaModel>(m =>
             db.Append($$"""
             SELECT *
             FROM {{m}}
-            """));
-        
-        // Act
-        var result = db.Build();
+            """))
+            .Build();
 
         // Assert
         Assert.Equal(testCase.ExpectedSql, result.Sql);

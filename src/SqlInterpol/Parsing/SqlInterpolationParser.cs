@@ -1,3 +1,5 @@
+using System.Collections;
+
 namespace SqlInterpol.Parsing;
 
 public class SqlInterpolationParser : ISqlInterpolationParser
@@ -31,6 +33,19 @@ public class SqlInterpolationParser : ISqlInterpolationParser
             return new SqlSegment(SqlSegmentType.Raw, frag);
         }
 
+        if (value is IEnumerable enumerable && value is not string && value is not byte[])
+        {
+            var paramKeys = new List<string>();
+            
+            foreach (var item in enumerable)
+            {
+                var paramSegment = CreateParameter(context, item);
+                paramKeys.Add((string)paramSegment.Value!);
+            }
+
+            return new SqlSegment(SqlSegmentType.Raw, new SqlCollectionFragment(paramKeys));
+        }
+
         return CreateParameter(context, value);
     }
 
@@ -45,7 +60,6 @@ public class SqlInterpolationParser : ISqlInterpolationParser
             return;
         }
 
-        // Alias Capture
         if (context.ParserState.LastAliasableTarget is ISqlProjection projection)
         {
             if (TryPeekAlias(context, span, out var alias))
