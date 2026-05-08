@@ -39,13 +39,12 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
                         if (index >= 2 && segments[index - 2].Type == SqlSegmentType.Literal)
                         {
                             var beforeSubquery = segments[index - 2].Value?.ToString()?.TrimEnd();
+
                             if (beforeSubquery != null && beforeSubquery.EndsWith("("))
                             {
-                                // Snip off the "(" and any whitespace before it
                                 var textBeforeParen = beforeSubquery[..^1].TrimEnd();
                                 
-                                // Delegate the context check to our new SqlOperator abstraction
-                                if (SqlOperator.IsExpressionContext(textBeforeParen))
+                                if (context.Dialect.IsExpressionContext(textBeforeParen))
                                 {
                                     requiresAlias = false;
                                 }

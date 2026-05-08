@@ -10,6 +10,15 @@ public abstract class SqlDialectBase : ISqlDialect
     public abstract string OpenQuote { get; }
     public abstract string CloseQuote { get; }
     public abstract string ParameterPrefix { get; }
+    protected static readonly string[] DefaultExpressionSymbols = 
+    [
+        "=", "<", ">", "<=", ">=", "<>", "!=", "+", "-", "*", "/", "%"
+    ];
+
+    protected static readonly string[] DefaultExpressionKeywords = 
+    [
+        "IN", "EXISTS", "ANY", "ALL", "SOME"
+    ];
 
     // Common logic for all dialects
     public virtual string QuoteIdentifier(string name)
@@ -49,6 +58,31 @@ public abstract class SqlDialectBase : ISqlDialect
     {
         // Default logic: @p0, @p1, etc.
         return $"{ParameterPrefix}{index}";
+    }
+
+    public virtual bool IsExpressionContext(string textBeforeParen)
+    {
+        if (string.IsNullOrWhiteSpace(textBeforeParen)) 
+            return false;
+
+        // 1. Check for symbol operators (they can touch the previous word safely)
+        foreach (var symbol in DefaultExpressionSymbols)
+        {
+            if (textBeforeParen.EndsWith(symbol)) return true;
+        }
+
+        // 2. Check for word operators (they need to be isolated words)
+        int lastSeparator = textBeforeParen.LastIndexOfAny([' ', '\t', '\n', '\r', '(']);
+        string lastWord = lastSeparator >= 0 
+            ? textBeforeParen[(lastSeparator + 1)..] 
+            : textBeforeParen;
+
+        foreach (var keyword in DefaultExpressionKeywords)
+        {
+            if (lastWord.Equals(keyword, StringComparison.OrdinalIgnoreCase)) return true;
+        }
+
+        return false;
     }
 
     public string ApplyAlias(string source, string? alias = null)

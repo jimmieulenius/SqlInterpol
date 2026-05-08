@@ -6,6 +6,7 @@ public interface ISqlDialect
     string OpenQuote { get; }
     string CloseQuote { get; }
     string ParameterPrefix { get; }
+    bool IsExpressionContext(string textBeforeParen);
 
     string QuoteIdentifier(string name);
 
