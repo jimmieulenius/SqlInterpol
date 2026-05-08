@@ -24,8 +24,9 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
             case SqlSegmentType.Literal:
             {
                 var text = segment.Value?.ToString() ?? string.Empty;
+                
                 // If the previous segment was a subquery rendered as Default (user wrote parens),
-                // and this literal starts with ), inject AS alias unless already present.
+                // and this literal starts with ), inject AS alias unless already present or invalid.
                 if (index > 0 && segments[index - 1].Value is ISqlQuery prevSubquery)
                 {
                     var trimmed = text.TrimStart();
@@ -33,9 +34,47 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
                     {
                         var afterClose = trimmed[1..].TrimStart();
                         bool alreadyHasAs = afterClose.StartsWith($"{SqlKeyword.As.Value} ", StringComparison.OrdinalIgnoreCase)
-                                         || afterClose.StartsWith($"{SqlKeyword.As.Value}\n", StringComparison.OrdinalIgnoreCase)
-                                         || afterClose.StartsWith($"{SqlKeyword.As.Value}\r", StringComparison.OrdinalIgnoreCase);
-                        if (!alreadyHasAs)
+                                        || afterClose.StartsWith($"{SqlKeyword.As.Value}\n", StringComparison.OrdinalIgnoreCase)
+                                        || afterClose.StartsWith($"{SqlKeyword.As.Value}\r", StringComparison.OrdinalIgnoreCase);
+
+                        // Determine if this context actually requires an alias.
+                        // Expressions like "IN (...)", "EXISTS (...)", or "= (...)" do NOT take aliases.
+                        bool requiresAlias = true;
+
+                        if (index >= 2 && segments[index - 2].Type == SqlSegmentType.Literal)
+                        {
+                            var beforeSubquery = segments[index - 2].Value?.ToString()?.TrimEnd();
+                            if (beforeSubquery != null && beforeSubquery.EndsWith("("))
+                            {
+                                var textBeforeParen = beforeSubquery[..^1].TrimEnd();
+                                if (textBeforeParen.Length > 0)
+                                {
+                                    char lastChar = textBeforeParen[^1];
+                                    // If it follows an operator, it's a scalar expression
+                                    if (lastChar == '=' || lastChar == '<' || lastChar == '>' || 
+                                        lastChar == '+' || lastChar == '-' || lastChar == '*' || lastChar == '/')
+                                    {
+                                        requiresAlias = false;
+                                    }
+                                    else
+                                    {
+                                        // Look at the last keyword before the parenthesis
+                                        int lastSpace = textBeforeParen.LastIndexOfAny([' ', '\t', '\n', '\r']);
+                                        string lastWord = lastSpace >= 0 ? textBeforeParen[(lastSpace + 1)..] : textBeforeParen;
+
+                                        if (lastWord.Equals($"{SqlKeyword.In.Value}", StringComparison.OrdinalIgnoreCase) ||
+                                            lastWord.Equals($"{SqlKeyword.Exists.Value}", StringComparison.OrdinalIgnoreCase) ||
+                                            lastWord.Equals($"{SqlKeyword.Any.Value}", StringComparison.OrdinalIgnoreCase) ||
+                                            lastWord.Equals($"{SqlKeyword.All.Value}", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            requiresAlias = false;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if (!alreadyHasAs && requiresAlias)
                         {
                             int ws = text.Length - trimmed.Length;
                             var asAlias = prevSubquery.ToSql(context, SqlRenderMode.AsAlias);
@@ -45,6 +84,30 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
                 }
                 return text;
             }
+            // case SqlSegmentType.Literal:
+            // {
+            //     var text = segment.Value?.ToString() ?? string.Empty;
+            //     // If the previous segment was a subquery rendered as Default (user wrote parens),
+            //     // and this literal starts with ), inject AS alias unless already present.
+            //     if (index > 0 && segments[index - 1].Value is ISqlQuery prevSubquery)
+            //     {
+            //         var trimmed = text.TrimStart();
+            //         if (trimmed.StartsWith(")"))
+            //         {
+            //             var afterClose = trimmed[1..].TrimStart();
+            //             bool alreadyHasAs = afterClose.StartsWith($"{SqlKeyword.As.Value} ", StringComparison.OrdinalIgnoreCase)
+            //                              || afterClose.StartsWith($"{SqlKeyword.As.Value}\n", StringComparison.OrdinalIgnoreCase)
+            //                              || afterClose.StartsWith($"{SqlKeyword.As.Value}\r", StringComparison.OrdinalIgnoreCase);
+            //             if (!alreadyHasAs)
+            //             {
+            //                 int ws = text.Length - trimmed.Length;
+            //                 var asAlias = prevSubquery.ToSql(context, SqlRenderMode.AsAlias);
+            //                 return text[..ws] + ") " + asAlias + trimmed[1..];
+            //             }
+            //         }
+            //     }
+            //     return text;
+            // }
 
             case SqlSegmentType.Parameter:
                 return segment.Value?.ToString() ?? string.Empty;
@@ -102,31 +165,39 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
     private SqlRenderMode ResolveRenderMode(int index, SqlSegment segment, IReadOnlyList<SqlSegment> segments)
     {
         if (segment.IsAliasTarget) return SqlRenderMode.AliasOnly;
-
-        // Subquery: use Default if the user wrote their own opening paren, otherwise Declaration
-        if (segment.Value is ISqlQuery)
-        {
-            if (index > 0 && segments[index - 1].Type == SqlSegmentType.Literal)
-            {
-                var prevText = segments[index - 1].Value?.ToString()?.TrimEnd();
-                if (prevText?.Length > 0 && prevText[^1] == '(')
-                    return SqlRenderMode.Default;
-            }
-            return SqlRenderMode.Declaration;
-        }
-
         if (segment.Value is not ISqlEntity entity) return SqlRenderMode.Default;
 
+        // 1. WYSIWYG Look-Behind: Did the user manually open a parenthesis?
+        // E.g., WHERE IN ( {{subquery}} ) or FROM ( {{subquery}} ) AS stats
+        if (index > 0 && segments[index - 1].Type == SqlSegmentType.Literal)
+        {
+            var prevText = segments[index - 1].Value?.ToString()?.TrimEnd();
+            if (prevText != null && prevText.EndsWith("("))
+            {
+                // The user controls the wrapping. Just return the raw SQL body.
+                return SqlRenderMode.Default;
+            }
+        }
+
+        // 2. Look-Ahead Checks
         if (index + 1 < segments.Count)
         {
             var next = segments[index + 1];
             if (next.Type == SqlSegmentType.Literal)
             {
                 var text = next.Value?.ToString()?.TrimStart();
+                
+                // If they manually type AS, drop the declaration but keep parentheses
                 if (text?.StartsWith("AS ", StringComparison.OrdinalIgnoreCase) == true
                     || text?.StartsWith("AS\n", StringComparison.OrdinalIgnoreCase) == true)
                 {
                     return SqlRenderMode.BaseName;
+                }
+
+                // WYSIWYG Look-Ahead: If the next string closes a parenthesis, they opened one.
+                if (text?.StartsWith(")") == true)
+                {
+                    return SqlRenderMode.Default;
                 }
             }
             else if (next.Type == SqlSegmentType.Raw)
@@ -135,8 +206,50 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
             }
         }
 
+        // 3. Auto-wrapping for un-wrapped physical tables / queries
         return !string.IsNullOrEmpty(entity.Reference.Alias)
             ? SqlRenderMode.Declaration
             : SqlRenderMode.BaseName;
     }
+
+    // private SqlRenderMode ResolveRenderMode(int index, SqlSegment segment, IReadOnlyList<SqlSegment> segments)
+    // {
+    //     if (segment.IsAliasTarget) return SqlRenderMode.AliasOnly;
+
+    //     // Subquery: use Default if the user wrote their own opening paren, otherwise Declaration
+    //     if (segment.Value is ISqlQuery)
+    //     {
+    //         if (index > 0 && segments[index - 1].Type == SqlSegmentType.Literal)
+    //         {
+    //             var prevText = segments[index - 1].Value?.ToString()?.TrimEnd();
+    //             if (prevText?.Length > 0 && prevText[^1] == '(')
+    //                 return SqlRenderMode.Default;
+    //         }
+    //         return SqlRenderMode.Declaration;
+    //     }
+
+    //     if (segment.Value is not ISqlEntity entity) return SqlRenderMode.Default;
+
+    //     if (index + 1 < segments.Count)
+    //     {
+    //         var next = segments[index + 1];
+    //         if (next.Type == SqlSegmentType.Literal)
+    //         {
+    //             var text = next.Value?.ToString()?.TrimStart();
+    //             if (text?.StartsWith("AS ", StringComparison.OrdinalIgnoreCase) == true
+    //                 || text?.StartsWith("AS\n", StringComparison.OrdinalIgnoreCase) == true)
+    //             {
+    //                 return SqlRenderMode.BaseName;
+    //             }
+    //         }
+    //         else if (next.Type == SqlSegmentType.Raw)
+    //         {
+    //             return SqlRenderMode.BaseName;
+    //         }
+    //     }
+
+    //     return !string.IsNullOrEmpty(entity.Reference.Alias)
+    //         ? SqlRenderMode.Declaration
+    //         : SqlRenderMode.BaseName;
+    // }
 }

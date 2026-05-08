@@ -10,4 +10,7 @@ public static class Sql
 
     public static ISqlFragment CloseQuote() => 
         new SqlDeferredFragment(ctx => ctx.Dialect.CloseQuote);
+
+    public static ISqlFragment Quote(string value) => 
+        new SqlDeferredFragment(ctx => ctx.Dialect.QuoteIdentifier(value));
 }

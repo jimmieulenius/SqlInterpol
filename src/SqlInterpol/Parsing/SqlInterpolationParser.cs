@@ -6,10 +6,39 @@ public class SqlInterpolationParser : ISqlInterpolationParser
 {
     public static readonly SqlInterpolationParser Instance = new();
 
+    // public virtual SqlSegment ProcessValue(ISqlParserContext context, object? value)
+    // {
+    //     bool isAlias = context.ParserState.ExpectsAliasOnly;
+    //     context.ParserState.ExpectsAliasOnly = false; // consume immediately
     public virtual SqlSegment ProcessValue(ISqlParserContext context, object? value)
     {
         bool isAlias = context.ParserState.ExpectsAliasOnly;
         context.ParserState.ExpectsAliasOnly = false; // consume immediately
+
+        // NEW: Check if the user is passing a dynamic string alias via a hole: AS {{"stats"}}
+        if (isAlias && value is string dynamicAlias)
+        {
+            if (context.ParserState.LastAliasableTarget is ISqlEntityBase targetEntity)
+            {
+                if (targetEntity.Reference is ISqlReference entRef) entRef.Alias = dynamicAlias;
+            }
+            else if (context.ParserState.LastAliasableTarget is ISqlProjection targetProj)
+            {
+                if (targetProj.Reference is ISqlReference entRef) entRef.Alias = dynamicAlias;
+            }
+
+            context.ParserState.LastAliasableTarget = null;
+            
+            // Return a Raw segment with the quoted identifier (e.g. [stats])
+            // We DO NOT want aliases to become parameters (@p0)!
+            return new SqlSegment(SqlSegmentType.Raw, context.Dialect.QuoteIdentifier(dynamicAlias));
+        }
+
+        // Clean up if it was expected to be an alias but wasn't a valid string
+        if (isAlias)
+        {
+            context.ParserState.LastAliasableTarget = null;
+        }
 
         // 1. Check for Columns/Projections
         if (value is ISqlProjection projection)
@@ -78,6 +107,8 @@ public class SqlInterpolationParser : ISqlInterpolationParser
             return;
         }
 
+        bool endsWithAs = EndsWithAsKeyword(span);
+
         // 3. NEW: Support retroactive look-ahead aliasing for BOTH Entities and Projections
         if (context.ParserState.LastAliasableTarget != null)
         {
@@ -94,6 +125,11 @@ public class SqlInterpolationParser : ISqlInterpolationParser
 
                 context.ParserState.LastAliasableTarget = null;
             }
+            else if (endsWithAs)
+            {
+                // DO NOT clear LastAliasableTarget! 
+                // The literal ends with AS, so the alias name is coming in the next interpolation hole.
+            }
             else if (IsCaptureTerminated(span))
             {
                 context.ParserState.LastAliasableTarget = null;
@@ -101,10 +137,48 @@ public class SqlInterpolationParser : ISqlInterpolationParser
         }
 
         // Signal that the NEXT hole is an alias label if this literal ends with "AS"
-        context.ParserState.ExpectsAliasOnly = EndsWithAsKeyword(span);
+        context.ParserState.ExpectsAliasOnly = endsWithAs;
 
         UpdateScannerState(context, span);
     }
+
+    // public virtual void ProcessLiteral(ISqlParserContext context, ReadOnlySpan<char> span)
+    // {
+    //     var trimmed = span.Trim();
+
+    //     if (trimmed.IsEmpty)
+    //     {
+    //         UpdateScannerState(context, span);
+    //         return;
+    //     }
+
+    //     // 3. NEW: Support retroactive look-ahead aliasing for BOTH Entities and Projections
+    //     if (context.ParserState.LastAliasableTarget != null)
+    //     {
+    //         if (TryPeekAlias(context, span, out var alias))
+    //         {
+    //             if (context.ParserState.LastAliasableTarget is ISqlEntityBase entity)
+    //             {
+    //                 if (entity.Reference is ISqlReference entRef) entRef.Alias = alias;
+    //             }
+    //             else if (context.ParserState.LastAliasableTarget is ISqlProjection projection)
+    //             {
+    //                 if (projection.Reference is ISqlReference entRef) entRef.Alias = alias;
+    //             }
+
+    //             context.ParserState.LastAliasableTarget = null;
+    //         }
+    //         else if (IsCaptureTerminated(span))
+    //         {
+    //             context.ParserState.LastAliasableTarget = null;
+    //         }
+    //     }
+
+    //     // Signal that the NEXT hole is an alias label if this literal ends with "AS"
+    //     context.ParserState.ExpectsAliasOnly = EndsWithAsKeyword(span);
+
+    //     UpdateScannerState(context, span);
+    // }
 
     protected virtual SqlSegment CreateParameter(ISqlParserContext context, object? value)
     {

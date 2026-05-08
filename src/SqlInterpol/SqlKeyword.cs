@@ -60,6 +60,8 @@ public sealed class SqlKeyword
     public static readonly SqlKeyword Is = new("IS");
     public static readonly SqlKeyword Null = new("NULL");
     public static readonly SqlKeyword Distinct = new("DISTINCT");
+    public static readonly SqlKeyword Any = new("ANY");
+    public static readonly SqlKeyword All = new("ALL");
 
     // Registry for the Handler
     public static readonly SqlKeyword[] AllKeywords = 
@@ -68,7 +70,7 @@ public sealed class SqlKeyword
         Where, GroupBy, Having, OrderBy, Limit, Offset, Fetch,
         InnerJoin, LeftJoin, RightJoin, FullOuterJoin, CrossJoin, Join,
         Union, UnionAll, Intersect, Except, Top, Distinct, As, On, And, Or,
-        Not, In, Exists, Is, Null
+        Not, In, Exists, Is, Null, Any, All
     ];
 
     public static readonly SqlKeyword[] AllInitiatorsOrdered = [.. AllKeywords

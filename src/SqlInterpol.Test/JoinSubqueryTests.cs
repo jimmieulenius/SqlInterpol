@@ -4,20 +4,20 @@ using SqlInterpol.Test.Models;
 
 namespace SqlInterpol.Test;
 
-public class FromSubqueryTests
+public class JoinSubqueryTests
 {
     // The Type-Safe Projection Model
     public record CategoryStats(int CategoryId, decimal TotalPrice);
 
     [Theory]
-    [MemberData(nameof(FromSubqueryData))]
-    public void From_Subquery_With_TypeSafe_Projection(SqlTestCase testCase)
+    [MemberData(nameof(JoinSubqueryData))]
+    public void Join_Subquery_With_TypeSafe_Projection(SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
 
         var statsQuery = db
-            .Entity<CategoryStats>()
+            .Entity<CategoryStats>(alias: "stats")
             .Entity<Product>(alias: "p")
             .Query((stats, p) => db.Append($$"""
                 SELECT 
@@ -32,11 +32,12 @@ public class FromSubqueryTests
             SELECT 
                 {{c[x => x.Name]}}, 
                 {{statsQuery[x => x.TotalPrice]}}
-            FROM
+            FROM {{c}}
+            LEFT JOIN
             (
                 {{statsQuery}}
-            ) AS {{"stats"}}
-            JOIN {{c}} ON {{statsQuery[x => x.CategoryId]}} = {{c[x => x.Id]}}
+            )
+                ON {{statsQuery[x => x.CategoryId]}} = {{c[x => x.Id]}}
             """))
             .Build();
 
@@ -44,7 +45,7 @@ public class FromSubqueryTests
         Assert.Equal(testCase.ExpectedSql[0], result.Sql);
     }
 
-    public static TheoryData<SqlTestCase> FromSubqueryData =>
+    public static TheoryData<SqlTestCase> JoinSubqueryData =>
     [
         new SqlTestCase(
             SqlDialectKind.CustomDb,
@@ -53,7 +54,8 @@ public class FromSubqueryTests
                 SELECT 
                     <<c>>.<<Name>>, 
                     <<stats>>.<<TotalPrice>>
-                FROM
+                FROM <<Category>> AS <<c>>
+                LEFT JOIN
                 (
                     SELECT 
                         <<p>>.<<CategoryId>> AS <<CategoryId>>,
@@ -61,7 +63,7 @@ public class FromSubqueryTests
                     FROM <<dbo>>.<<Products>> AS <<p>>
                     GROUP BY <<p>>.<<CategoryId>>
                 ) AS <<stats>>
-                JOIN <<Category>> AS <<c>> ON <<stats>>.<<CategoryId>> = <<c>>.<<Id>>
+                    ON <<stats>>.<<CategoryId>> = <<c>>.<<Id>>
                 """
             ]
         ),
@@ -72,7 +74,8 @@ public class FromSubqueryTests
                 SELECT 
                     `c`.`Name`, 
                     `stats`.`TotalPrice`
-                FROM
+                FROM `Category` AS `c`
+                LEFT JOIN
                 (
                     SELECT 
                         `p`.`CategoryId` AS `CategoryId`,
@@ -80,7 +83,7 @@ public class FromSubqueryTests
                     FROM `dbo`.`Products` AS `p`
                     GROUP BY `p`.`CategoryId`
                 ) AS `stats`
-                JOIN `Category` AS `c` ON `stats`.`CategoryId` = `c`.`Id`
+                    ON `stats`.`CategoryId` = `c`.`Id`
                 """
             ]
         ),
@@ -91,7 +94,8 @@ public class FromSubqueryTests
                 SELECT 
                     "c"."Name", 
                     "stats"."TotalPrice"
-                FROM
+                FROM "Category" AS "c"
+                LEFT JOIN
                 (
                     SELECT 
                         "p"."CategoryId" AS "CategoryId",
@@ -99,7 +103,7 @@ public class FromSubqueryTests
                     FROM "dbo"."Products" AS "p"
                     GROUP BY "p"."CategoryId"
                 ) AS "stats"
-                JOIN "Category" AS "c" ON "stats"."CategoryId" = "c"."Id"
+                    ON "stats"."CategoryId" = "c"."Id"
                 """
             ]
         ),
@@ -110,7 +114,8 @@ public class FromSubqueryTests
                 SELECT 
                     "c"."Name", 
                     "stats"."TotalPrice"
-                FROM
+                FROM "Category" AS "c"
+                LEFT JOIN
                 (
                     SELECT 
                         "p"."CategoryId" AS "CategoryId",
@@ -118,7 +123,7 @@ public class FromSubqueryTests
                     FROM "dbo"."Products" AS "p"
                     GROUP BY "p"."CategoryId"
                 ) AS "stats"
-                JOIN "Category" AS "c" ON "stats"."CategoryId" = "c"."Id"
+                    ON "stats"."CategoryId" = "c"."Id"
                 """
             ]
         ),
@@ -129,7 +134,8 @@ public class FromSubqueryTests
                 SELECT 
                     "c"."Name", 
                     "stats"."TotalPrice"
-                FROM
+                FROM "Category" AS "c"
+                LEFT JOIN
                 (
                     SELECT 
                         "p"."CategoryId" AS "CategoryId",
@@ -137,7 +143,7 @@ public class FromSubqueryTests
                     FROM "dbo"."Products" AS "p"
                     GROUP BY "p"."CategoryId"
                 ) AS "stats"
-                JOIN "Category" AS "c" ON "stats"."CategoryId" = "c"."Id"
+                    ON "stats"."CategoryId" = "c"."Id"
                 """
             ]
         ),
@@ -148,7 +154,8 @@ public class FromSubqueryTests
                 SELECT 
                     [c].[Name], 
                     [stats].[TotalPrice]
-                FROM
+                FROM [Category] AS [c]
+                LEFT JOIN
                 (
                     SELECT 
                         [p].[CategoryId] AS [CategoryId],
@@ -156,7 +163,7 @@ public class FromSubqueryTests
                     FROM [dbo].[Products] AS [p]
                     GROUP BY [p].[CategoryId]
                 ) AS [stats]
-                JOIN [Category] AS [c] ON [stats].[CategoryId] = [c].[Id]
+                    ON [stats].[CategoryId] = [c].[Id]
                 """
             ]
         )
