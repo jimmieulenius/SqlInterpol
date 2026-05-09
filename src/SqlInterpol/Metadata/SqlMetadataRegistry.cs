@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Linq.Expressions;
 using System.Reflection;
 using SqlInterpol.Parsing;
@@ -11,13 +12,20 @@ public static class SqlMetadataRegistry
         public static readonly SqlEntityMetadata Metadata = InitializeMetadata(typeof(T));
     }
 
+    private static readonly ConcurrentDictionary<Type, SqlEntityMetadata> _runtimeCache = new();
+
     public static SqlEntityMetadata GetMetadata<T>() => Cache<T>.Metadata;
+
+    public static SqlEntityMetadata GetMetadata(Type type)
+    {
+        return _runtimeCache.GetOrAdd(type, InitializeMetadata);
+    }
 
     private static SqlEntityMetadata InitializeMetadata(Type type)
     {
         var entityAttr = type.GetCustomAttribute<SqlEntityAttribute>(inherit: true);
         string name = entityAttr?.Name ?? type.Name;
-        string? schema = entityAttr?.Schema; // This should now be populated
+        string? schema = entityAttr?.Schema; 
         SqlEntityType entityType = entityAttr?.Type ?? SqlEntityType.Table;
 
         var columns = type.GetProperties(BindingFlags.Public | BindingFlags.Instance)

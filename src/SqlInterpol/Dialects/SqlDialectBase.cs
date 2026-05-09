@@ -92,7 +92,7 @@ public abstract class SqlDialectBase : ISqlDialect
             return source;
         }
 
-        return $"{source} {SqlKeyword.As.Value} {QuoteIdentifier(alias)}";
+        return $"{QuoteIdentifier(source)} {SqlKeyword.As.Value} {QuoteIdentifier(alias)}";
     }
 
     public virtual SqlInterpolOptions GetDefaultOptions() => new();

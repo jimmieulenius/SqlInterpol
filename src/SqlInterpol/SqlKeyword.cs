@@ -63,14 +63,53 @@ public sealed class SqlKeyword
     public static readonly SqlKeyword Any = new("ANY");
     public static readonly SqlKeyword All = new("ALL");
 
+    // --- Order Directions ---
+    public static readonly SqlKeyword Asc = new("ASC");
+    public static readonly SqlKeyword Desc = new("DESC");
+
     // Registry for the Handler
     public static readonly SqlKeyword[] AllKeywords = 
     [ 
-        Select, From, Insert, Update, Delete, Set, Values, With,
-        Where, GroupBy, Having, OrderBy, Limit, Offset, Fetch,
-        InnerJoin, LeftJoin, RightJoin, FullOuterJoin, CrossJoin, Join,
-        Union, UnionAll, Intersect, Except, Top, Distinct, As, On, And, Or,
-        Not, In, Exists, Is, Null, Any, All
+        Select,
+        From,
+        Insert,
+        Update,
+        Delete,
+        Set,
+        Values,
+        With,
+        Where,
+        GroupBy,
+        Having,
+        OrderBy,
+        Limit,
+        Offset,
+        Fetch,
+        InnerJoin,
+        LeftJoin,
+        RightJoin,
+        FullOuterJoin,
+        CrossJoin,
+        Join,
+        Union,
+        UnionAll,
+        Intersect,
+        Except,
+        Top,
+        Distinct,
+        As,
+        On,
+        And,
+        Or,
+        Not,
+        In,
+        Exists,
+        Is,
+        Null,
+        Any,
+        All,
+        Asc,
+        Desc
     ];
 
     public static readonly SqlKeyword[] AllInitiatorsOrdered = [.. AllKeywords

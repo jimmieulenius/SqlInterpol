@@ -91,7 +91,7 @@ public class SqlInterpolationParser : ISqlInterpolationParser
                 paramKeys.Add((string)paramSegment.Value!);
             }
 
-            return new SqlSegment(SqlSegmentType.Raw, new SqlCollectionFragment(paramKeys));
+            return new SqlSegment(SqlSegmentType.Raw, new SqlRawCollectionFragment(paramKeys));
         }
 
         return CreateParameter(context, value);
@@ -104,6 +104,7 @@ public class SqlInterpolationParser : ISqlInterpolationParser
         if (trimmed.IsEmpty)
         {
             UpdateScannerState(context, span);
+
             return;
         }
 

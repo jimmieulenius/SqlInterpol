@@ -28,13 +28,13 @@ public abstract class SqlEntity<T> : SqlEntityBase<T>, ISqlEntity<T>
     {
         return mode switch
         {
-            // We render the declaration directly here instead of calling Declaration.ToSql()
-            // to prevent the infinite recursion loop.
             SqlRenderMode.Declaration => RenderDeclaration(context),
             
             SqlRenderMode.BaseName => context.Dialect.QuoteEntityName(Name, Schema),
             
-            SqlRenderMode.AliasOnly => context.Dialect.QuoteIdentifier(Reference.Alias ?? typeof(T).Name),
+            SqlRenderMode.AliasOnly => string.IsNullOrWhiteSpace(Reference.Alias) 
+                ? string.Empty 
+                : context.Dialect.QuoteIdentifier(Reference.Alias),
             
             _ => RenderReference(context)
         };
@@ -51,7 +51,7 @@ public abstract class SqlEntity<T> : SqlEntityBase<T>, ISqlEntity<T>
         }
 
         // Return the full declaration (e.g., [dbo].[Products] AS [p])
-        return $"{baseName} AS {context.Dialect.QuoteIdentifier(Reference.Alias)}";
+        return context.Dialect.ApplyAlias(baseName, Reference.Alias);
     }
 
     private string RenderReference(ISqlContext context)

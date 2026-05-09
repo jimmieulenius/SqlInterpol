@@ -1,0 +1,146 @@
+using SqlInterpol.Config;
+using SqlInterpol.Metadata;
+using SqlInterpol.Test.Dialects;
+using SqlInterpol.Test.Models;
+
+namespace SqlInterpol.Test;
+
+public class OrderBySubqueryTests
+{
+    // Local model for the subquery shape
+    [SqlTable("Stats")]
+    public record StatsModel(int CategoryId, decimal MaxPrice);
+
+    [Theory]
+    [MemberData(nameof(OrderBySubqueryData))]
+    public void OrderBy_AgainstSubquery_FormatsCorrectly(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        
+        // Act
+        var result = db.Query<StatsModel>(sm =>
+            db.Append($$"""
+            SELECT *
+            FROM
+            (
+                SELECT
+                    CategoryId,
+                    MAX(Price) AS MaxPrice
+                FROM Products
+                GROUP BY CategoryId
+            ) AS {{sm.Alias("stats")}}
+            ORDER BY {{sm.OrderBy(x => x.MaxPrice, SqlOrderDirection.Desc)}}
+            """))
+            .Build();
+
+        // Assert
+        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+    }
+
+    public static TheoryData<SqlTestCase> OrderBySubqueryData =>
+    [
+        new SqlTestCase(
+            SqlDialectKind.CustomDb, 
+            [
+                """
+                SELECT *
+                FROM
+                (
+                    SELECT
+                        CategoryId,
+                        MAX(Price) AS MaxPrice
+                    FROM Products
+                    GROUP BY CategoryId
+                ) AS <<stats>>
+                ORDER BY <<stats>>.<<MaxPrice>> DESC
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.MySql, 
+            [
+                """
+                SELECT *
+                FROM
+                (
+                    SELECT
+                        CategoryId,
+                        MAX(Price) AS MaxPrice
+                    FROM Products
+                    GROUP BY CategoryId
+                ) AS `stats`
+                ORDER BY `stats`.`MaxPrice` DESC
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Oracle, 
+            [
+                """
+                SELECT *
+                FROM
+                (
+                    SELECT
+                        CategoryId,
+                        MAX(Price) AS MaxPrice
+                    FROM Products
+                    GROUP BY CategoryId
+                ) AS "stats"
+                ORDER BY "stats"."MaxPrice" DESC
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.PostgreSql, 
+            [
+                """
+                SELECT *
+                FROM
+                (
+                    SELECT
+                        CategoryId,
+                        MAX(Price) AS MaxPrice
+                    FROM Products
+                    GROUP BY CategoryId
+                ) AS "stats"
+                ORDER BY "stats"."MaxPrice" DESC
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqLite, 
+            [
+                """
+                SELECT *
+                FROM
+                (
+                    SELECT
+                        CategoryId,
+                        MAX(Price) AS MaxPrice
+                    FROM Products
+                    GROUP BY CategoryId
+                ) AS "stats"
+                ORDER BY "stats"."MaxPrice" DESC
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqlServer, 
+            [
+                """
+                SELECT *
+                FROM
+                (
+                    SELECT
+                        CategoryId,
+                        MAX(Price) AS MaxPrice
+                    FROM Products
+                    GROUP BY CategoryId
+                ) AS [stats]
+                ORDER BY [stats].[MaxPrice] DESC
+                """
+            ]
+        )
+    ];
+}
