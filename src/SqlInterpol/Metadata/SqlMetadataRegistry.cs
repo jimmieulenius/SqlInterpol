@@ -13,6 +13,7 @@ public static class SqlMetadataRegistry
     }
 
     private static readonly ConcurrentDictionary<Type, SqlEntityMetadata> _runtimeCache = new();
+    private static readonly ConcurrentDictionary<Type, PropertyInfo[]> _typePropertyCache = new();
 
     public static SqlEntityMetadata GetMetadata<T>() => Cache<T>.Metadata;
 
@@ -21,20 +22,10 @@ public static class SqlMetadataRegistry
         return _runtimeCache.GetOrAdd(type, InitializeMetadata);
     }
 
-    private static SqlEntityMetadata InitializeMetadata(Type type)
+    public static PropertyInfo[] GetDtoProperties(Type type)
     {
-        var entityAttr = type.GetCustomAttribute<SqlEntityAttribute>(inherit: true);
-        string name = entityAttr?.Name ?? type.Name;
-        string? schema = entityAttr?.Schema; 
-        SqlEntityType entityType = entityAttr?.Type ?? SqlEntityType.Table;
-
-        var columns = type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .ToDictionary(
-                p => (MemberInfo)p,
-                p => p.GetCustomAttribute<SqlColumnAttribute>()?.Name ?? p.Name
-            );
-
-        return new SqlEntityMetadata(name, schema, entityType, columns);
+        return _typePropertyCache.GetOrAdd(type, t => 
+            t.GetProperties(BindingFlags.Public | BindingFlags.Instance));
     }
 
     public static string GetColumnName<T>(Expression<Func<T, object>> propertySelector)
@@ -55,6 +46,22 @@ public static class SqlMetadataRegistry
         var member = GetMemberInfo(propertySelector);
 
         return member.Name;
+    }
+
+    private static SqlEntityMetadata InitializeMetadata(Type type)
+    {
+        var entityAttr = type.GetCustomAttribute<SqlEntityAttribute>(inherit: true);
+        string name = entityAttr?.Name ?? type.Name;
+        string? schema = entityAttr?.Schema; 
+        SqlEntityType entityType = entityAttr?.Type ?? SqlEntityType.Table;
+
+        var columns = type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .ToDictionary(
+                p => (MemberInfo)p,
+                p => p.GetCustomAttribute<SqlColumnAttribute>()?.Name ?? p.Name
+            );
+
+        return new SqlEntityMetadata(name, schema, entityType, columns);
     }
 
     private static MemberInfo GetMemberInfo(LambdaExpression expression)

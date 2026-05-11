@@ -15,9 +15,10 @@ public abstract class SqlColumnReferenceBase(ISqlReference sourceReference)
     {
         return mode switch
         {
-            SqlRenderMode.AliasOnly => 
-                context.Dialect.QuoteIdentifier(PropertyName),
+            SqlRenderMode.AliasOnly => context.Dialect.QuoteIdentifier(PropertyName),
 
+            SqlRenderMode.BaseName => context.Dialect.QuoteIdentifier(GetColumnName(context)),
+            
             _ => RenderFullReference(context)
         };
     }

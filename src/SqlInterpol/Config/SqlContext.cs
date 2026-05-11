@@ -13,4 +13,18 @@ public class SqlContext(SqlBuilder builder, ISqlDialect dialect, ISqlInterpolati
     internal SqlParserState ParserState { get; } = new();
 
     ISqlParserState ISqlParserContext.ParserState => ParserState;
+
+    // Inside SqlContext.cs
+
+    public string AddParameter(object? value)
+    {
+        int index = Options.ParameterIndexStart + ParserState.ParameterCount;
+        string prefix = Options.ParameterPrefixOverride ?? Dialect.ParameterPrefix;
+        string paramKey = $"{prefix}{index}";
+        
+        Parameters[paramKey] = value ?? DBNull.Value;
+        ParserState.ParameterCount++;
+        
+        return paramKey;
+    }
 }

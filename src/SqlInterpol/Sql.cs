@@ -1,3 +1,6 @@
+using SqlInterpol.Metadata;
+using SqlInterpol.References;
+
 namespace SqlInterpol;
 
 public static class Sql
@@ -40,4 +43,77 @@ public static class Sql
 
     public static ISqlFragment Raw(string? value) => 
         new SqlRawFragment(value ?? string.Empty);
+
+    public static ISqlAssignmentFragment Set(ISqlReference reference, object? value)
+    {
+        return new SqlAssignmentFragment(reference, value);
+    }
+
+    public static ISqlFragment Update(ISqlEntityBase entity, ISqlAssignmentFragment assignment)
+    {
+        return new SqlUpdateFragment(entity, [assignment]);
+    }
+
+    public static ISqlFragment Update(ISqlEntityBase entity, params ISqlAssignmentFragment[] assignments)
+    {
+        if (assignments.Length == 0) throw new ArgumentException("Update must have at least one assignment.");
+        return new SqlUpdateFragment(entity, assignments);
+    }
+
+    public static ISqlFragment Update<TEntity, TDto>(ISqlEntityBase<TEntity> entity, TDto dto) 
+        where TDto : class
+    {
+        if (dto is ISqlAssignmentFragment assignment)
+        {
+            return Update(entity, [assignment]);
+        }
+
+        var assignments = BuildAssignmentsFromDto(entity, dto);
+
+        return new SqlUpdateFragment(entity, assignments);
+    }
+
+    public static ISqlFragment UpdateSet(ISqlAssignmentFragment assignment) 
+        => assignment;
+
+    public static ISqlFragment UpdateSet(params ISqlAssignmentFragment[] assignments) 
+        => new SqlCollectionFragment(assignments);
+
+    public static ISqlFragment UpdateSet<TEntity, TDto>(ISqlEntityBase<TEntity> entity, TDto dto) 
+        where TDto : class
+    {
+        if (dto is ISqlAssignmentFragment assignment) return assignment;
+
+        var assignments = BuildAssignmentsFromDto(entity, dto);
+        return new SqlCollectionFragment(assignments);
+    }
+
+    private static List<ISqlAssignmentFragment> BuildAssignmentsFromDto<TEntity>(ISqlEntityBase<TEntity> entity, object dto)
+    {
+        var properties = SqlMetadataRegistry.GetDtoProperties(dto.GetType());
+        var assignments = new List<ISqlAssignmentFragment>(properties.Length);
+        var meta = SqlMetadataRegistry.GetMetadata<TEntity>();
+
+        foreach (var prop in properties)
+        {
+            // LOOKUP: Find matching property on the target Entity
+            var entityMember = meta.Columns.Keys.FirstOrDefault(k => k.Name == prop.Name);
+            
+            if (entityMember == null)
+            {
+                // SAFETY: Throw if the DTO has a property like "NonExistentCol" 
+                // that doesn't map to the entity.
+                throw new ArgumentException(
+                    $"Property '{prop.Name}' on DTO does not exist on Entity '{typeof(TEntity).Name}'.");
+            }
+
+            string columnName = meta.Columns[entityMember];
+            var reference = new SqlColumnReference(entity.Reference, columnName, prop.Name); 
+            var value = prop.GetValue(dto);
+            
+            assignments.Add(new SqlAssignmentFragment(reference, value));
+        }
+
+        return assignments;
+    }
 }
