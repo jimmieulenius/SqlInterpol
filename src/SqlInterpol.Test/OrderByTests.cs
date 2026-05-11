@@ -30,8 +30,7 @@ public class OrderByTests
             db.Append($$"""
             SELECT *
             FROM {{o}}
-            ORDER BY
-                {{o.OrderBy(x => x.CreatedAt, SqlOrderDirection.Desc)}}
+            ORDER BY {{o.OrderBy(x => x.CreatedAt, SqlOrderDirection.Desc)}}
             """))
             .Build();
 
@@ -47,8 +46,7 @@ public class OrderByTests
                 """
                 SELECT *
                 FROM <<Orders>>
-                ORDER BY
-                    <<Orders>>.<<created_at>> DESC
+                ORDER BY <<Orders>>.<<created_at>> DESC
                 """
             ]
         ),
@@ -58,8 +56,7 @@ public class OrderByTests
                 """
                 SELECT *
                 FROM `Orders`
-                ORDER BY
-                    `Orders`.`created_at` DESC
+                ORDER BY `Orders`.`created_at` DESC
                 """
             ]
         ),
@@ -69,8 +66,7 @@ public class OrderByTests
                 """
                 SELECT *
                 FROM "Orders"
-                ORDER BY
-                    "Orders"."created_at" DESC
+                ORDER BY "Orders"."created_at" DESC
                 """
             ]
         ),
@@ -80,8 +76,7 @@ public class OrderByTests
                 """
                 SELECT *
                 FROM "Orders"
-                ORDER BY
-                    "Orders"."created_at" DESC
+                ORDER BY "Orders"."created_at" DESC
                 """
             ]
         ),
@@ -91,8 +86,7 @@ public class OrderByTests
                 """
                 SELECT *
                 FROM "Orders"
-                ORDER BY
-                    "Orders"."created_at" DESC
+                ORDER BY "Orders"."created_at" DESC
                 """
             ]
         ),
@@ -102,27 +96,28 @@ public class OrderByTests
                 """
                 SELECT *
                 FROM [Orders]
-                ORDER BY
-                    [Orders].[created_at] DESC
+                ORDER BY [Orders].[created_at] DESC
                 """
             ]
         )
     ];
 
     [Theory]
-    [MemberData(nameof(OrderByChainedData))]
-    public void OrderBy_ThenBy_ChainsCorrectly(SqlTestCase testCase)
+    [MemberData(nameof(OrderByCombinerData))]
+    public void OrderBy_WithParamsCombiner_RendersCorrectly(SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
 
-        // Act
+        // Act - Tests the Sql.OrderBy(params) overload
         var result = db.Query<OrderModel>(o =>
             db.Append($$"""
             SELECT *
             FROM {{o}}
-            ORDER BY {{o.OrderBy("Total", SqlOrderDirection.Desc)
-                .ThenBy(o[x => x.Id], SqlOrderDirection.Asc)}}
+            ORDER BY {{Sql.OrderBy(
+                o.OrderBy("Total", SqlOrderDirection.Desc),
+                o.OrderBy(x => x.Id, SqlOrderDirection.Asc)
+            )}}
             """))
             .Build();
 
@@ -130,7 +125,35 @@ public class OrderByTests
         Assert.Equal(testCase.ExpectedSql[0], result.Sql);
     }
 
-    public static TheoryData<SqlTestCase> OrderByChainedData =>
+    [Theory]
+    [MemberData(nameof(OrderByCombinerData))]
+    public void OrderBy_WithEnumerableCombiner_RendersCorrectly(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+
+        // Act - Tests the dynamic API scenario using IEnumerable
+        var result = db.Query<OrderModel>(o =>
+        {
+            // Simulate generating fragments dynamically from an API request
+            IEnumerable<ISqlOrderFragment> sorts = 
+            [
+                o.OrderBy("Total", SqlOrderDirection.Desc),
+                o.OrderBy(x => x.Id, SqlOrderDirection.Asc)
+            ];
+
+            db.Append($$"""
+                SELECT *
+                FROM {{o}}
+                ORDER BY {{Sql.OrderBy(sorts)}}
+                """);
+        }).Build();
+
+        // Assert
+        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+    }
+
+    public static TheoryData<SqlTestCase> OrderByCombinerData =>
     [
         new SqlTestCase(
             SqlDialectKind.CustomDb,
@@ -206,8 +229,7 @@ public class OrderByTests
             db.Append($$"""
             SELECT *
             FROM {{o}}
-            ORDER BY
-                {{Sql.Raw("TotalValue DESC")}}
+            ORDER BY {{Sql.Raw("Total DESC")}}
             """))
             .Build();
 
@@ -223,8 +245,7 @@ public class OrderByTests
                 """
                 SELECT *
                 FROM <<Orders>>
-                ORDER BY
-                    TotalValue DESC
+                ORDER BY Total DESC
                 """
             ]
         ),
@@ -234,8 +255,7 @@ public class OrderByTests
                 """
                 SELECT *
                 FROM `Orders`
-                ORDER BY
-                    TotalValue DESC
+                ORDER BY Total DESC
                 """
             ]
         ),
@@ -245,8 +265,7 @@ public class OrderByTests
                 """
                 SELECT *
                 FROM "Orders"
-                ORDER BY
-                    TotalValue DESC
+                ORDER BY Total DESC
                 """
             ]
         ),
@@ -256,8 +275,7 @@ public class OrderByTests
                 """
                 SELECT *
                 FROM "Orders"
-                ORDER BY
-                    TotalValue DESC
+                ORDER BY Total DESC
                 """
             ]
         ),
@@ -267,8 +285,7 @@ public class OrderByTests
                 """
                 SELECT *
                 FROM "Orders"
-                ORDER BY
-                    TotalValue DESC
+                ORDER BY Total DESC
                 """
             ]
         ),
@@ -278,8 +295,7 @@ public class OrderByTests
                 """
                 SELECT *
                 FROM [Orders]
-                ORDER BY
-                    TotalValue DESC
+                ORDER BY Total DESC
                 """
             ]
         )
@@ -292,14 +308,12 @@ public class OrderByTests
         // Arrange
         var db = testCase.CreateBuilder();
 
-        // Act - Proves we can mix typed chains with raw SQL via standard comma placement
+        // Act
         var result = db.Query<OrderModel>(o =>
             db.Append($$"""
             SELECT *
             FROM {{o}}
-            ORDER BY
-                {{o.OrderBy(x => x.CreatedAt, SqlOrderDirection.Asc)}},
-                {{Sql.Raw("(Total * 0.9) DESC")}}
+            ORDER BY {{o.OrderBy(x => x.CreatedAt, SqlOrderDirection.Asc)}}, {{Sql.Raw("(Total * 0.9) DESC")}}
             """))
             .Build();
 
@@ -315,9 +329,7 @@ public class OrderByTests
                 """
                 SELECT *
                 FROM <<Orders>>
-                ORDER BY
-                    <<Orders>>.<<created_at>> ASC,
-                    (Total * 0.9) DESC
+                ORDER BY <<Orders>>.<<created_at>> ASC, (Total * 0.9) DESC
                 """
             ]
         ),
@@ -327,9 +339,7 @@ public class OrderByTests
                 """
                 SELECT *
                 FROM `Orders`
-                ORDER BY
-                    `Orders`.`created_at` ASC,
-                    (Total * 0.9) DESC
+                ORDER BY `Orders`.`created_at` ASC, (Total * 0.9) DESC
                 """
             ]
         ),
@@ -339,9 +349,7 @@ public class OrderByTests
                 """
                 SELECT *
                 FROM "Orders"
-                ORDER BY
-                    "Orders"."created_at" ASC,
-                    (Total * 0.9) DESC
+                ORDER BY "Orders"."created_at" ASC, (Total * 0.9) DESC
                 """
             ]
         ),
@@ -351,9 +359,7 @@ public class OrderByTests
                 """
                 SELECT *
                 FROM "Orders"
-                ORDER BY
-                    "Orders"."created_at" ASC,
-                    (Total * 0.9) DESC
+                ORDER BY "Orders"."created_at" ASC, (Total * 0.9) DESC
                 """
             ]
         ),
@@ -363,9 +369,7 @@ public class OrderByTests
                 """
                 SELECT *
                 FROM "Orders"
-                ORDER BY
-                    "Orders"."created_at" ASC,
-                    (Total * 0.9) DESC
+                ORDER BY "Orders"."created_at" ASC, (Total * 0.9) DESC
                 """
             ]
         ),
@@ -375,9 +379,7 @@ public class OrderByTests
                 """
                 SELECT *
                 FROM [Orders]
-                ORDER BY
-                    [Orders].[created_at] ASC,
-                    (Total * 0.9) DESC
+                ORDER BY [Orders].[created_at] ASC, (Total * 0.9) DESC
                 """
             ]
         )
