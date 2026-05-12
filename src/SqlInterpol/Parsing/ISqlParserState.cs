@@ -10,4 +10,5 @@ public interface ISqlParserState
     bool ExpectsAliasOnly { get; set; }
     ISqlFragment? LastAliasableTarget { get; set; }
     SqlSegment? LastSegment { get; set; }
+    Dictionary<ISqlEntityBase, SqlEntityRole> EntityRoles { get; }
 }

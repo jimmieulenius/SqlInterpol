@@ -2,15 +2,23 @@ using SqlInterpol.Config;
 
 namespace SqlInterpol;
 
-public sealed class SqlRawCollectionFragment(List<string> raw) : ISqlFragment
+public sealed class SqlRawCollectionFragment(List<string> items) : ISqlFragment
 {
     public string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
     {
-        if (raw.Count == 0)
+        var separator = context.Options.CollectionSeparator;
+        var list = items.ToList();
+
+        if (list.Count == 0) return string.Empty;
+
+        if (context.Options.CollectionLayout == SqlCollectionLayout.Vertical)
         {
-            return string.Empty;
+            separator = separator.TrimEnd();
+            var indent = new string(' ', context.Options.IndentSize);
+
+            return $"{string.Join($"{separator}{Environment.NewLine}{indent}", list)}";
         }
 
-        return string.Join(context.Options.CollectionSeparator, raw);
+        return string.Join(separator, list);
     }
 }

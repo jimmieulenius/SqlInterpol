@@ -9,15 +9,25 @@ public class SqlCollectionFragmentBase<T>(IEnumerable<T> items, string? separato
 
     public string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
     {
-        if (Items.Count == 0)
+        separator ??= context.Options.CollectionSeparator;
+        var list = Items.Select(i => i.ToSql(context, mode)).ToList();
+
+        if (list.Count == 0)
         {
             return string.Empty;
         }
 
-        string actualSeparator = separator ?? context.Options.CollectionSeparator;
+        // Use the global option to decide layout
+        if (context.Options.CollectionLayout == SqlCollectionLayout.Vertical)
+        {
+            var indent = new string(' ', context.Options.IndentSize);
+            // Result:
+            //     item1,
+            //     item2,
+            //     item3
+            return $"{Environment.NewLine}{indent}{string.Join($"{separator.TrimEnd()}{Environment.NewLine}{indent}", list)}";
+        }
 
-        var renderedFragments = Items.Select(f => f.ToSql(context, mode));
-
-        return string.Join(actualSeparator, renderedFragments);
+        return string.Join(separator, list);
     }
 }

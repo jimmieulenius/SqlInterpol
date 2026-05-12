@@ -8,4 +8,5 @@ internal class SqlParserState : ISqlParserState
     public ISqlFragment? LastAliasableTarget { get; set; }
     public bool ExpectsAliasOnly { get; set; }
     public SqlSegment? LastSegment { get; set; }
+    public Dictionary<ISqlEntityBase, SqlEntityRole> EntityRoles { get; } = [];
 }

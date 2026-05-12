@@ -9,6 +9,8 @@ public interface ISqlDialect
     bool IsExpressionContext(string textBeforeParen);
 
     string QuoteIdentifier(string name);
+    
+    string UnquoteIdentifier(string identifier);
 
     string QuoteEntityName(string table, string? schema = null);
     

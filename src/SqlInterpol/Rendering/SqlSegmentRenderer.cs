@@ -1,4 +1,5 @@
 using SqlInterpol.Config;
+using SqlInterpol.Metadata;
 
 namespace SqlInterpol.Rendering;
 
@@ -16,8 +17,42 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
             case SqlSegmentType.Reference:
                 if (segment.Value is ISqlFragment fragment)
                 {
-                    var mode = ResolveRenderMode(index, segment, segments);
-                    rendered = fragment.ToSql(context, mode);
+                    // Prioritize the segment's specific RenderMode if set by the parser
+                    var mode = segment.RenderMode ?? ResolveRenderMode(index, segment, segments);
+
+                    // NEW: CTE Schema Override Check
+                    // We check if the current context provides parser state, and if so, if this is a CTE
+                    if (segment.Type == SqlSegmentType.Reference && 
+                        segment.Value is ISqlEntityBase entity &&
+                        context is Parsing.ISqlParserContext parserContext &&
+                        parserContext.ParserState.EntityRoles.TryGetValue(entity, out var role) &&
+                        role == Parsing.SqlEntityRole.Cte)
+                    {
+                        // CTEs don't have schemas! We build it raw.
+                        if (mode == SqlRenderMode.BaseName || mode == SqlRenderMode.Declaration)
+                        {
+                            string baseName = context.Dialect.QuoteIdentifier(entity.Reference.FallbackAlias);
+
+                            if (mode == SqlRenderMode.Declaration && entity.Reference is ISqlReference entRef && !string.IsNullOrEmpty(entRef.Alias))
+                            {
+                                rendered = $"{baseName} AS {context.Dialect.QuoteIdentifier(entRef.Alias)}";
+                            }
+                            else
+                            {
+                                rendered = baseName;
+                            }
+                        }
+                        else 
+                        {
+                            // Fallback for modes like AliasOnly
+                            rendered = fragment.ToSql(context, mode);
+                        }
+                    }
+                    else
+                    {
+                        // Standard entity/projection rendering
+                        rendered = fragment.ToSql(context, mode);
+                    }
                 }
                 break;
 
@@ -118,7 +153,8 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
 
     private SqlRenderMode ResolveRenderMode(int index, SqlSegment segment, IReadOnlyList<SqlSegment> segments)
     {
-        if (segment.IsAliasTarget) return SqlRenderMode.AliasOnly;
+        // if (segment.RenderMode == SqlRenderMode.AliasOnly) return SqlRenderMode.AliasOnly;
+
         if (segment.Value is not ISqlEntity entity) return SqlRenderMode.Default;
 
         // 1. WYSIWYG Look-Behind: Did the user manually open a parenthesis?
@@ -142,8 +178,8 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
                 var text = next.Value?.ToString()?.TrimStart();
                 
                 // If they manually type AS, drop the declaration but keep parentheses
-                if (text?.StartsWith("AS ", StringComparison.OrdinalIgnoreCase) == true
-                    || text?.StartsWith("AS\n", StringComparison.OrdinalIgnoreCase) == true)
+                if (text?.StartsWith($"{SqlKeyword.As} ", StringComparison.OrdinalIgnoreCase) == true
+                    || text?.StartsWith($"{SqlKeyword.As}\n", StringComparison.OrdinalIgnoreCase) == true)
                 {
                     return SqlRenderMode.BaseName;
                 }
@@ -165,45 +201,4 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
             ? SqlRenderMode.Declaration
             : SqlRenderMode.BaseName;
     }
-
-    // private SqlRenderMode ResolveRenderMode(int index, SqlSegment segment, IReadOnlyList<SqlSegment> segments)
-    // {
-    //     if (segment.IsAliasTarget) return SqlRenderMode.AliasOnly;
-
-    //     // Subquery: use Default if the user wrote their own opening paren, otherwise Declaration
-    //     if (segment.Value is ISqlQuery)
-    //     {
-    //         if (index > 0 && segments[index - 1].Type == SqlSegmentType.Literal)
-    //         {
-    //             var prevText = segments[index - 1].Value?.ToString()?.TrimEnd();
-    //             if (prevText?.Length > 0 && prevText[^1] == '(')
-    //                 return SqlRenderMode.Default;
-    //         }
-    //         return SqlRenderMode.Declaration;
-    //     }
-
-    //     if (segment.Value is not ISqlEntity entity) return SqlRenderMode.Default;
-
-    //     if (index + 1 < segments.Count)
-    //     {
-    //         var next = segments[index + 1];
-    //         if (next.Type == SqlSegmentType.Literal)
-    //         {
-    //             var text = next.Value?.ToString()?.TrimStart();
-    //             if (text?.StartsWith("AS ", StringComparison.OrdinalIgnoreCase) == true
-    //                 || text?.StartsWith("AS\n", StringComparison.OrdinalIgnoreCase) == true)
-    //             {
-    //                 return SqlRenderMode.BaseName;
-    //             }
-    //         }
-    //         else if (next.Type == SqlSegmentType.Raw)
-    //         {
-    //             return SqlRenderMode.BaseName;
-    //         }
-    //     }
-
-    //     return !string.IsNullOrEmpty(entity.Reference.Alias)
-    //         ? SqlRenderMode.Declaration
-    //         : SqlRenderMode.BaseName;
-    // }
 }

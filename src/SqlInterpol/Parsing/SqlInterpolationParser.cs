@@ -11,52 +11,83 @@ public class SqlInterpolationParser : ISqlInterpolationParser
         bool isAlias = context.ParserState.ExpectsAliasOnly;
         context.ParserState.ExpectsAliasOnly = false; // consume immediately
 
-        // NEW: Check if the user is passing a dynamic string alias via a hole: AS {{"stats"}}
-        if (isAlias && value is string dynamicAlias)
+        // 1. Handle dynamic string or generic fragment aliases (e.g. AS {"stats"} or AS {Sql.Quote("stats")})
+        // We explicitly exclude Projections and Entities here so they fall down to their dedicated 
+        // blocks below, which correctly apply SqlRenderMode.AliasOnly.
+        if (isAlias && (value is string || (value is ISqlFragment && value is not ISqlProjection && value is not ISqlEntityBase)))
         {
-            if (context.ParserState.LastAliasableTarget is ISqlEntityBase targetEntity)
+            string? rawAlias = null;
+            string? renderedOutput = null;
+
+            if (value is string stringAlias)
             {
-                if (targetEntity.Reference is ISqlReference entRef) entRef.Alias = dynamicAlias;
+                rawAlias = stringAlias;
+                renderedOutput = context.Dialect.QuoteIdentifier(stringAlias);
             }
-            else if (context.ParserState.LastAliasableTarget is ISqlProjection targetProj)
+            else if (value is ISqlFragment fragmentAlias)
             {
-                if (targetProj.Reference is ISqlReference entRef) entRef.Alias = dynamicAlias;
+                // Render the fragment to get the dialect-quoted string
+                renderedOutput = fragmentAlias.ToSql(context);
+                // Strip the quotes so the entity strictly stores the raw alias
+                rawAlias = context.Dialect.UnquoteIdentifier(renderedOutput);
             }
 
-            context.ParserState.LastAliasableTarget = null;
-            
-            // Return a Raw segment with the quoted identifier (e.g. [stats])
-            // We DO NOT want aliases to become parameters (@p0)!
-            return new SqlSegment(SqlSegmentType.Raw, context.Dialect.QuoteIdentifier(dynamicAlias));
+            if (rawAlias != null && renderedOutput != null)
+            {
+                // Retroactively apply the alias to the previously tracked entity or projection
+                if (context.ParserState.LastAliasableTarget is ISqlEntityBase targetEntity)
+                {
+                    if (targetEntity.Reference is ISqlReference entRef) entRef.Alias = rawAlias;
+                }
+                else if (context.ParserState.LastAliasableTarget is ISqlProjection targetProj)
+                {
+                    if (targetProj.Reference is ISqlReference entRef) entRef.Alias = rawAlias;
+                }
+
+                context.ParserState.LastAliasableTarget = null;
+                
+                // Return a Raw segment with the quoted identifier
+                return new SqlSegment(SqlSegmentType.Raw, renderedOutput);
+            }
         }
 
-        // Clean up if it was expected to be an alias but wasn't a valid string
+        // Clean up if it was expected to be an alias but wasn't a valid string/fragment,
+        // OR if it's a Projection/Entity that we are about to process below.
         if (isAlias)
         {
             context.ParserState.LastAliasableTarget = null;
         }
 
-        // 1. Check for Columns/Projections
+        // 2. Check for Columns/Projections
         if (value is ISqlProjection projection)
         {
-            if (!isAlias)
+            // If it's an alias, apply AliasOnly mode so it renders just the property name!
+            SqlRenderMode? mode = isAlias ? SqlRenderMode.AliasOnly : null;
+
+            // Detect if we are inside an INSERT INTO (...) column list
+            if (mode == null && context.ParserState.CurrentKeyword?.Value == SqlKeyword.Insert)
             {
-                context.ParserState.LastAliasableTarget = projection;
-            }
-            else
-            {
-                if (projection.Reference is ISqlReference entRef && entRef.Alias == null)
-                {
-                    entRef.Alias = entRef.FallbackAlias;
-                }
+                mode = SqlRenderMode.BaseName;
             }
 
-            return new SqlSegment(SqlSegmentType.Projection, projection, isAliasTarget: isAlias);
+            if (!isAlias) context.ParserState.LastAliasableTarget = projection;
+
+            return new SqlSegment(SqlSegmentType.Projection, projection, mode);
         }
 
-        // 2. NEW: Check for Tables/Subqueries (Entities)
+        // 3. Check for Tables/Subqueries (Entities)
         if (value is ISqlEntityBase entity)
         {
+            if (context.ParserState.CurrentKeyword?.Value.Equals(SqlKeyword.With, StringComparison.OrdinalIgnoreCase) == true)
+            {
+                // 1. Store in the dictionary that this entity is a CTE
+                context.ParserState.EntityRoles[entity] = SqlEntityRole.Cte;
+
+                // 2. Render only the base name for the declaration (e.g. [CategoryStats])
+                // It strictly prevents "AS [alias]" or schemas from bleeding into the WITH slot
+                return new SqlSegment(SqlSegmentType.Reference, entity, SqlRenderMode.BaseName);
+            }
+
             if (!isAlias)
             {
                 context.ParserState.LastAliasableTarget = entity;
@@ -69,9 +100,10 @@ public class SqlInterpolationParser : ISqlInterpolationParser
                 }
             }
 
-            return new SqlSegment(SqlSegmentType.Reference, entity, isAliasTarget: isAlias);
+            return new SqlSegment(SqlSegmentType.Reference, entity, isAlias ? SqlRenderMode.AliasOnly : null);
         }
 
+        // 4. Other Fragments
         if (value is ISqlFragment frag)
         {
             if (frag is ISqlParameterGenerator generator)
@@ -82,6 +114,7 @@ public class SqlInterpolationParser : ISqlInterpolationParser
             return new SqlSegment(SqlSegmentType.Raw, frag);
         }
 
+        // 5. Parameter Lists (IN clauses)
         if (value is IEnumerable enumerable && value is not string && value is not byte[])
         {
             var paramKeys = new List<string>();
@@ -95,6 +128,7 @@ public class SqlInterpolationParser : ISqlInterpolationParser
             return new SqlSegment(SqlSegmentType.Raw, new SqlRawCollectionFragment(paramKeys));
         }
 
+        // 6. Standard Parameters
         return CreateParameter(context, value);
     }
 

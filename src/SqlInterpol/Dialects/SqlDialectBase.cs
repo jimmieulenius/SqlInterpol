@@ -42,6 +42,26 @@ public abstract class SqlDialectBase : ISqlDialect
         return trimmed;
     }
 
+    public virtual string UnquoteIdentifier(string identifier)
+    {
+        if (string.IsNullOrEmpty(identifier))
+        {
+            return identifier;
+        }
+
+        string open = OpenQuote;
+        string close = CloseQuote;
+
+        if (identifier.StartsWith(open) && identifier.EndsWith(close))
+        {
+            // Dynamically strip based on the length of the quote characters.
+            // This safely handles single chars like '[' or multi-chars like '<<'
+            return identifier.Substring(open.Length, identifier.Length - open.Length - close.Length);
+        }
+
+        return identifier;
+    }
+
     public virtual string QuoteEntityName(string table, string? schema = null)
     {
         var quotedTable = QuoteIdentifier(table);

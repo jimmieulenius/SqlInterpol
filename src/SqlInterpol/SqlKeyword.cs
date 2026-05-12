@@ -16,12 +16,13 @@ public sealed class SqlKeyword
     // --- CRUD & Main Clauses ---
     public static readonly SqlKeyword Select = new("SELECT", true, false);
     public static readonly SqlKeyword From = new("FROM", true, true);
-    public static readonly SqlKeyword Insert = new("INSERT INTO", true, true);
+    public static readonly SqlKeyword Insert = new("INSERT", true, true);
     public static readonly SqlKeyword Update = new("UPDATE", true, true);
     public static readonly SqlKeyword Delete = new("DELETE", true, true);
     public static readonly SqlKeyword Set = new("SET", true, false);
     public static readonly SqlKeyword Values = new("VALUES", true, false);
     public static readonly SqlKeyword With = new("WITH", true, true);
+    public static readonly SqlKeyword Into = new("INTO");
 
     // --- Filtering & Grouping ---
     public static readonly SqlKeyword Where = new("WHERE", true, false);
@@ -78,6 +79,7 @@ public sealed class SqlKeyword
         Set,
         Values,
         With,
+        Into,
         Where,
         GroupBy,
         Having,

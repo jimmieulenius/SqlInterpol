@@ -21,6 +21,38 @@ public static class Sql
         return new SqlCollectionFragment(fragments);
     }
 
+    public static ISqlFragment Insert(ISqlEntityBase entity, params ISqlAssignmentFragment[] assignments)
+    {
+        return new SqlInsertFragment(entity, assignments);
+    }
+
+    public static ISqlFragment Insert<TEntity, TDto>(ISqlEntityBase<TEntity> entity, TDto dto) 
+        where TDto : class
+    {
+        // Handle the single assignment ambiguity
+        if (dto is ISqlAssignmentFragment assignment)
+        {
+            return Insert(entity, [assignment]);
+        }
+
+        var assignments = BuildAssignmentsFromDto(entity, dto);
+
+        return new SqlInsertFragment(entity, assignments);
+    }
+
+    public static ISqlFragment InsertValues(params ISqlAssignmentFragment[] assignments)
+    {
+        return new SqlInsertValuesFragment(assignments);
+    }
+
+    public static ISqlFragment InsertValues<TEntity, TDto>(ISqlEntityBase<TEntity> entity, TDto dto) 
+        where TDto : class
+    {
+        var assignments = BuildAssignmentsFromDto(entity, dto);
+        
+        return new SqlInsertValuesFragment(assignments);
+    }
+
     public static ISqlOrderFragment OrderBy(
         ISqlReference reference, 
         SqlOrderDirection direction = SqlOrderDirection.Asc) 
@@ -57,6 +89,7 @@ public static class Sql
     public static ISqlFragment Update(ISqlEntityBase entity, params ISqlAssignmentFragment[] assignments)
     {
         if (assignments.Length == 0) throw new ArgumentException("Update must have at least one assignment.");
+
         return new SqlUpdateFragment(entity, assignments);
     }
 
