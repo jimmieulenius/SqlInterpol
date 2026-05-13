@@ -81,6 +81,7 @@ public sealed class SqlKeyword
         Values,
         With,
         Into,
+        Returning,
         Where,
         GroupBy,
         Having,

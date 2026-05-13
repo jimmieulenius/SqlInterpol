@@ -445,7 +445,8 @@ public class InsertTests
 
         // Act - Requesting the auto-incremented ID back
         var result = db.Query<Product>(p => db.Append($$"""
-            INSERT INTO {{p}} {{newProduct}} RETURNING {{p[x => x.Id]}}
+            INSERT INTO {{p}} {{newProduct}}
+            RETURNING {{p[x => x.Id]}}
             """)).Build();
 
         // Assert SQL
@@ -457,47 +458,69 @@ public class InsertTests
 
     public static TheoryData<SqlTestCase> AllDialectsReturningSingleData =>
     [
-        // SQL Server (Intercepts RETURNING and injects OUTPUT inserted.[Id])
-        new SqlTestCase(SqlDialectKind.SqlServer, [
-            """
-            INSERT INTO [dbo].[Products] ([PROD_NAME], [CategoryId], [Price])
-            OUTPUT inserted.[Id]
-            VALUES (@p0, @p1, @p2)
-            """
-        ]),
-
-        // Postgres (Naturally prints ANSI syntax)
-        new SqlTestCase(SqlDialectKind.PostgreSql, [
-            """
-            INSERT INTO "dbo"."Products" ("PROD_NAME", "CategoryId", "Price")
-            VALUES ($1, $2, $3) RETURNING "Id"
-            """
-        ]),
-
-        // SQLite (Naturally prints ANSI syntax)
-        new SqlTestCase(SqlDialectKind.SqLite, [
-            """
-            INSERT INTO "dbo"."Products" ("PROD_NAME", "CategoryId", "Price")
-            VALUES (?0, ?1, ?2) RETURNING "Id"
-            """
-        ]),
-
+        new SqlTestCase(
+            SqlDialectKind.CustomDb,
+            [
+                """
+                INSERT INTO <<dbo>>.<<Products>> (<<PROD_NAME>>, <<CategoryId>>, <<Price>>)
+                VALUES (!!100, !!101, !!102)
+                RETURNING <<Id>>
+                """
+            ]
+        ),
         // MySQL (Pass-through: Note that MySQL doesn't natively support RETURNING, 
         // but this proves the engine leaves the AST untouched for non-SQL Server dialects)
-        new SqlTestCase(SqlDialectKind.MySql, [
-            """
-            INSERT INTO `dbo`.`Products` (`PROD_NAME`, `CategoryId`, `Price`)
-            VALUES (@p0, @p1, @p2) RETURNING `Id`
-            """
-        ]),
-
-        // Oracle
-        new SqlTestCase(SqlDialectKind.Oracle, [
-            """
-            INSERT INTO "dbo"."Products" ("PROD_NAME", "CategoryId", "Price")
-            VALUES (:0, :1, :2) RETURNING "Id"
-            """
-        ])
+        new SqlTestCase(
+            SqlDialectKind.MySql,
+            [
+                """
+                INSERT INTO `dbo`.`Products` (`PROD_NAME`, `CategoryId`, `Price`)
+                VALUES (@p0, @p1, @p2)
+                RETURNING `Id`
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Oracle,
+            [
+                """
+                INSERT INTO "dbo"."Products" ("PROD_NAME", "CategoryId", "Price")
+                VALUES (:0, :1, :2)
+                RETURNING "Id"
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.PostgreSql,
+            [
+                """
+                INSERT INTO "dbo"."Products" ("PROD_NAME", "CategoryId", "Price")
+                VALUES ($1, $2, $3)
+                RETURNING "Id"
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqLite,
+            [
+                """
+                INSERT INTO "dbo"."Products" ("PROD_NAME", "CategoryId", "Price")
+                VALUES (?0, ?1, ?2)
+                RETURNING "Id"
+                """
+            ]
+        ),
+        // SQL Server (Intercepts RETURNING and injects OUTPUT inserted.[Id])
+        new SqlTestCase(
+            SqlDialectKind.SqlServer,
+            [
+                """
+                INSERT INTO [dbo].[Products] ([PROD_NAME], [CategoryId], [Price])
+                OUTPUT inserted.[Id]
+                VALUES (@p0, @p1, @p2)
+                """
+            ]
+        )
     ];
 
     [Theory]
@@ -510,7 +533,8 @@ public class InsertTests
 
         // Act - Requesting multiple columns back (Id and the mapped PROD_NAME)
         var result = db.Query<Product>(p => db.Append($$"""
-            INSERT INTO {{p}} {{newProduct}} RETURNING {{p[x => x.Id]}}, {{p[x => x.Name]}}
+            INSERT INTO {{p}} {{newProduct}}
+            RETURNING {{p[x => x.Id]}}, {{p[x => x.Name]}}
             """)).Build();
 
         // Assert SQL
@@ -522,45 +546,66 @@ public class InsertTests
 
     public static TheoryData<SqlTestCase> AllDialectsReturningMultipleData =>
     [
-        // SQL Server
-        new SqlTestCase(SqlDialectKind.SqlServer, [
-            """
-            INSERT INTO [dbo].[Products] ([PROD_NAME], [CategoryId], [Price])
-            OUTPUT inserted.[Id], inserted.[PROD_NAME]
-            VALUES (@p0, @p1, @p2)
-            """
-        ]),
-
-        // Postgres
-        new SqlTestCase(SqlDialectKind.PostgreSql, [
-            """
-            INSERT INTO "dbo"."Products" ("PROD_NAME", "CategoryId", "Price")
-            VALUES ($1, $2, $3) RETURNING "Id", "PROD_NAME"
-            """
+        new SqlTestCase(
+            SqlDialectKind.CustomDb,
+            [
+                """
+                INSERT INTO <<dbo>>.<<Products>> (<<PROD_NAME>>, <<CategoryId>>, <<Price>>)
+                VALUES (!!100, !!101, !!102)
+                RETURNING <<Id>>, <<PROD_NAME>>
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.MySql,
+            [
+                """
+                INSERT INTO `dbo`.`Products` (`PROD_NAME`, `CategoryId`, `Price`)
+                VALUES (@p0, @p1, @p2)
+                RETURNING `Id`, `PROD_NAME`
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Oracle,
+            [
+                """
+                INSERT INTO "dbo"."Products" ("PROD_NAME", "CategoryId", "Price")
+                VALUES (:0, :1, :2)
+                RETURNING "Id", "PROD_NAME"
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.PostgreSql,
+            [
+                """
+                INSERT INTO "dbo"."Products" ("PROD_NAME", "CategoryId", "Price")
+                VALUES ($1, $2, $3)
+                RETURNING "Id", "PROD_NAME"
+                """
         ]),
 
         // SQLite
-        new SqlTestCase(SqlDialectKind.SqLite, [
-            """
-            INSERT INTO "dbo"."Products" ("PROD_NAME", "CategoryId", "Price")
-            VALUES (?0, ?1, ?2) RETURNING "Id", "PROD_NAME"
-            """
-        ]),
-
-        // MySQL
-        new SqlTestCase(SqlDialectKind.MySql, [
-            """
-            INSERT INTO `dbo`.`Products` (`PROD_NAME`, `CategoryId`, `Price`)
-            VALUES (@p0, @p1, @p2) RETURNING `Id`, `PROD_NAME`
-            """
-        ]),
-
-        // Oracle
-        new SqlTestCase(SqlDialectKind.Oracle, [
-            """
-            INSERT INTO "dbo"."Products" ("PROD_NAME", "CategoryId", "Price")
-            VALUES (:0, :1, :2) RETURNING "Id", "PROD_NAME"
-            """
-        ])
+        new SqlTestCase(
+            SqlDialectKind.SqLite,
+            [
+                """
+                INSERT INTO "dbo"."Products" ("PROD_NAME", "CategoryId", "Price")
+                VALUES (?0, ?1, ?2)
+                RETURNING "Id", "PROD_NAME"
+                """
+            ]),
+        
+        new SqlTestCase(
+            SqlDialectKind.SqlServer,
+            [
+                """
+                INSERT INTO [dbo].[Products] ([PROD_NAME], [CategoryId], [Price])
+                OUTPUT inserted.[Id], inserted.[PROD_NAME]
+                VALUES (@p0, @p1, @p2)
+                """
+            ]
+        )
     ];
 }

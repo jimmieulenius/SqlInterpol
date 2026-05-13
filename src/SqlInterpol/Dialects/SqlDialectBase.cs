@@ -128,6 +128,7 @@ public abstract class SqlDialectBase : ISqlDialect
     public virtual IEnumerable<SqlSegment> RewriteSegments(IReadOnlyList<SqlSegment> segments)
     {
         var rewritten = new List<SqlSegment>(segments.Count);
+        bool isReturningClause = false;
 
         bool TryRewriteKeywordFragment<T>(string keyword, SqlSegment segment, int index) where T : ISqlFragment
         {
@@ -141,7 +142,6 @@ public abstract class SqlDialectBase : ISqlDialect
                     {
                         // Preserve all formatting (newlines/spaces) BEFORE the keyword
                         rewritten.Add(new SqlSegment(SqlSegmentType.Literal, text[..keywordIndex]));
-
                         return true;
                     }
                 }
@@ -157,7 +157,20 @@ public abstract class SqlDialectBase : ISqlDialect
         for (int i = 0; i < segments.Count; i++)
         {
             var segment = segments[i];
-            
+
+            // 1. Track if we have entered the RETURNING phase of the query
+            if (segment.Tag == SqlSegmentTag.ReturningKeyword)
+            {
+                isReturningClause = true;
+            }
+
+            // 2. If we are returning columns, force them to render as "Id" instead of "dbo"."Table"."Id"
+            if (isReturningClause && segment.Type == SqlSegmentType.Projection && segment.Value is ISqlProjection proj)
+            {
+                rewritten.Add(new SqlSegment(SqlSegmentType.Projection, proj, SqlRenderMode.BaseName));
+                continue;
+            }
+
             switch (segment.Tag)
             {
                 case SqlSegmentTag.InsertValuesKeyword:
