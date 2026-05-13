@@ -343,4 +343,224 @@ public class InsertTests
             ]
         )
     ];
+
+    [Theory]
+    [MemberData(nameof(AllDialectsBulkInsertData))]
+    public void Insert_BulkImplicitSyntax_RendersCorrectly(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        
+        // Passing an array of anonymous objects
+        var products = new[]
+        {
+            new { Name = "Prod1", CategoryId = 1, Price = 10m },
+            new { Name = "Prod2", CategoryId = 2, Price = 20m }
+        };
+
+        // Act - Using the shorthand bulk syntax!
+        var result = db.Query<Product>(p => db.Append($$"""
+            INSERT INTO {{p}} VALUES {{products}}
+            """)).Build();
+
+        // Assert SQL
+        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+
+        // Assert Parameters - It should safely unpack all 6 values across 2 rows!
+        Assert.Equal(6, result.Parameters.Count);
+        Assert.Equal("Prod1", result.Parameters.ElementAt(0).Value);
+        Assert.Equal(1, result.Parameters.ElementAt(1).Value);
+        Assert.Equal(10m, result.Parameters.ElementAt(2).Value);
+        
+        Assert.Equal("Prod2", result.Parameters.ElementAt(3).Value);
+        Assert.Equal(2, result.Parameters.ElementAt(4).Value);
+        Assert.Equal(20m, result.Parameters.ElementAt(5).Value);
+    }
+
+    public static TheoryData<SqlTestCase> AllDialectsBulkInsertData =>
+    [
+        new SqlTestCase(
+            SqlDialectKind.CustomDb,
+            [
+                """
+                INSERT INTO <<dbo>>.<<Products>> (<<PROD_NAME>>, <<CategoryId>>, <<Price>>)
+                VALUES (!!100, !!101, !!102), (!!103, !!104, !!105)
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.MySql,
+            [
+                """
+                INSERT INTO `dbo`.`Products` (`PROD_NAME`, `CategoryId`, `Price`)
+                VALUES (@p0, @p1, @p2), (@p3, @p4, @p5)
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Oracle,
+            [
+                """
+                INSERT INTO "dbo"."Products" ("PROD_NAME", "CategoryId", "Price")
+                VALUES (:0, :1, :2), (:3, :4, :5)
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.PostgreSql,
+            [
+                """
+                INSERT INTO "dbo"."Products" ("PROD_NAME", "CategoryId", "Price")
+                VALUES ($1, $2, $3), ($4, $5, $6)
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqLite,
+            [
+                """
+                INSERT INTO "dbo"."Products" ("PROD_NAME", "CategoryId", "Price")
+                VALUES (?0, ?1, ?2), (?3, ?4, ?5)
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqlServer,
+            [
+                """
+                INSERT INTO [dbo].[Products] ([PROD_NAME], [CategoryId], [Price])
+                VALUES (@p0, @p1, @p2), (@p3, @p4, @p5)
+                """
+            ]
+        )
+    ];
+
+    [Theory]
+    [MemberData(nameof(AllDialectsReturningSingleData))]
+    public void Insert_ReturningSingleColumn_RendersCorrectly(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        var newProduct = new { Name = "Test Product", CategoryId = 5, Price = 19.99m };
+
+        // Act - Requesting the auto-incremented ID back
+        var result = db.Query<Product>(p => db.Append($$"""
+            INSERT INTO {{p}} {{newProduct}} RETURNING {{p[x => x.Id]}}
+            """)).Build();
+
+        // Assert SQL
+        var expectedSql = testCase.ExpectedSql[0].Replace("\r\n", "\n").Trim();
+        var actualSql = result.Sql.Replace("\r\n", "\n").Trim();
+        
+        Assert.Equal(expectedSql, actualSql);
+    }
+
+    public static TheoryData<SqlTestCase> AllDialectsReturningSingleData =>
+    [
+        // SQL Server (Intercepts RETURNING and injects OUTPUT inserted.[Id])
+        new SqlTestCase(SqlDialectKind.SqlServer, [
+            """
+            INSERT INTO [dbo].[Products] ([PROD_NAME], [CategoryId], [Price])
+            OUTPUT inserted.[Id]
+            VALUES (@p0, @p1, @p2)
+            """
+        ]),
+
+        // Postgres (Naturally prints ANSI syntax)
+        new SqlTestCase(SqlDialectKind.PostgreSql, [
+            """
+            INSERT INTO "dbo"."Products" ("PROD_NAME", "CategoryId", "Price")
+            VALUES ($1, $2, $3) RETURNING "Id"
+            """
+        ]),
+
+        // SQLite (Naturally prints ANSI syntax)
+        new SqlTestCase(SqlDialectKind.SqLite, [
+            """
+            INSERT INTO "dbo"."Products" ("PROD_NAME", "CategoryId", "Price")
+            VALUES (?0, ?1, ?2) RETURNING "Id"
+            """
+        ]),
+
+        // MySQL (Pass-through: Note that MySQL doesn't natively support RETURNING, 
+        // but this proves the engine leaves the AST untouched for non-SQL Server dialects)
+        new SqlTestCase(SqlDialectKind.MySql, [
+            """
+            INSERT INTO `dbo`.`Products` (`PROD_NAME`, `CategoryId`, `Price`)
+            VALUES (@p0, @p1, @p2) RETURNING `Id`
+            """
+        ]),
+
+        // Oracle
+        new SqlTestCase(SqlDialectKind.Oracle, [
+            """
+            INSERT INTO "dbo"."Products" ("PROD_NAME", "CategoryId", "Price")
+            VALUES (:0, :1, :2) RETURNING "Id"
+            """
+        ])
+    ];
+
+    [Theory]
+    [MemberData(nameof(AllDialectsReturningMultipleData))]
+    public void Insert_ReturningMultipleColumns_RendersCorrectly(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        var newProduct = new { Name = "Test Product", CategoryId = 5, Price = 19.99m };
+
+        // Act - Requesting multiple columns back (Id and the mapped PROD_NAME)
+        var result = db.Query<Product>(p => db.Append($$"""
+            INSERT INTO {{p}} {{newProduct}} RETURNING {{p[x => x.Id]}}, {{p[x => x.Name]}}
+            """)).Build();
+
+        // Assert SQL
+        var expectedSql = testCase.ExpectedSql[0].Replace("\r\n", "\n").Trim();
+        var actualSql = result.Sql.Replace("\r\n", "\n").Trim();
+        
+        Assert.Equal(expectedSql, actualSql);
+    }
+
+    public static TheoryData<SqlTestCase> AllDialectsReturningMultipleData =>
+    [
+        // SQL Server
+        new SqlTestCase(SqlDialectKind.SqlServer, [
+            """
+            INSERT INTO [dbo].[Products] ([PROD_NAME], [CategoryId], [Price])
+            OUTPUT inserted.[Id], inserted.[PROD_NAME]
+            VALUES (@p0, @p1, @p2)
+            """
+        ]),
+
+        // Postgres
+        new SqlTestCase(SqlDialectKind.PostgreSql, [
+            """
+            INSERT INTO "dbo"."Products" ("PROD_NAME", "CategoryId", "Price")
+            VALUES ($1, $2, $3) RETURNING "Id", "PROD_NAME"
+            """
+        ]),
+
+        // SQLite
+        new SqlTestCase(SqlDialectKind.SqLite, [
+            """
+            INSERT INTO "dbo"."Products" ("PROD_NAME", "CategoryId", "Price")
+            VALUES (?0, ?1, ?2) RETURNING "Id", "PROD_NAME"
+            """
+        ]),
+
+        // MySQL
+        new SqlTestCase(SqlDialectKind.MySql, [
+            """
+            INSERT INTO `dbo`.`Products` (`PROD_NAME`, `CategoryId`, `Price`)
+            VALUES (@p0, @p1, @p2) RETURNING `Id`, `PROD_NAME`
+            """
+        ]),
+
+        // Oracle
+        new SqlTestCase(SqlDialectKind.Oracle, [
+            """
+            INSERT INTO "dbo"."Products" ("PROD_NAME", "CategoryId", "Price")
+            VALUES (:0, :1, :2) RETURNING "Id", "PROD_NAME"
+            """
+        ])
+    ];
 }

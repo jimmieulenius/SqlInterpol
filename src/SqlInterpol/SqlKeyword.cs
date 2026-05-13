@@ -23,6 +23,7 @@ public sealed class SqlKeyword
     public static readonly SqlKeyword Values = new("VALUES", true, false);
     public static readonly SqlKeyword With = new("WITH", true, true);
     public static readonly SqlKeyword Into = new("INTO");
+    public static readonly SqlKeyword Returning = new("RETURNING", true, false);
 
     // --- Filtering & Grouping ---
     public static readonly SqlKeyword Where = new("WHERE", true, false);

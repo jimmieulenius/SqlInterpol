@@ -81,6 +81,11 @@ public static class Sql
     public static ISqlFragment Raw(string? value) => 
         new SqlRawFragment(value ?? string.Empty);
 
+    public static SqlReturningFragment Returning(params ISqlProjection[] columns)
+    {
+        return new SqlReturningFragment(columns);
+    }
+
     public static ISqlAssignmentFragment Set(ISqlReference reference, object? value)
     {
         return new SqlAssignmentFragment(reference, value);

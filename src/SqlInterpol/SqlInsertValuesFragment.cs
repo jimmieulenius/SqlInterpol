@@ -2,42 +2,58 @@ using SqlInterpol.Config;
 
 namespace SqlInterpol;
 
-public class SqlInsertValuesFragment(IEnumerable<ISqlAssignmentFragment> assignments) 
+public class SqlInsertValuesFragment
     : ISqlFragment, ISqlParameterGenerator
 {
-    private readonly List<ISqlAssignmentFragment> _assignments = assignments.ToList();
+    private readonly List<List<ISqlAssignmentFragment>> _bulkAssignments;
+
+    public SqlInsertValuesFragment(IEnumerable<ISqlAssignmentFragment> assignments)
+    {
+        _bulkAssignments = [assignments.ToList()];
+    }
+
+    public SqlInsertValuesFragment(IEnumerable<IEnumerable<ISqlAssignmentFragment>> bulkAssignments)
+    {
+        _bulkAssignments = bulkAssignments.Select(a => a.ToList()).ToList();
+    }
 
     public void GenerateParameters(ISqlContext context)
     {
-        foreach (var assignment in _assignments)
+        foreach (var row in _bulkAssignments)
         {
-            if (assignment is ISqlParameterGenerator generator)
+            foreach (var assignment in row)
             {
-                generator.GenerateParameters(context);
+                if (assignment is ISqlParameterGenerator generator) generator.GenerateParameters(context);
             }
         }
     }
 
     public string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
     {
-        var assignmentList = assignments.ToList();
-        var separator = context.Options.CollectionSeparator;
+        if (_bulkAssignments.Count == 0 || _bulkAssignments[0].Count == 0) return string.Empty;
 
-        if (assignmentList.Count == 0)
+        var firstRow = _bulkAssignments[0];
+        var columnNames = new SqlCollectionFragment([.. firstRow.Select(a => new SqlRawFragment(a.Reference.ToSql(context, SqlRenderMode.BaseName)))]);
+        var separator = context.Options.CollectionSeparator;
+        var valuesBlocks = new List<string>();
+
+        foreach (var row in _bulkAssignments)
         {
-            return string.Empty;
+            var paramNames = new SqlCollectionFragment([.. row.Select(a => new SqlRawFragment(a.ToSql(context).Split('=').Last().Trim()))]);
+            valuesBlocks.Add($"{paramNames.ToSql(context, mode)}");
         }
 
-        var columnNames = new SqlCollectionFragment([.. assignmentList.Select(a => new SqlRawFragment(a.Reference.ToSql(context, SqlRenderMode.BaseName)))]);
-        var paramNames = new SqlCollectionFragment([.. assignmentList.Select(a => new SqlRawFragment(a.ToSql(context).Split('=').Last().Trim()))]);
         var cols = columnNames.ToSql(context, mode);
-        var vals = paramNames.ToSql(context, mode);
 
         if (context.Options.CollectionLayout == SqlCollectionLayout.Vertical)
         {
-            return $"({cols}{Environment.NewLine}){Environment.NewLine}{SqlKeyword.Values}{Environment.NewLine}({vals}{Environment.NewLine})";
+            separator = separator.TrimEnd();
+            
+            var vals = string.Join($"{separator}{Environment.NewLine}", valuesBlocks.Select(v => $"({v}{Environment.NewLine})"));
+
+            return $"({cols}{Environment.NewLine}){Environment.NewLine}{SqlKeyword.Values}{Environment.NewLine}{vals}";
         }
 
-        return $"({cols}){Environment.NewLine}{SqlKeyword.Values} ({vals})";
+        return $"({cols}){Environment.NewLine}{SqlKeyword.Values} {string.Join(separator, valuesBlocks.Select(v => $"({v})"))}";
     }
 }

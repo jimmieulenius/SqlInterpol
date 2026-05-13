@@ -116,6 +116,9 @@ public class SqlInterpolationParser : ISqlInterpolationParser
             return new SqlSegment(SqlSegmentType.Literal, direction == SqlOrderDirection.Asc ? " ASC" : " DESC");
         }
 
+        bool isInsert = context.ParserState.CurrentKeyword?.Value.Equals(SqlKeyword.Insert, StringComparison.OrdinalIgnoreCase) == true;
+        bool isValues = context.ParserState.CurrentKeyword?.Value.Equals(SqlKeyword.Values, StringComparison.OrdinalIgnoreCase) == true;
+
         // We ensure it's a Class to prevent accidentally capturing primitive structs like Guid or DateTime 
         // if a user manually writes `UPDATE {{o}} SET Id = {{guid}}`.
         if (value != null && 
@@ -141,13 +144,13 @@ public class SqlInterpolationParser : ISqlInterpolationParser
                 }
 
                 var fragment = new SqlSetFragment(assignments);
-                
+
                 return new SqlSegment(SqlSegmentType.Reference, fragment);
             }
 
             // INSERT: User typed "INSERT INTO {{o}} "
-            bool isInsert = context.ParserState.CurrentKeyword?.Value.Equals(SqlKeyword.Insert, StringComparison.OrdinalIgnoreCase) == true;
-            bool isValues = context.ParserState.CurrentKeyword?.Value.Equals(SqlKeyword.Values, StringComparison.OrdinalIgnoreCase) == true;
+            // bool isInsert = context.ParserState.CurrentKeyword?.Value.Equals(SqlKeyword.Insert, StringComparison.OrdinalIgnoreCase) == true;
+            // bool isValues = context.ParserState.CurrentKeyword?.Value.Equals(SqlKeyword.Values, StringComparison.OrdinalIgnoreCase) == true;
 
             // Trigger if the user typed "INSERT INTO {o} " OR "VALUES "
             if ((isInsert || isValues) && context.ParserState.ActiveEntityTarget != null)
@@ -175,6 +178,36 @@ public class SqlInterpolationParser : ISqlInterpolationParser
             }
 
             return new SqlSegment(SqlSegmentType.Raw, frag);
+        }
+
+        // bool isInsert = context.ParserState.CurrentKeyword?.Value.Equals(SqlKeyword.Insert, StringComparison.OrdinalIgnoreCase) == true;
+        // bool isValues = context.ParserState.CurrentKeyword?.Value.Equals(SqlKeyword.Values, StringComparison.OrdinalIgnoreCase) == true;
+
+        if ((isInsert || isValues) && context.ParserState.ActiveEntityTarget != null && value is IEnumerable bulkEnumerable && value is not string && value is not byte[])
+        {
+            var bulkAssignments = new List<IEnumerable<ISqlAssignmentFragment>>();
+
+            foreach (var item in bulkEnumerable)
+            {
+                if (item != null && item.GetType().IsClass && item is not string)
+                {
+                    var assignments = Sql.BuildAssignments(context.ParserState.ActiveEntityTarget, item);
+
+                    foreach (var assignment in assignments)
+                    {
+                        if (assignment is ISqlParameterGenerator gen) gen.GenerateParameters(context);
+                    }
+
+                    bulkAssignments.Add(assignments);
+                }
+            }
+
+            if (bulkAssignments.Count > 0)
+            {
+                var fragment = new SqlInsertValuesFragment(bulkAssignments);
+
+                return new SqlSegment(SqlSegmentType.Reference, fragment);
+            }
         }
 
         // 5. Parameter Lists (IN clauses)
@@ -222,6 +255,10 @@ public class SqlInterpolationParser : ISqlInterpolationParser
         {
             context.ParserState.CurrentKeyword = SqlKeyword.Values;
             tag = SqlSegmentTag.InsertValuesKeyword;
+        }
+        else if (trimmed.EndsWith(SqlKeyword.Returning, StringComparison.OrdinalIgnoreCase))
+        {
+            tag = SqlSegmentTag.ReturningKeyword;
         }
 
         if (trimmed.IsEmpty)

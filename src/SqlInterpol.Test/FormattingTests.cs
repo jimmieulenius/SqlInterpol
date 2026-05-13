@@ -193,6 +193,182 @@ public class FormattingTests
     ];
 
     [Theory]
+    [MemberData(nameof(VerticalBulkInsertData))]
+    public void ContextualBulkInsert_WithVerticalLayout_IndentsCorrectly(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        db.Context.Options.CollectionLayout = SqlCollectionLayout.Vertical;
+        db.Context.Options.IndentSize = 4;
+        
+        var products = new[]
+        {
+            new { Name = "Prod1", CategoryId = 1, Price = 10m },
+            new { Name = "Prod2", CategoryId = 2, Price = 20m }
+        };
+
+        // Act
+        var result = db.Query<Product>(p => 
+            db.Append($$"""
+                INSERT INTO {{p}}
+                VALUES
+                {{products}}
+                """))
+            .Build();
+
+        // Assert        
+        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+    }
+
+    public static TheoryData<SqlTestCase> VerticalBulkInsertData =>
+    [
+        new SqlTestCase(
+            SqlDialectKind.CustomDb,
+            [
+                $$"""
+                INSERT INTO <<dbo>>.<<Products>>
+                (
+                    <<PROD_NAME>>,
+                    <<CategoryId>>,
+                    <<Price>>
+                )
+                VALUES
+                (
+                    !!100,
+                    !!101,
+                    !!102
+                ),
+                (
+                    !!103,
+                    !!104,
+                    !!105
+                )
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.MySql,
+            [
+                """
+                INSERT INTO `dbo`.`Products`
+                (
+                    `PROD_NAME`,
+                    `CategoryId`,
+                    `Price`
+                )
+                VALUES
+                (
+                    @p0,
+                    @p1,
+                    @p2
+                ),
+                (
+                    @p3,
+                    @p4,
+                    @p5
+                )
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Oracle,
+            [
+                """
+                INSERT INTO "dbo"."Products"
+                (
+                    "PROD_NAME",
+                    "CategoryId",
+                    "Price"
+                )
+                VALUES
+                (
+                    :0,
+                    :1,
+                    :2
+                ),
+                (
+                    :3,
+                    :4,
+                    :5
+                )
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.PostgreSql,
+            [
+                """
+                INSERT INTO "dbo"."Products"
+                (
+                    "PROD_NAME",
+                    "CategoryId",
+                    "Price"
+                )
+                VALUES
+                (
+                    $1,
+                    $2,
+                    $3
+                ),
+                (
+                    $4,
+                    $5,
+                    $6
+                )
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqLite,
+            [
+                """
+                INSERT INTO "dbo"."Products"
+                (
+                    "PROD_NAME",
+                    "CategoryId",
+                    "Price"
+                )
+                VALUES
+                (
+                    ?0,
+                    ?1,
+                    ?2
+                ),
+                (
+                    ?3,
+                    ?4,
+                    ?5
+                )
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqlServer,
+            [
+                """
+                INSERT INTO [dbo].[Products]
+                (
+                    [PROD_NAME],
+                    [CategoryId],
+                    [Price]
+                )
+                VALUES
+                (
+                    @p0,
+                    @p1,
+                    @p2
+                ),
+                (
+                    @p3,
+                    @p4,
+                    @p5
+                )
+                """
+            ]
+        )
+    ];
+
+    [Theory]
     [MemberData(nameof(HorizontalInsertData))]
     public void Insert_WithHorizontalLayout_RendersInline(SqlTestCase testCase)
     {
