@@ -9,7 +9,7 @@ public interface ISqlDialect
     bool IsExpressionContext(string textBeforeParen);
 
     string QuoteIdentifier(string name);
-    
+
     string UnquoteIdentifier(string identifier);
 
     string QuoteEntityName(string table, string? schema = null);
@@ -17,6 +17,8 @@ public interface ISqlDialect
     string GetParameterName(int index);
 
     string ApplyAlias(string source, string? alias = null);
+
+    string RenderFragment(ISqlFragment fragment, ISqlContext context);
 
     SqlInterpolOptions GetDefaultOptions() => new();
 }

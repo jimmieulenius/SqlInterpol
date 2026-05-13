@@ -21,7 +21,6 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
                     var mode = segment.RenderMode ?? ResolveRenderMode(index, segment, segments);
 
                     // NEW: CTE Schema Override Check
-                    // We check if the current context provides parser state, and if so, if this is a CTE
                     if (segment.Type == SqlSegmentType.Reference && 
                         segment.Value is ISqlEntityBase entity &&
                         context is Parsing.ISqlParserContext parserContext &&
@@ -31,7 +30,8 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
                         // CTEs don't have schemas! We build it raw.
                         if (mode == SqlRenderMode.BaseName || mode == SqlRenderMode.Declaration)
                         {
-                            string baseName = context.Dialect.QuoteIdentifier(entity.Reference.FallbackAlias);
+                            // FIX 1: Use entity.Declaration.Name instead of FallbackAlias
+                            string baseName = context.Dialect.QuoteIdentifier(SqlMetadataRegistry.GetEntityName(entity));
 
                             if (mode == SqlRenderMode.Declaration && entity.Reference is ISqlReference entRef && !string.IsNullOrEmpty(entRef.Alias))
                             {
@@ -79,7 +79,9 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
                             {
                                 var textBeforeParen = beforeSubquery[..^1].TrimEnd();
                                 
-                                if (context.Dialect.IsExpressionContext(textBeforeParen))
+                                // FIX 2: If the block is prefixed by AS, it's a CTE definition and shouldn't be auto-aliased
+                                if (context.Dialect.IsExpressionContext(textBeforeParen) ||
+                                    textBeforeParen.EndsWith("AS", StringComparison.OrdinalIgnoreCase))
                                 {
                                     requiresAlias = false;
                                 }

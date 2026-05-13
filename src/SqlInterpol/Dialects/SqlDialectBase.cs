@@ -115,5 +115,15 @@ public abstract class SqlDialectBase : ISqlDialect
         return $"{QuoteIdentifier(source)} {SqlKeyword.As.Value} {QuoteIdentifier(alias)}";
     }
 
+    public virtual string RenderFragment(ISqlFragment fragment, ISqlContext context)
+    {
+        return fragment switch
+        {
+            SqlPagingFragment p => $"LIMIT {p.Limit} OFFSET {p.Offset}",
+
+            _ => throw new NotSupportedException($"The fragment type '{fragment.GetType().Name}' is not supported by {this.GetType().Name}.")
+        };
+    }
+
     public virtual SqlInterpolOptions GetDefaultOptions() => new();
 }

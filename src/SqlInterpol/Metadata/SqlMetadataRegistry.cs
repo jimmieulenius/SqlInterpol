@@ -14,8 +14,32 @@ public static class SqlMetadataRegistry
 
     private static readonly ConcurrentDictionary<Type, SqlEntityMetadata> _runtimeCache = new();
     private static readonly ConcurrentDictionary<Type, PropertyInfo[]> _typePropertyCache = new();
+    private static readonly ConcurrentDictionary<Type, Type> _entityModelTypeCache = new();
 
     public static SqlEntityMetadata GetMetadata<T>() => Cache<T>.Metadata;
+
+    public static string GetEntityName(ISqlEntityBase entity)
+    {
+        ArgumentNullException.ThrowIfNull(entity);
+
+        // 2. Safely extract and cache the 'T' from ISqlEntityBase<T> (e.g. Product)
+        Type modelType = _entityModelTypeCache.GetOrAdd(entity.GetType(), type =>
+        {
+            var interfaceType = type.GetInterfaces().FirstOrDefault(i => 
+                i.IsGenericType && i.GetGenericTypeDefinition() == typeof(ISqlEntityBase<>));
+
+            if (interfaceType != null)
+            {
+                // Returns the actual model type (T)
+                return interfaceType.GetGenericArguments()[0];
+            }
+
+            throw new ArgumentException($"Entity type {type.Name} must implement ISqlEntityBase<T>.", nameof(entity));
+        });
+
+        // 3. Forward the resolved model type to your existing attribute-parsing logic
+        return GetMetadata(modelType).Name;
+    }
 
     public static SqlEntityMetadata GetMetadata(Type type)
     {

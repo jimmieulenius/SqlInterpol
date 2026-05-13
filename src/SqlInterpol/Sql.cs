@@ -70,6 +70,11 @@ public static class Sql
         return new SqlOrderCollectionFragment(fragments);
     }
 
+    public static ISqlFragment Paging(int limit, int offset = 0)
+    {
+        return new SqlPagingFragment(limit, offset);
+    }
+
     public static ISqlFragment Quote(string value) => 
         new SqlDeferredFragment(ctx => ctx.Dialect.QuoteIdentifier(value));
 

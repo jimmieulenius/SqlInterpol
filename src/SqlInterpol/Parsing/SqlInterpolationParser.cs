@@ -83,8 +83,10 @@ public class SqlInterpolationParser : ISqlInterpolationParser
                 // 1. Store in the dictionary that this entity is a CTE
                 context.ParserState.EntityRoles[entity] = SqlEntityRole.Cte;
 
+                // NEW FIX: Clear the CurrentKeyword so the following subquery isn't also marked as a CTE!
+                context.ParserState.CurrentKeyword = null;
+
                 // 2. Render only the base name for the declaration (e.g. [CategoryStats])
-                // It strictly prevents "AS [alias]" or schemas from bleeding into the WITH slot
                 return new SqlSegment(SqlSegmentType.Reference, entity, SqlRenderMode.BaseName);
             }
 
