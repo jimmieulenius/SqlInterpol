@@ -31,14 +31,22 @@ public class SqlServerSqlDialect : SqlDialectBase
             var segment = baseRewritten[i];
 
             // 2. Apply SQL Server specific paging logic to the cleaned AST
-            if (segment.Tag == SqlSegmentTag.Paging)
+            if (segment.Tag == SqlSegmentTag.Paging && segment.Value is string text)
             {
                 if (i + 3 < baseRewritten.Count &&
                     baseRewritten[i + 1].Type == SqlSegmentType.Parameter &&
                     baseRewritten[i + 3].Type == SqlSegmentType.Parameter)
                 {
+                    int index = text.LastIndexOf(SqlKeyword.Limit, StringComparison.OrdinalIgnoreCase);
+                    
+                    if (index > -1)
+                    {
+                        // Preserve formatting before the word LIMIT
+                        rewritten.Add(new SqlSegment(SqlSegmentType.Literal, text[..index]));
+                    }
+
                     // Swapping LIMIT/OFFSET to SQL Server syntax
-                    rewritten.Add(new SqlSegment(SqlSegmentType.Literal, "OFFSET "));
+                    rewritten.Add(new SqlSegment(SqlSegmentType.Literal, $"{SqlKeyword.Offset} "));
                     rewritten.Add(baseRewritten[i + 3]); // offset param
                     
                     rewritten.Add(new SqlSegment(SqlSegmentType.Literal, " ROWS FETCH NEXT "));
@@ -47,6 +55,7 @@ public class SqlServerSqlDialect : SqlDialectBase
                     rewritten.Add(new SqlSegment(SqlSegmentType.Literal, " ROWS ONLY"));
 
                     i += 3; // Skip consumed segments
+
                     continue;
                 }
             }

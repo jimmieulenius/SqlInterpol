@@ -14,6 +14,7 @@ public class CustomSqlParser : SqlInterpolationParser
 
         // 2. Sniff for our custom "CUSTOM_IN" keyword
         var trimmed = span.TrimEnd();
+
         if (trimmed.EndsWith("CUSTOM_IN", StringComparison.OrdinalIgnoreCase))
         {
             _nextIsCollection = true;
