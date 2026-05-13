@@ -140,8 +140,8 @@ public class SqlInterpolationParser : ISqlInterpolationParser
                     if (assignment is ISqlParameterGenerator gen) gen.GenerateParameters(context);
                 }
 
-                // Use SqlCollectionFragment so it simply renders: Col1 = @p1, Col2 = @p2
-                var fragment = new SqlCollectionFragment(assignments);
+                var fragment = new SqlSetFragment(assignments);
+                
                 return new SqlSegment(SqlSegmentType.Reference, fragment);
             }
 
@@ -161,6 +161,7 @@ public class SqlInterpolationParser : ISqlInterpolationParser
                 }
 
                 var fragment = new SqlInsertValuesFragment(assignments);
+
                 return new SqlSegment(SqlSegmentType.Reference, fragment);
             }
         }
@@ -211,6 +212,7 @@ public class SqlInterpolationParser : ISqlInterpolationParser
         else if (trimmed.EndsWith(SqlKeyword.Set, StringComparison.OrdinalIgnoreCase))
         {
             context.ParserState.CurrentKeyword = SqlKeyword.Set;
+            tag = SqlSegmentTag.UpdateSetKeyword;
         }
         else if (trimmed.EndsWith($"{SqlKeyword.Insert} {SqlKeyword.Into}", StringComparison.OrdinalIgnoreCase) || trimmed.EndsWith($"{SqlKeyword.Insert} {SqlKeyword.Into}", StringComparison.OrdinalIgnoreCase))
         {

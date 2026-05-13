@@ -20,6 +20,55 @@ public class FormattingTests
 
     [Theory]
     [MemberData(nameof(VerticalInsertData))]
+    public void ContextualInsert_WithVerticalLayout_IndentsCorrectly(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        db.Context.Options.CollectionLayout = SqlCollectionLayout.Vertical;
+        db.Context.Options.IndentSize = 4;
+        var dto = new { Status = "New", Total = 10m };
+
+        // Act - Using implicit contextual syntax!
+        var result = db.Query<OrderModel>(o => 
+            db.Append($$"""
+                INSERT INTO {{o}}
+                VALUES {{dto}}
+                """))
+            .Build();
+
+        // Assert
+        var expectedSql = testCase.ExpectedSql[0].Replace("\r\n", "\n").Trim();
+        var actualSql = result.Sql.Replace("\r\n", "\n").Trim();
+        Assert.Equal(expectedSql, actualSql);
+    }
+
+    [Theory]
+    [MemberData(nameof(VerticalUpdateData))]
+    public void ContextualUpdate_WithVerticalLayout_IndentsCorrectly(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        db.Context.Options.CollectionLayout = SqlCollectionLayout.Vertical;
+        db.Context.Options.IndentSize = 4;
+        var dto = new { Status = "Processing", Total = 50.00m };
+
+        // Act - Using implicit contextual syntax!
+        // Note: No trailing space after SET because the vertical collection prepends its own newline!
+        var result = db.Query<OrderModel>(o => 
+            db.Append($$"""
+                UPDATE {{o}}
+                SET {{dto}}
+                """))
+            .Build();
+
+        // Assert
+        var expectedSql = testCase.ExpectedSql[0].Replace("\r\n", "\n").Trim();
+        var actualSql = result.Sql.Replace("\r\n", "\n").Trim();
+        Assert.Equal(expectedSql, actualSql);
+    }
+
+    [Theory]
+    [MemberData(nameof(VerticalInsertData))]
     public void Insert_WithVerticalLayout_IndentsCorrectly(SqlTestCase testCase)
     {
         // Arrange

@@ -28,26 +28,16 @@ public class SqlInsertValuesFragment(IEnumerable<ISqlAssignmentFragment> assignm
             return string.Empty;
         }
 
-        var columnNames = assignmentList.Select(a => a.Reference.ToSql(context, SqlRenderMode.BaseName)).ToList();
-        var paramNames = assignmentList.Select(a => a.ToSql(context).Split('=').Last().Trim()).ToList();
+        var columnNames = new SqlCollectionFragment([.. assignmentList.Select(a => new SqlRawFragment(a.Reference.ToSql(context, SqlRenderMode.BaseName)))]);
+        var paramNames = new SqlCollectionFragment([.. assignmentList.Select(a => new SqlRawFragment(a.ToSql(context).Split('=').Last().Trim()))]);
+        var cols = columnNames.ToSql(context, mode);
+        var vals = paramNames.ToSql(context, mode);
 
         if (context.Options.CollectionLayout == SqlCollectionLayout.Vertical)
         {
-            var indent = new string(' ', context.Options.IndentSize);
-            var cols = FormatVertical(columnNames, context);
-            var vals = FormatVertical(paramNames, context);
-
             return $"({cols}{Environment.NewLine}){Environment.NewLine}{SqlKeyword.Values}{Environment.NewLine}({vals}{Environment.NewLine})";
         }
 
-        return $"({string.Join(separator, columnNames)}){Environment.NewLine}{SqlKeyword.Values} ({string.Join(separator, paramNames)})";
-    }
-
-    private static string FormatVertical(List<string> items, ISqlContext context)
-    {
-        var indent = new string(' ', context.Options.IndentSize);
-        var separator = context.Options.CollectionSeparator.TrimEnd();
-
-        return $"{Environment.NewLine}{indent}{string.Join($"{separator}{Environment.NewLine}{indent}", items)}";
+        return $"({cols}){Environment.NewLine}{SqlKeyword.Values} ({vals})";
     }
 }

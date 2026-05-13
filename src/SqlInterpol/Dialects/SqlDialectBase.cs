@@ -129,31 +129,49 @@ public abstract class SqlDialectBase : ISqlDialect
     {
         var rewritten = new List<SqlSegment>(segments.Count);
 
+        bool TryRewriteKeywordFragment<T>(string keyword, SqlSegment segment, int index) where T : ISqlFragment
+        {
+            if (index + 1 < segments.Count && segments[index + 1].Value is T)
+            {
+                if (segment.Value is string text)
+                {
+                    int keywordIndex = text.LastIndexOf(keyword, StringComparison.OrdinalIgnoreCase);
+
+                    if (keywordIndex > -1)
+                    {
+                        // Preserve all formatting (newlines/spaces) BEFORE the keyword
+                        rewritten.Add(new SqlSegment(SqlSegmentType.Literal, text[..keywordIndex]));
+
+                        return true;
+                    }
+                }
+
+                // Safe fallback just in case
+                rewritten.Add(new SqlSegment(SqlSegmentType.Literal, " "));
+                return true; 
+            }
+
+            return false;
+        }
+
         for (int i = 0; i < segments.Count; i++)
         {
             var segment = segments[i];
-
-            if (segment.Tag == SqlSegmentTag.InsertValuesKeyword)
+            
+            switch (segment.Tag)
             {
-                // Check if the VERY NEXT segment is our DTO Fragment
-                if (i + 1 < segments.Count && segments[i + 1].Value is SqlInsertValuesFragment)
-                {
-                    // Extract the text and find the exact start of the "VALUES" keyword
-                    if (segment.Value is string text)
+                case SqlSegmentTag.InsertValuesKeyword:
+                    if (TryRewriteKeywordFragment<SqlInsertValuesFragment>(SqlKeyword.Values, segment, i))
                     {
-                        int index = text.LastIndexOf(SqlKeyword.Values, StringComparison.OrdinalIgnoreCase);
-                        if (index > -1)
-                        {
-                            // Slice to preserve all formatting (newlines/spaces) BEFORE the word
-                            rewritten.Add(new SqlSegment(SqlSegmentType.Literal, text[..index]));
-                            continue;
-                        }
-                    }
-
-                    // Safe fallback just in case
-                    rewritten.Add(new SqlSegment(SqlSegmentType.Literal, " "));
-                    continue; 
-                }
+                        continue;
+                    };
+                    break;
+                case SqlSegmentTag.UpdateSetKeyword:
+                    if (TryRewriteKeywordFragment<SqlSetFragment>(SqlKeyword.Set, segment, i))
+                    {
+                        continue;
+                    };
+                    break;
             }
 
             rewritten.Add(segment);
