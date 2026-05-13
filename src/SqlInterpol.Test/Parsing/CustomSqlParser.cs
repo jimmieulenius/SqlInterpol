@@ -7,7 +7,7 @@ public class CustomSqlParser : SqlInterpolationParser
 {
     private bool _nextIsCollection;
 
-    public override void ProcessLiteral(ISqlParserContext context, ReadOnlySpan<char> span)
+    public override string? ProcessLiteral(ISqlParserContext context, ReadOnlySpan<char> span)
     {
         // 1. Let the base parser handle all the standard keyword and alias tracking
         base.ProcessLiteral(context, span);
@@ -23,6 +23,8 @@ public class CustomSqlParser : SqlInterpolationParser
             // Reset if the literal ends with something else
             _nextIsCollection = false; 
         }
+
+        return null;
     }
 
     public override SqlSegment ProcessValue(ISqlParserContext context, object? value)

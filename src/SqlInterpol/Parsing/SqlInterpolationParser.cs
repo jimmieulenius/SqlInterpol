@@ -90,6 +90,12 @@ public class SqlInterpolationParser : ISqlInterpolationParser
                 return new SqlSegment(SqlSegmentType.Reference, entity, SqlRenderMode.BaseName);
             }
 
+            if (context.ParserState.CurrentKeyword?.Value.Equals(SqlKeyword.Update, StringComparison.OrdinalIgnoreCase) == true ||
+                context.ParserState.CurrentKeyword?.Value.Equals(SqlKeyword.Insert, StringComparison.OrdinalIgnoreCase) == true)
+            {
+                context.ParserState.ActiveEntityTarget = entity;
+            }
+
             if (!isAlias)
             {
                 context.ParserState.LastAliasableTarget = entity;
@@ -103,6 +109,60 @@ public class SqlInterpolationParser : ISqlInterpolationParser
             }
 
             return new SqlSegment(SqlSegmentType.Reference, entity, isAlias ? SqlRenderMode.AliasOnly : null);
+        }
+
+        if (value is SqlOrderDirection direction)
+        {
+            return new SqlSegment(SqlSegmentType.Literal, direction == SqlOrderDirection.Asc ? " ASC" : " DESC");
+        }
+
+        // We ensure it's a Class to prevent accidentally capturing primitive structs like Guid or DateTime 
+        // if a user manually writes `UPDATE {{o}} SET Id = {{guid}}`.
+        if (value != null && 
+            value.GetType().IsClass && 
+            value is not ISqlFragment && 
+            value is not ISqlReference && 
+            value is not ISqlEntityBase && 
+            value is not ISqlProjection && 
+            value is not string && 
+            value is not IEnumerable)
+        {
+            // UPDATE: User typed "SET "
+            if (context.ParserState.CurrentKeyword?.Value.Equals(SqlKeyword.Set, StringComparison.OrdinalIgnoreCase) == true 
+                && context.ParserState.ActiveEntityTarget != null)
+            {
+                // Convert DTO to ISqlAssignmentFragments
+                var assignments = Sql.BuildAssignments(context.ParserState.ActiveEntityTarget, value);
+                
+                // Pre-generate parameters during parsing so they claim their ordinal spots
+                foreach (var assignment in assignments)
+                {
+                    if (assignment is ISqlParameterGenerator gen) gen.GenerateParameters(context);
+                }
+
+                // Use SqlCollectionFragment so it simply renders: Col1 = @p1, Col2 = @p2
+                var fragment = new SqlCollectionFragment(assignments);
+                return new SqlSegment(SqlSegmentType.Reference, fragment);
+            }
+
+            // INSERT: User typed "INSERT INTO {{o}} "
+            bool isInsert = context.ParserState.CurrentKeyword?.Value.Equals(SqlKeyword.Insert, StringComparison.OrdinalIgnoreCase) == true;
+            bool isValues = context.ParserState.CurrentKeyword?.Value.Equals(SqlKeyword.Values, StringComparison.OrdinalIgnoreCase) == true;
+
+            // Trigger if the user typed "INSERT INTO {o} " OR "VALUES "
+            if ((isInsert || isValues) && context.ParserState.ActiveEntityTarget != null)
+            {
+                var assignments = Sql.BuildAssignments(context.ParserState.ActiveEntityTarget, value);
+                
+                // Pre-generate parameters during parsing so they claim their ordinal spots
+                foreach (var assignment in assignments)
+                {
+                    if (assignment is ISqlParameterGenerator gen) gen.GenerateParameters(context);
+                }
+
+                var fragment = new SqlInsertValuesFragment(assignments);
+                return new SqlSegment(SqlSegmentType.Reference, fragment);
+            }
         }
 
         // 4. Other Fragments
@@ -134,15 +194,39 @@ public class SqlInterpolationParser : ISqlInterpolationParser
         return CreateParameter(context, value);
     }
 
-    public virtual void ProcessLiteral(ISqlParserContext context, ReadOnlySpan<char> span)
+    public virtual string? ProcessLiteral(ISqlParserContext context, ReadOnlySpan<char> span)
     {
         var trimmed = span.Trim();
+
+        string? tag = null;
+
+        if (span.Contains(SqlKeyword.Limit, StringComparison.OrdinalIgnoreCase))
+        {
+            tag = SqlSegmentTag.Paging;
+        }
+        else if (trimmed.EndsWith(SqlKeyword.Update, StringComparison.OrdinalIgnoreCase))
+        {
+            context.ParserState.CurrentKeyword = SqlKeyword.Update;
+        }
+        else if (trimmed.EndsWith(SqlKeyword.Set, StringComparison.OrdinalIgnoreCase))
+        {
+            context.ParserState.CurrentKeyword = SqlKeyword.Set;
+        }
+        else if (trimmed.EndsWith($"{SqlKeyword.Insert} {SqlKeyword.Into}", StringComparison.OrdinalIgnoreCase) || trimmed.EndsWith($"{SqlKeyword.Insert} {SqlKeyword.Into}", StringComparison.OrdinalIgnoreCase))
+        {
+            context.ParserState.CurrentKeyword = SqlKeyword.Insert;
+        }
+        else if (trimmed.EndsWith($"{SqlKeyword.Values}", StringComparison.OrdinalIgnoreCase))
+        {
+            context.ParserState.CurrentKeyword = SqlKeyword.Values;
+            tag = SqlSegmentTag.InsertValuesKeyword;
+        }
 
         if (trimmed.IsEmpty)
         {
             UpdateScannerState(context, span);
 
-            return;
+            return tag;
         }
 
         bool endsWithAs = EndsWithAsKeyword(span);
@@ -178,6 +262,8 @@ public class SqlInterpolationParser : ISqlInterpolationParser
         context.ParserState.ExpectsAliasOnly = endsWithAs;
 
         UpdateScannerState(context, span);
+
+        return tag;
     }
 
     protected virtual SqlSegment CreateParameter(ISqlParserContext context, object? value)

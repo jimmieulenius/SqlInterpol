@@ -11,4 +11,5 @@ public interface ISqlParserState
     ISqlFragment? LastAliasableTarget { get; set; }
     SqlSegment? LastSegment { get; set; }
     Dictionary<ISqlEntityBase, SqlEntityRole> EntityRoles { get; }
+    ISqlEntityBase? ActiveEntityTarget { get; set; }
 }

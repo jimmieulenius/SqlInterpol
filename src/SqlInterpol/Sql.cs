@@ -35,7 +35,7 @@ public static class Sql
             return Insert(entity, [assignment]);
         }
 
-        var assignments = BuildAssignmentsFromDto(entity, dto);
+        var assignments = BuildAssignments(entity, dto);
 
         return new SqlInsertFragment(entity, assignments);
     }
@@ -48,7 +48,7 @@ public static class Sql
     public static ISqlFragment InsertValues<TEntity, TDto>(ISqlEntityBase<TEntity> entity, TDto dto) 
         where TDto : class
     {
-        var assignments = BuildAssignmentsFromDto(entity, dto);
+        var assignments = BuildAssignments(entity, dto);
         
         return new SqlInsertValuesFragment(assignments);
     }
@@ -106,7 +106,7 @@ public static class Sql
             return Update(entity, [assignment]);
         }
 
-        var assignments = BuildAssignmentsFromDto(entity, dto);
+        var assignments = BuildAssignments(entity, dto);
 
         return new SqlUpdateFragment(entity, assignments);
     }
@@ -122,27 +122,38 @@ public static class Sql
     {
         if (dto is ISqlAssignmentFragment assignment) return assignment;
 
-        var assignments = BuildAssignmentsFromDto(entity, dto);
+        var assignments = BuildAssignments(entity, dto);
         return new SqlCollectionFragment(assignments);
     }
 
-    private static List<ISqlAssignmentFragment> BuildAssignmentsFromDto<TEntity>(ISqlEntityBase<TEntity> entity, object dto)
+    // Replaces private BuildAssignmentsFromDto
+    public static List<ISqlAssignmentFragment> BuildAssignments(ISqlEntityBase entity, object dto)
     {
         var properties = SqlMetadataRegistry.GetDtoProperties(dto.GetType());
         var assignments = new List<ISqlAssignmentFragment>(properties.Length);
-        var meta = SqlMetadataRegistry.GetMetadata<TEntity>();
+
+        // Safely extract the generic T from ISqlEntityBase<T>
+        Type? modelType = null;
+        foreach (var i in entity.GetType().GetInterfaces())
+        {
+            if (i.IsGenericType && i.GetGenericTypeDefinition() == typeof(ISqlEntityBase<>))
+            {
+                modelType = i.GetGenericArguments()[0];
+                break;
+            }
+        }
+
+        if (modelType == null) throw new ArgumentException("Entity must implement ISqlEntityBase<T>");
+
+        var meta = SqlMetadataRegistry.GetMetadata(modelType);
 
         foreach (var prop in properties)
         {
-            // LOOKUP: Find matching property on the target Entity
             var entityMember = meta.Columns.Keys.FirstOrDefault(k => k.Name == prop.Name);
             
             if (entityMember == null)
             {
-                // SAFETY: Throw if the DTO has a property like "NonExistentCol" 
-                // that doesn't map to the entity.
-                throw new ArgumentException(
-                    $"Property '{prop.Name}' on DTO does not exist on Entity '{typeof(TEntity).Name}'.");
+                throw new ArgumentException($"Property '{prop.Name}' on DTO does not exist on Entity.");
             }
 
             string columnName = meta.Columns[entityMember];

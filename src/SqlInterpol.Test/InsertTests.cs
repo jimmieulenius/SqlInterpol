@@ -19,6 +19,125 @@ public class InsertTests
     }
 
     [Theory]
+    [MemberData(nameof(AllDialectsInsertData))]
+    public void Insert_WithImplicitSyntax_RendersCorrectly(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+
+        // An anonymous DTO representing the new product
+        var newProduct = new { Name = "Test Product", CategoryId = 5, Price = 19.99m };
+
+        // Act - Using the shorthand implicit syntax (no VALUES keyword)
+        var result = db.Query<Product>(p => db.Append($$"""
+            INSERT INTO {{p}}
+            {{newProduct}}
+            """)).Build();
+
+        // Assert SQL
+        var expectedSql = testCase.ExpectedSql[0].Replace("\r\n", "\n");
+        var actualSql = result.Sql.Replace("\r\n", "\n");
+        Assert.Equal(expectedSql, actualSql);
+
+        // Assert Parameters
+        Assert.Equal(3, result.Parameters.Count);
+        Assert.Equal("Test Product", result.Parameters.ElementAt(0).Value);
+        Assert.Equal(5, result.Parameters.ElementAt(1).Value);
+        Assert.Equal(19.99m, result.Parameters.ElementAt(2).Value);
+    }
+
+    [Theory]
+    [MemberData(nameof(AllDialectsInsertData))]
+    public void Insert_WithExplicitValuesKeyword_RendersCorrectlyAndSwallowsKeyword(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        var newProduct = new { Name = "Test Product", CategoryId = 5, Price = 19.99m };
+
+        // Act - Using the explicit visual syntax (with VALUES keyword)
+        // The AST Rewriter should intercept and swallow the VALUES keyword!
+        var result = db.Query<Product>(p => db.Append($$"""
+            INSERT INTO {{p}}
+            VALUES {{newProduct}}
+            """)).Build();
+
+        // Assert SQL - Should match the EXACT SAME expected SQL as the implicit test!
+        // We trim start/end because the swallowed keyword leaves a newline/space, which is normal.
+        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+
+        // Assert Parameters
+        Assert.Equal(3, result.Parameters.Count);
+        Assert.Equal("Test Product", result.Parameters.ElementAt(0).Value);
+        Assert.Equal(5, result.Parameters.ElementAt(1).Value);
+        Assert.Equal(19.99m, result.Parameters.ElementAt(2).Value);
+    }
+
+    // The shared expected SQL data for both syntax styles!
+    public static TheoryData<SqlTestCase> AllDialectsInsertData =>
+    [
+        new SqlTestCase(
+            SqlDialectKind.CustomDb,
+            [
+                """
+                INSERT INTO <<dbo>>.<<Products>>
+                (<<PROD_NAME>>, <<CategoryId>>, <<Price>>)
+                VALUES (!!100, !!101, !!102)
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.MySql,
+            [
+                """
+                INSERT INTO `dbo`.`Products`
+                (`PROD_NAME`, `CategoryId`, `Price`)
+                VALUES (@p0, @p1, @p2)
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Oracle,
+            [
+                """
+                INSERT INTO "dbo"."Products"
+                ("PROD_NAME", "CategoryId", "Price")
+                VALUES (:0, :1, :2)
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.PostgreSql,
+            [
+                """
+                INSERT INTO "dbo"."Products"
+                ("PROD_NAME", "CategoryId", "Price")
+                VALUES ($1, $2, $3)
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqLite,
+            [
+                """
+                INSERT INTO "dbo"."Products"
+                ("PROD_NAME", "CategoryId", "Price")
+                VALUES (?0, ?1, ?2)
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqlServer,
+            [
+                """
+                INSERT INTO [dbo].[Products]
+                ([PROD_NAME], [CategoryId], [Price])
+                VALUES (@p0, @p1, @p2)
+                """
+            ]
+        ),
+    ];
+
+    [Theory]
     [MemberData(nameof(InsertData))]
     public void Insert_WithDto_RendersCorrectly(SqlTestCase testCase)
     {
@@ -33,8 +152,6 @@ public class InsertTests
 
         // Assert
         Assert.Equal(testCase.ExpectedSql[0], result.Sql);
-        
-        // Verify sequential parameter order (@p0 = Status, @p1 = Total)
         Assert.Equal("New", result.Parameters.ElementAt(0).Value);
         Assert.Equal(10.50m, result.Parameters.ElementAt(1).Value);
     }
@@ -107,34 +224,46 @@ public class InsertTests
                 """
             ]
         ),
-        new SqlTestCase(SqlDialectKind.Oracle, [
-            """
-            INSERT INTO "dbo"."Orders"
-            ("order_status", "Total")
-            VALUES (:0, :1)
-            """
-        ]),
-        new SqlTestCase(SqlDialectKind.PostgreSql, [
-            """
-            INSERT INTO "dbo"."Orders"
-            ("order_status", "Total")
-            VALUES ($1, $2)
-            """
-        ]),
-        new SqlTestCase(SqlDialectKind.SqLite, [
-            """
-            INSERT INTO "dbo"."Orders"
-            ("order_status", "Total")
-            VALUES (?0, ?1)
-            """
-        ]),
-        new SqlTestCase(SqlDialectKind.SqlServer, [
-            """
-            INSERT INTO [dbo].[Orders]
-            ([order_status], [Total])
-            VALUES (@p0, @p1)
-            """
-        ])
+        new SqlTestCase(
+            SqlDialectKind.Oracle,
+            [
+                """
+                INSERT INTO "dbo"."Orders"
+                ("order_status", "Total")
+                VALUES (:0, :1)
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.PostgreSql,
+            [
+                """
+                INSERT INTO "dbo"."Orders"
+                ("order_status", "Total")
+                VALUES ($1, $2)
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqLite,
+            [
+                """
+                INSERT INTO "dbo"."Orders"
+                ("order_status", "Total")
+                VALUES (?0, ?1)
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqlServer,
+            [
+                """
+                INSERT INTO [dbo].[Orders]
+                ([order_status], [Total])
+                VALUES (@p0, @p1)
+                """
+            ]
+        )
     ];
 
     [Theory]

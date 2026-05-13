@@ -81,13 +81,16 @@ public class SqlBuilder : ISqlEntityRegistry
 
     private SqlQueryResult BuildSegments(IReadOnlyList<SqlSegment> segmentsToBuild)
     {
+        // 1. AST Rewriting Phase: Let the active dialect intercept and modify the segments!
+        var finalSegments = Context.Dialect.RewriteSegments(segmentsToBuild).ToList();
         var vsb = new ValueStringBuilder(stackalloc char[2048]);
 
         try
         {
-            for (int i = 0; i < segmentsToBuild.Count; i++)
+            // 2. Rendering Phase: Loop through the REWRITTEN segments
+            for (int i = 0; i < finalSegments.Count; i++)
             {
-                vsb.Append(Renderer.Render(Context, segmentsToBuild[i], i, segmentsToBuild) ?? string.Empty);
+                vsb.Append(Renderer.Render(Context, finalSegments[i], i, finalSegments) ?? string.Empty);
             }
 
             return new SqlQueryResult(vsb.ToString(), Context.Parameters.AsReadOnly());
@@ -100,10 +103,17 @@ public class SqlBuilder : ISqlEntityRegistry
 
     internal SqlSegment ProcessLiteral(string value)
     {
-        Parser.ProcessLiteral(Context, value.AsSpan());
+        string? tag = Parser.ProcessLiteral(Context, value.AsSpan());
 
-        return new SqlSegment(SqlSegmentType.Literal, value);
+        return new SqlSegment(SqlSegmentType.Literal, value, null, tag);
     }
+
+    // internal SqlSegment ProcessLiteral(string value)
+    // {
+    //     Parser.ProcessLiteral(Context, value.AsSpan());
+
+    //     return new SqlSegment(SqlSegmentType.Literal, value);
+    // }
 
     internal SqlSegment ProcessValue(object? value)
     {

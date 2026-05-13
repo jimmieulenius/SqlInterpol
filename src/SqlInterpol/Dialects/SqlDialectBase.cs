@@ -125,5 +125,42 @@ public abstract class SqlDialectBase : ISqlDialect
         };
     }
 
+    public virtual IEnumerable<SqlSegment> RewriteSegments(IReadOnlyList<SqlSegment> segments)
+    {
+        var rewritten = new List<SqlSegment>(segments.Count);
+
+        for (int i = 0; i < segments.Count; i++)
+        {
+            var segment = segments[i];
+
+            if (segment.Tag == SqlSegmentTag.InsertValuesKeyword)
+            {
+                // Check if the VERY NEXT segment is our DTO Fragment
+                if (i + 1 < segments.Count && segments[i + 1].Value is SqlInsertValuesFragment)
+                {
+                    // Extract the text and find the exact start of the "VALUES" keyword
+                    if (segment.Value is string text)
+                    {
+                        int index = text.LastIndexOf(SqlKeyword.Values, StringComparison.OrdinalIgnoreCase);
+                        if (index > -1)
+                        {
+                            // Slice to preserve all formatting (newlines/spaces) BEFORE the word
+                            rewritten.Add(new SqlSegment(SqlSegmentType.Literal, text[..index]));
+                            continue;
+                        }
+                    }
+
+                    // Safe fallback just in case
+                    rewritten.Add(new SqlSegment(SqlSegmentType.Literal, " "));
+                    continue; 
+                }
+            }
+
+            rewritten.Add(segment);
+        }
+
+        return rewritten;
+    }
+
     public virtual SqlInterpolOptions GetDefaultOptions() => new();
 }

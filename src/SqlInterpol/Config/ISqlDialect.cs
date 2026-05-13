@@ -20,5 +20,7 @@ public interface ISqlDialect
 
     string RenderFragment(ISqlFragment fragment, ISqlContext context);
 
+    IEnumerable<SqlSegment> RewriteSegments(IReadOnlyList<SqlSegment> segments);
+
     SqlInterpolOptions GetDefaultOptions() => new();
 }
