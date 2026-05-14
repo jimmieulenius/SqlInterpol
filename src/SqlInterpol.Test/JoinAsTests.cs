@@ -124,7 +124,7 @@ public class JoinAsTests
             SELECT
                 {{p[x => x.Id]}},
                 {{ol[x => x.OrderId]}}
-            FROM dbo.Products AS {{p.Alias("prod")}}
+            FROM dbo.Products AS {{p.As("prod")}}
             JOIN order_lines AS {{ol}}
                 ON {{p[x => x.Id]}} = {{ol[x => x.ProductItemNumber]}}
             """))

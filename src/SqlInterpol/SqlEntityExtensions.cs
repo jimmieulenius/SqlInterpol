@@ -8,9 +8,16 @@ public static class SqlEntityExtensions
 {
     extension<T>(ISqlEntityBase<T> entity)
     {
+        public ISqlEntityBase<T> As(string alias)
+        {
+            entity.Reference?.Alias = alias;
+            
+            return entity;
+        }
+
         public ISqlOrderFragment OrderBy(
             string propertyName, 
-            SqlOrderDirection direction = SqlOrderDirection.Asc)
+            SqlOrderDirection? direction = null)
         {
             var meta = SqlMetadataRegistry.GetMetadata<T>();
             
@@ -27,7 +34,7 @@ public static class SqlEntityExtensions
 
         public ISqlOrderFragment OrderBy(
             Expression<Func<T, object?>> expression, 
-            SqlOrderDirection direction = SqlOrderDirection.Asc)
+            SqlOrderDirection? direction = null)
         {
             var memberInfo = SqlExpressionHelper.GetMember(expression);
             var meta = SqlMetadataRegistry.GetMetadata<T>();

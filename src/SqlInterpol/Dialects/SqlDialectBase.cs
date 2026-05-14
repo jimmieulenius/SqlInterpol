@@ -17,7 +17,11 @@ public abstract class SqlDialectBase : ISqlDialect
 
     protected static readonly string[] DefaultExpressionKeywords = 
     [
-        "IN", "EXISTS", "ANY", "ALL", "SOME"
+        SqlKeyword.In,
+        SqlKeyword.Exists,
+        SqlKeyword.Any,
+        SqlKeyword.All,
+        SqlKeyword.Some
     ];
 
     // Common logic for all dialects
@@ -119,7 +123,7 @@ public abstract class SqlDialectBase : ISqlDialect
     {
         return fragment switch
         {
-            SqlPagingFragment p => $"LIMIT {p.Limit} OFFSET {p.Offset}",
+            SqlPagingFragment p => $"{SqlKeyword.Limit} {p.Limit} {SqlKeyword.Offset} {p.Offset}",
 
             _ => throw new NotSupportedException($"The fragment type '{fragment.GetType().Name}' is not supported by {this.GetType().Name}.")
         };
@@ -128,7 +132,7 @@ public abstract class SqlDialectBase : ISqlDialect
     public virtual IEnumerable<SqlSegment> RewriteSegments(IReadOnlyList<SqlSegment> segments)
     {
         var rewritten = new List<SqlSegment>(segments.Count);
-        bool isReturningClause = false;
+        bool forceBaseNamePhase = false;
 
         bool TryRewriteKeywordFragment<T>(string keyword, SqlSegment segment, int index) where T : ISqlFragment
         {
@@ -140,17 +144,13 @@ public abstract class SqlDialectBase : ISqlDialect
 
                     if (keywordIndex > -1)
                     {
-                        // Preserve all formatting (newlines/spaces) BEFORE the keyword
                         rewritten.Add(new SqlSegment(SqlSegmentType.Literal, text[..keywordIndex]));
                         return true;
                     }
                 }
-
-                // Safe fallback just in case
                 rewritten.Add(new SqlSegment(SqlSegmentType.Literal, " "));
                 return true; 
             }
-
             return false;
         }
 
@@ -158,14 +158,49 @@ public abstract class SqlDialectBase : ISqlDialect
         {
             var segment = segments[i];
 
-            // 1. Track if we have entered the RETURNING phase of the query
             if (segment.Tag == SqlSegmentTag.ReturningKeyword)
             {
-                isReturningClause = true;
+                forceBaseNamePhase = true;
+            }
+            // 1. Safe detection and auto-injection for ON CONFLICT
+            else if (segment.Tag == SqlSegmentTag.OnConflictKeyword || 
+                    (segment.Type == SqlSegmentType.Literal && segment.Value is string s1 && s1.Contains("ON CONFLICT", StringComparison.OrdinalIgnoreCase)))
+            {
+                forceBaseNamePhase = true;
+                
+                if (segment.Value is string text)
+                {
+                    string clean = text.EndsWith(" ") ? text[..^1] : text;
+                    if (!clean.EndsWith('(')) clean += " (";
+                    
+                    rewritten.Add(new SqlSegment(SqlSegmentType.Literal, clean));
+                    continue;
+                }
+            }
+            // 2. Safe detection and auto-injection for DO UPDATE SET
+            else if (segment.Tag == SqlSegmentTag.DoUpdateSetKeyword || 
+                    (segment.Type == SqlSegmentType.Literal && segment.Value is string s2 && s2.Contains("DO UPDATE SET", StringComparison.OrdinalIgnoreCase)))
+            {
+                forceBaseNamePhase = false; 
+                
+                if (segment.Value is string text)
+                {
+                    string clean = text;
+                    if (!clean.TrimStart().StartsWith(')')) clean = ")\n" + clean.TrimStart();
+                    
+                    int keywordIndex = clean.LastIndexOf(SqlKeyword.Set, StringComparison.OrdinalIgnoreCase);
+                    if (keywordIndex > -1 && i + 1 < segments.Count && segments[i + 1].Value is SqlSetFragment)
+                    {
+                        rewritten.Add(new SqlSegment(SqlSegmentType.Literal, clean[..keywordIndex]));
+                        continue;
+                    }
+                    
+                    rewritten.Add(new SqlSegment(SqlSegmentType.Literal, clean));
+                    continue;
+                }
             }
 
-            // 2. If we are returning columns, force them to render as "Id" instead of "dbo"."Table"."Id"
-            if (isReturningClause && segment.Type == SqlSegmentType.Projection && segment.Value is ISqlProjection proj)
+            if (forceBaseNamePhase && segment.Type == SqlSegmentType.Projection && segment.Value is ISqlProjection proj)
             {
                 rewritten.Add(new SqlSegment(SqlSegmentType.Projection, proj, SqlRenderMode.BaseName));
                 continue;
@@ -174,16 +209,10 @@ public abstract class SqlDialectBase : ISqlDialect
             switch (segment.Tag)
             {
                 case SqlSegmentTag.InsertValuesKeyword:
-                    if (TryRewriteKeywordFragment<SqlInsertValuesFragment>(SqlKeyword.Values, segment, i))
-                    {
-                        continue;
-                    };
+                    if (TryRewriteKeywordFragment<SqlInsertValuesFragment>(SqlKeyword.Values, segment, i)) continue;
                     break;
                 case SqlSegmentTag.UpdateSetKeyword:
-                    if (TryRewriteKeywordFragment<SqlSetFragment>(SqlKeyword.Set, segment, i))
-                    {
-                        continue;
-                    };
+                    if (TryRewriteKeywordFragment<SqlSetFragment>(SqlKeyword.Set, segment, i)) continue;
                     break;
             }
 

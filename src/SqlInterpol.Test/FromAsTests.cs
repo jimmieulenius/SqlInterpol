@@ -270,7 +270,7 @@ public class FromAsTests
             db.Append($$"""
             SELECT
                 {{p[x => x.Id]}}
-            FROM products AS {{p.Alias("prod")}}
+            FROM products AS {{p.As("prod")}}
             """))
             .Build();
 

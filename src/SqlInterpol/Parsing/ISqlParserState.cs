@@ -12,4 +12,6 @@ public interface ISqlParserState
     SqlSegment? LastSegment { get; set; }
     Dictionary<ISqlEntityBase, SqlEntityRole> EntityRoles { get; }
     ISqlEntityBase? ActiveEntityTarget { get; set; }
+    bool InBlockComment { get; set; }
+    bool InLineComment { get; set; }
 }

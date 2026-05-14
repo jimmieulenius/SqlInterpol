@@ -29,8 +29,8 @@ public class UpdateAsTests
         // Act
         var result = db.Query<OrderModel>(o =>
             db.Append($$"""
-            UPDATE {{o}} AS {{o.Alias("ord")}}
-            SET {{Sql.UpdateSet(o, updateDto)}}
+            UPDATE {{o}} AS {{o.As("ord")}}
+            SET {{updateDto}}
             WHERE {{o[x => x.Id]}} = 1
             """))
             .Build();

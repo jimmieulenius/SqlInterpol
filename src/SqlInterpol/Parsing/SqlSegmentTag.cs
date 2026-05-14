@@ -8,4 +8,6 @@ public static class SqlSegmentTag
     public const string InsertValuesKeyword = "InsertValuesKeyword";
     public const string UpdateSetKeyword = "UpdateSetKeyword";
     public const string ReturningKeyword = "ReturningKeyword";
+    public const string OnConflictKeyword = "OnConflictKeyword";
+    public const string DoUpdateSetKeyword = "DoUpdateSetKeyword";
 }

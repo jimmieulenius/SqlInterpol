@@ -19,8 +19,8 @@ public class GroupByAsTests
         var result = db.Query<Product>(p =>
             db.Append($$"""
             SELECT {{p[x => x.Name]}}, {{p[x => x.IsActive]}}, COUNT(*)
-            FROM {{p}} AS {{p.Alias("prod")}}
-            GROUP BY {{Sql.GroupBy(p[x => x.Name], p[x => x.IsActive])}}
+            FROM {{p}} AS {{p.As("prod")}}
+            GROUP BY {{p[x => x.Name]}}, {{p[x => x.IsActive]}}
             """))
             .Build();
 

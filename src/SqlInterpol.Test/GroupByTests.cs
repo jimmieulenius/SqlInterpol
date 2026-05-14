@@ -32,7 +32,7 @@ public class GroupByTests
             db.Append($$"""
             SELECT CategoryId, Status, COUNT(*)
             FROM {{o}}
-            GROUP BY {{Sql.GroupBy(o[x => x.CategoryId], o[x => x.Status])}}
+            GROUP BY {{o[x => x.CategoryId]}}, {{o[x => x.Status]}}
             """))
             .Build();
 
@@ -60,7 +60,7 @@ public class GroupByTests
             db.Append($$"""
                 SELECT CategoryId, Status, COUNT(*)
                 FROM {{o}}
-                GROUP BY {{Sql.GroupBy(groups)}}
+                GROUP BY {{groups}}
                 """);
         }).Build();
 
@@ -228,7 +228,7 @@ public class GroupByTests
             db.Append($$"""
             SELECT Status, YEAR(created_at), COUNT(*)
             FROM {{o}}
-            GROUP BY {{Sql.GroupBy(o[x => x.Status], Sql.Raw("YEAR(created_at)"))}}
+            GROUP BY {{o[x => x.Status]}}, {{Sql.Raw("YEAR(created_at)")}}
             """))
             .Build();
 

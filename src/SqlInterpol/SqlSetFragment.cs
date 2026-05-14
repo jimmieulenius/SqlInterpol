@@ -6,10 +6,13 @@ namespace SqlInterpol;
 public class SqlSetFragment : ISqlFragment
 {
     private readonly SqlCollectionFragment _collection;
+    
+    public IReadOnlyList<ISqlAssignmentFragment> Assignments { get; }
 
     public SqlSetFragment(IEnumerable<ISqlAssignmentFragment> assignments)
     {
-        _collection = new SqlCollectionFragment(assignments);
+        Assignments = assignments.ToList();
+        _collection = new SqlCollectionFragment(Assignments);
     }
 
     public string ToSql(ISqlContext context, SqlRenderMode renderMode = SqlRenderMode.Default)

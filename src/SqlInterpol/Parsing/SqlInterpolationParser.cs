@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Collections;
 
 namespace SqlInterpol.Parsing;
@@ -11,13 +12,12 @@ public class SqlInterpolationParser : ISqlInterpolationParser
         bool isAlias = context.ParserState.ExpectsAliasOnly;
         context.ParserState.ExpectsAliasOnly = false; // consume immediately
 
-        // FIX: If this value is not expected to be an alias, the previous target is officially dead!
         if (!isAlias)
         {
             context.ParserState.LastAliasableTarget = null;
         }
 
-        // 1. Handle dynamic string or generic fragment aliases (e.g. AS {"stats"} or AS {Sql.Quote("stats")})
+        // 1. Alias Handling
         if (isAlias && (value is string || (value is ISqlFragment && value is not ISqlProjection && value is not ISqlEntityBase)))
         {
             string? rawAlias = null;
@@ -50,7 +50,7 @@ public class SqlInterpolationParser : ISqlInterpolationParser
             }
         }
 
-        // 2. Check for Columns/Projections
+        // 2. Projections
         if (value is ISqlProjection projection)
         {
             SqlRenderMode? mode = isAlias ? SqlRenderMode.AliasOnly : null;
@@ -61,7 +61,6 @@ public class SqlInterpolationParser : ISqlInterpolationParser
             }
 
             if (!isAlias) context.ParserState.LastAliasableTarget = projection;
-
             return new SqlSegment(SqlSegmentType.Projection, projection, mode);
         }
 
@@ -75,8 +74,11 @@ public class SqlInterpolationParser : ISqlInterpolationParser
                 return new SqlSegment(SqlSegmentType.Reference, entity, SqlRenderMode.BaseName);
             }
 
+            // FIX: If it's an Update, an Insert, OR if it's explicitly being aliased (AS sq), 
+            // guarantee it becomes the Active Target for DTO mapping!
             if (context.ParserState.CurrentKeyword?.Value.Equals(SqlKeyword.Update, StringComparison.OrdinalIgnoreCase) == true ||
-                context.ParserState.CurrentKeyword?.Value.Equals(SqlKeyword.Insert, StringComparison.OrdinalIgnoreCase) == true)
+                context.ParserState.CurrentKeyword?.Value.Equals(SqlKeyword.Insert, StringComparison.OrdinalIgnoreCase) == true ||
+                isAlias)
             {
                 context.ParserState.ActiveEntityTarget = entity;
             }
@@ -98,34 +100,23 @@ public class SqlInterpolationParser : ISqlInterpolationParser
 
         if (value is SqlOrderDirection direction)
         {
-            return new SqlSegment(SqlSegmentType.Literal, direction == SqlOrderDirection.Asc ? " ASC" : " DESC");
+            return new SqlSegment(SqlSegmentType.Literal, direction == SqlOrderDirection.Asc ? SqlKeyword.Asc : SqlKeyword.Desc);
         }
 
-        // 4. Magic DTO Promotion (Single objects)
-        if (value != null && 
-            value.GetType().IsClass && 
-            value is not ISqlFragment && 
-            value is not ISqlReference && 
-            value is not ISqlEntityBase && 
-            value is not ISqlProjection && 
-            value is not string && 
-            value is not IEnumerable)
+        // 4. Magic DTO Promotion (This is what failed previously because CurrentKeyword wasn't Set!)
+        if (value != null && value.GetType().IsClass && value is not ISqlFragment && value is not ISqlReference && value is not ISqlEntityBase && value is not ISqlProjection && value is not string && value is not IEnumerable)
         {
-            // SET
-            if (context.ParserState.CurrentKeyword?.Value.Equals(SqlKeyword.Set, StringComparison.OrdinalIgnoreCase) == true 
-                && context.ParserState.ActiveEntityTarget != null)
+            if (context.ParserState.CurrentKeyword?.Value.Equals(SqlKeyword.Set, StringComparison.OrdinalIgnoreCase) == true && context.ParserState.ActiveEntityTarget != null)
             {
                 var assignments = Sql.BuildAssignments(context.ParserState.ActiveEntityTarget, value);
                 foreach (var assignment in assignments)
                 {
                     if (assignment is ISqlParameterGenerator gen) gen.GenerateParameters(context);
                 }
-
                 var fragment = new SqlSetFragment(assignments);
                 return new SqlSegment(SqlSegmentType.Reference, fragment);
             }
 
-            // INSERT
             bool isInsert = context.ParserState.CurrentKeyword?.Value.Equals(SqlKeyword.Insert, StringComparison.OrdinalIgnoreCase) == true;
             bool isValues = context.ParserState.CurrentKeyword?.Value.Equals(SqlKeyword.Values, StringComparison.OrdinalIgnoreCase) == true;
 
@@ -136,13 +127,12 @@ public class SqlInterpolationParser : ISqlInterpolationParser
                 {
                     if (assignment is ISqlParameterGenerator gen) gen.GenerateParameters(context);
                 }
-
                 var fragment = new SqlInsertValuesFragment(assignments);
                 return new SqlSegment(SqlSegmentType.Reference, fragment);
             }
         }
 
-        // 5. Bulk Insert Hook (Arrays of objects)
+        // 5. Bulk Inserts
         bool isInsertCmd = context.ParserState.CurrentKeyword?.Value.Equals(SqlKeyword.Insert, StringComparison.OrdinalIgnoreCase) == true;
         bool isValuesCmd = context.ParserState.CurrentKeyword?.Value.Equals(SqlKeyword.Values, StringComparison.OrdinalIgnoreCase) == true;
 
@@ -169,11 +159,21 @@ public class SqlInterpolationParser : ISqlInterpolationParser
             }
         }
 
-        // 6. Other Fragments
+        // 6. Single Fragments
         if (value is ISqlFragment frag)
         {
             if (frag is ISqlParameterGenerator generator) generator.GenerateParameters(context);
             return new SqlSegment(SqlSegmentType.Raw, frag);
+        }
+
+        // 6.5 Collections of Fragments (Dynamic GROUP BY / ORDER BY lists)
+        if (value is IEnumerable<ISqlFragment> fragmentCollection)
+        {
+            foreach (var item in fragmentCollection)
+            {
+                if (item is ISqlParameterGenerator gen) gen.GenerateParameters(context);
+            }
+            return new SqlSegment(SqlSegmentType.Raw, new SqlCollectionFragment(fragmentCollection));
         }
 
         // 7. Parameter Lists (IN clauses)
@@ -193,76 +193,156 @@ public class SqlInterpolationParser : ISqlInterpolationParser
     }
 
     public virtual string? ProcessLiteral(ISqlParserContext context, ReadOnlySpan<char> span)
+{
+    // 1. --- ZERO-ALLOCATION COMMENT SCRUBBING ---
+    int length = span.Length;
+    char[]? rented = null;
+    
+    // Use the stack for small strings, ArrayPool for massive chunks
+    Span<char> cleanBuffer = length <= 1024 
+        ? stackalloc char[length] 
+        : (rented = ArrayPool<char>.Shared.Rent(length));
+    
+    int cleanIndex = 0;
+
+    for (int i = 0; i < length; i++)
     {
-        var trimmed = span.Trim();
-        string? tag = null;
+        char c = span[i];
 
-        if (span.Contains("LIMIT", StringComparison.OrdinalIgnoreCase) || 
-            span.Contains("PAGING", StringComparison.OrdinalIgnoreCase))
+        // Start Block Comment /*
+        if (!context.ParserState.InLineComment && !context.ParserState.InBlockComment && 
+            c == '/' && i + 1 < length && span[i + 1] == '*')
         {
-            tag = SqlSegmentTag.Paging;
+            context.ParserState.InBlockComment = true;
+            i++; continue;
         }
-        else if (trimmed.EndsWith(SqlKeyword.Update, StringComparison.OrdinalIgnoreCase))
+        
+        // End Block Comment */
+        if (context.ParserState.InBlockComment && 
+            c == '*' && i + 1 < length && span[i + 1] == '/')
         {
-            context.ParserState.CurrentKeyword = SqlKeyword.Update;
+            context.ParserState.InBlockComment = false;
+            cleanBuffer[cleanIndex++] = ' '; // Pad with space so words don't merge
+            i++; continue;
         }
-        else if (trimmed.EndsWith(SqlKeyword.Set, StringComparison.OrdinalIgnoreCase))
+        
+        // Start Line Comment --
+        if (!context.ParserState.InBlockComment && !context.ParserState.InLineComment && 
+            c == '-' && i + 1 < length && span[i + 1] == '-')
         {
-            context.ParserState.CurrentKeyword = SqlKeyword.Set;
-            tag = SqlSegmentTag.UpdateSetKeyword;
+            context.ParserState.InLineComment = true;
+            i++; continue;
         }
-        else if (trimmed.EndsWith($"{SqlKeyword.Insert} INTO", StringComparison.OrdinalIgnoreCase) || 
-                 trimmed.EndsWith(SqlKeyword.Insert, StringComparison.OrdinalIgnoreCase))
+        
+        // End Line Comment \n or \r
+        if (context.ParserState.InLineComment && (c == '\n' || c == '\r'))
         {
-            context.ParserState.CurrentKeyword = SqlKeyword.Insert;
-        }
-        else if (trimmed.EndsWith(SqlKeyword.Values, StringComparison.OrdinalIgnoreCase))
-        {
-            context.ParserState.CurrentKeyword = SqlKeyword.Values;
-            tag = SqlSegmentTag.InsertValuesKeyword;
-        }
-        else if (trimmed.EndsWith("RETURNING", StringComparison.OrdinalIgnoreCase))
-        {
-            tag = SqlSegmentTag.ReturningKeyword;
-        }
-
-        if (trimmed.IsEmpty)
-        {
-            UpdateScannerState(context, span);
-            return tag;
+            context.ParserState.InLineComment = false;
+            // Let it fall through so the newline is kept in the clean buffer!
         }
 
-        bool endsWithAs = EndsWithAsKeyword(span);
-
-        // Alias tracking pipeline
-        if (context.ParserState.LastAliasableTarget != null)
+        // Only append characters if we are NOT inside a comment
+        if (!context.ParserState.InLineComment && !context.ParserState.InBlockComment)
         {
-            if (TryPeekAlias(context, span, out var alias))
-            {
-                if (context.ParserState.LastAliasableTarget is ISqlEntityBase entity)
-                {
-                    if (entity.Reference is ISqlReference entRef) entRef.Alias = alias;
-                }
-                else if (context.ParserState.LastAliasableTarget is ISqlProjection projection)
-                {
-                    if (projection.Reference is ISqlReference entRef) entRef.Alias = alias;
-                }
-
-                context.ParserState.LastAliasableTarget = null;
-            }
-            else if (!endsWithAs)
-            {
-                // FIX: If we didn't find an alias, and the string didn't end with AS, 
-                // the opportunity to alias is completely gone. Kill the target!
-                context.ParserState.LastAliasableTarget = null;
-            }
+            cleanBuffer[cleanIndex++] = c;
         }
+    }
 
-        context.ParserState.ExpectsAliasOnly = endsWithAs;
-        UpdateScannerState(context, span);
+    // This is our safe, comment-free string chunk!
+    var cleanSpan = cleanBuffer.Slice(0, cleanIndex);
+    var trimmed = cleanSpan.Trim();
+    
+    // 2. --- EXISTING LOGIC (Now using safe `cleanSpan` and `trimmed`) ---
+    
+    string? tag = null;
+    SqlKeyword? forcedKeyword = null; 
 
+    if (cleanSpan.Contains("LIMIT", StringComparison.OrdinalIgnoreCase))
+    {
+        tag = SqlSegmentTag.Paging;
+    }
+    else if (trimmed.EndsWith("DO UPDATE SET", StringComparison.OrdinalIgnoreCase))
+    {
+        forcedKeyword = SqlKeyword.Set;
+        tag = SqlSegmentTag.DoUpdateSetKeyword;
+    }
+    else if (trimmed.EndsWith("ON CONFLICT", StringComparison.OrdinalIgnoreCase))
+    {
+        tag = SqlSegmentTag.OnConflictKeyword;
+    }
+    else if (trimmed.EndsWith(SqlKeyword.Update, StringComparison.OrdinalIgnoreCase))
+    {
+        forcedKeyword = SqlKeyword.Update;
+    }
+    else if (trimmed.EndsWith(SqlKeyword.Set, StringComparison.OrdinalIgnoreCase) || trimmed.EndsWith("SET", StringComparison.OrdinalIgnoreCase))
+    {
+        forcedKeyword = SqlKeyword.Set;
+        tag = SqlSegmentTag.UpdateSetKeyword;
+    }
+    else if (trimmed.EndsWith($"{SqlKeyword.Insert} INTO", StringComparison.OrdinalIgnoreCase) || trimmed.EndsWith(SqlKeyword.Insert, StringComparison.OrdinalIgnoreCase))
+    {
+        forcedKeyword = SqlKeyword.Insert;
+    }
+    else if (trimmed.EndsWith(SqlKeyword.Values, StringComparison.OrdinalIgnoreCase) || trimmed.EndsWith("VALUES", StringComparison.OrdinalIgnoreCase))
+    {
+        forcedKeyword = SqlKeyword.Values;
+        tag = SqlSegmentTag.InsertValuesKeyword;
+    }
+    else if (trimmed.EndsWith("RETURNING", StringComparison.OrdinalIgnoreCase))
+    {
+        tag = SqlSegmentTag.ReturningKeyword;
+    }
+
+    if (trimmed.IsEmpty)
+    {
+        UpdateScannerState(context, cleanSpan);
+        if (forcedKeyword != null) context.ParserState.CurrentKeyword = forcedKeyword;
+        
+        if (rented != null) ArrayPool<char>.Shared.Return(rented);
         return tag;
     }
+
+    bool endsWithAs = EndsWithAsKeyword(cleanSpan);
+
+    if (context.ParserState.LastAliasableTarget != null)
+    {
+        if (TryPeekAlias(context, cleanSpan, out var alias))
+        {
+            if (context.ParserState.LastAliasableTarget is ISqlEntityBase entity)
+            {
+                if (entity.Reference is ISqlReference entRef) entRef.Alias = alias;
+            }
+            else if (context.ParserState.LastAliasableTarget is ISqlProjection projection)
+            {
+                if (projection.Reference is ISqlReference entRef) entRef.Alias = alias;
+            }
+            context.ParserState.LastAliasableTarget = null;
+        }
+        else if (!endsWithAs)
+        {
+            context.ParserState.LastAliasableTarget = null;
+        }
+    }
+
+    context.ParserState.ExpectsAliasOnly = endsWithAs;
+    
+    // Let the scanner run its dumb word-by-word checks ON THE CLEAN SPAN
+    UpdateScannerState(context, cleanSpan);
+
+    // PROTECT THE STATE: Overwrite the scanner with our explicitly detected keyword
+    if (forcedKeyword != null)
+    {
+        context.ParserState.CurrentKeyword = forcedKeyword;
+    }
+
+    // Clean up our rented array if we used one
+    if (rented != null)
+    {
+        ArrayPool<char>.Shared.Return(rented);
+    }
+
+    return tag;
+}
 
     protected virtual SqlSegment CreateParameter(ISqlParserContext context, object? value)
     {
@@ -325,8 +405,12 @@ public class SqlInterpolationParser : ISqlInterpolationParser
         {
             var token = current[..end].ToString();
             
-            // FIX: Explicitly prevent RETURNING from accidentally being captured as an alias!
-            if (IsSqlKeyword(token) || token.Equals("RETURNING", StringComparison.OrdinalIgnoreCase)) return false;
+            // Explicitly ignore UPSERT keywords!
+            if (IsSqlKeyword(token) || 
+                token.Equals("RETURNING", StringComparison.OrdinalIgnoreCase) ||
+                token.Equals("ON", StringComparison.OrdinalIgnoreCase) ||
+                token.Equals("DO", StringComparison.OrdinalIgnoreCase)) 
+                return false;
             
             alias = token;
             return true;
@@ -348,6 +432,8 @@ public class SqlInterpolationParser : ISqlInterpolationParser
 
     private void UpdateScannerState(ISqlParserContext context, ReadOnlySpan<char> span)
     {
+        int localParenDepth = 0; // NEW: Track parenthesis depth
+
         for (int i = 0; i < span.Length; i++)
         {
             var slice = span[i..];
@@ -366,7 +452,14 @@ public class SqlInterpolationParser : ISqlInterpolationParser
                 continue;
             }
 
-            if (i == 0 || char.IsWhiteSpace(span[i - 1]))
+            // NEW: Adjust depth
+            if (span[i] == '(') localParenDepth++;
+            else if (span[i] == ')') localParenDepth--;
+
+            // NEW: Completely ignore any SQL keywords if we are inside a subquery/parenthesis!
+            if (localParenDepth > 0) continue;
+
+            if (i == 0 || char.IsWhiteSpace(span[i - 1]) || span[i - 1] == '(' || span[i - 1] == ')')
             {
                 foreach (var keyword in SqlKeyword.AllInitiatorsOrdered)
                 {

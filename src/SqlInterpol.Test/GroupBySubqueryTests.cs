@@ -24,8 +24,8 @@ public class GroupBySubqueryTests
             SELECT CategoryId, COUNT(*)
             FROM (
                 SELECT CategoryId, MAX(Price) AS MaxPrice FROM Products GROUP BY CategoryId
-            ) AS {{sq.Alias("stats")}}
-            GROUP BY {{Sql.GroupBy(sq[x => x.CategoryId])}}
+            ) AS {{sq.As("stats")}}
+            GROUP BY {{sq[x => x.CategoryId]}}
             """))
             .Build();
 

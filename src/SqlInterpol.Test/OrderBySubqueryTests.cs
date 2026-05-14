@@ -29,7 +29,7 @@ public class OrderBySubqueryTests
                     MAX(Price) AS MaxPrice
                 FROM Products
                 GROUP BY CategoryId
-            ) AS {{sm.Alias("stats")}}
+            ) AS {{sm.As("stats")}}
             ORDER BY {{sm.OrderBy(x => x.MaxPrice, SqlOrderDirection.Desc)}}
             """))
             .Build();

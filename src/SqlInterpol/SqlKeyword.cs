@@ -24,6 +24,9 @@ public sealed class SqlKeyword
     public static readonly SqlKeyword With = new("WITH", true, true);
     public static readonly SqlKeyword Into = new("INTO");
     public static readonly SqlKeyword Returning = new("RETURNING", true, false);
+    public static readonly SqlKeyword OnConflict = new("ON CONFLICT", true, false);
+    public static readonly SqlKeyword DoUpdateSet = new("DO UPDATE SET", true, false);
+    public static readonly SqlKeyword Do = new("DO");
 
     // --- Filtering & Grouping ---
     public static readonly SqlKeyword Where = new("WHERE", true, false);
@@ -64,6 +67,7 @@ public sealed class SqlKeyword
     public static readonly SqlKeyword Distinct = new("DISTINCT");
     public static readonly SqlKeyword Any = new("ANY");
     public static readonly SqlKeyword All = new("ALL");
+    public static readonly SqlKeyword Some = new("SOME");
 
     // --- Order Directions ---
     public static readonly SqlKeyword Asc = new("ASC");
@@ -82,6 +86,8 @@ public sealed class SqlKeyword
         With,
         Into,
         Returning,
+        OnConflict,
+        DoUpdateSet,
         Where,
         GroupBy,
         Having,

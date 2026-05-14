@@ -7,6 +7,8 @@ public class SqlInsertValuesFragment
 {
     private readonly List<List<ISqlAssignmentFragment>> _bulkAssignments;
 
+    public IReadOnlyList<IReadOnlyList<ISqlAssignmentFragment>> Assignments => _bulkAssignments;
+
     public SqlInsertValuesFragment(IEnumerable<ISqlAssignmentFragment> assignments)
     {
         _bulkAssignments = [assignments.ToList()];

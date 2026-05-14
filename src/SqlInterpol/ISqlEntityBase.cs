@@ -11,7 +11,7 @@ public interface ISqlEntityBase : ISqlFragment
     ISqlReference this[string columnName] { get; }
 
     ISqlFragment Column(string name);
-    ISqlFragment Alias(string alias);
+    // ISqlFragment Alias(string alias);
 }
 
 public interface ISqlEntityBase<T> : ISqlEntityBase

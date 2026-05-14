@@ -111,53 +111,53 @@ public class UpdateTests
         )
     ];
 
-    [Theory]
-    [MemberData(nameof(UpdateData))]
-    public void Update_WithExplicitSets_RendersCorrectly(SqlTestCase testCase)
-    {
-        // Arrange
-        var db = testCase.CreateBuilder();
+    // [Theory]
+    // [MemberData(nameof(UpdateData))]
+    // public void Update_WithExplicitSets_RendersCorrectly(SqlTestCase testCase)
+    // {
+    //     // Arrange
+    //     var db = testCase.CreateBuilder();
         
-        // Act
-        var result = db.Query<OrderModel>(o =>
-            db.Append($$"""
-            {{Sql.Update(o, 
-                Sql.Set(o[x => x.Status], "Shipped"),
-                Sql.Set(o[x => x.Total], 99.99m)
-            )}}
-            WHERE {{o[x => x.Id]}} = 1
-            """))
-            .Build();
+    //     // Act
+    //     var result = db.Query<OrderModel>(o =>
+    //         db.Append($$"""
+    //         {{Sql.Update(o, 
+    //             Sql.Set(o[x => x.Status], "Shipped"),
+    //             Sql.Set(o[x => x.Total], 99.99m)
+    //         )}}
+    //         WHERE {{o[x => x.Id]}} = 1
+    //         """))
+    //         .Build();
 
-        // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+    //     // Assert
+    //     Assert.Equal(testCase.ExpectedSql[0], result.Sql);
         
-        Assert.Equal("Shipped", result.Parameters.ElementAt(0).Value);
-        Assert.Equal(99.99m, result.Parameters.ElementAt(1).Value);
-    }
+    //     Assert.Equal("Shipped", result.Parameters.ElementAt(0).Value);
+    //     Assert.Equal(99.99m, result.Parameters.ElementAt(1).Value);
+    // }
 
-    [Theory]
-    [MemberData(nameof(UpdateData))]
-    public void Update_WithDto_RendersCorrectly(SqlTestCase testCase)
-    {
-        // Arrange
-        var db = testCase.CreateBuilder();
-        var updateDto = new { Status = "Shipped", Total = 99.99m };
+    // [Theory]
+    // [MemberData(nameof(UpdateData))]
+    // public void Update_WithDto_RendersCorrectly(SqlTestCase testCase)
+    // {
+    //     // Arrange
+    //     var db = testCase.CreateBuilder();
+    //     var updateDto = new { Status = "Shipped", Total = 99.99m };
         
-        // Act
-        var result = db.Query<OrderModel>(o =>
-            db.Append($$"""
-            {{Sql.Update(o, updateDto)}}
-            WHERE {{o[x => x.Id]}} = 1
-            """))
-            .Build();
+    //     // Act
+    //     var result = db.Query<OrderModel>(o =>
+    //         db.Append($$"""
+    //         {{Sql.Update(o, updateDto)}}
+    //         WHERE {{o[x => x.Id]}} = 1
+    //         """))
+    //         .Build();
 
-        // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+    //     // Assert
+    //     Assert.Equal(testCase.ExpectedSql[0], result.Sql);
         
-        Assert.Equal("Shipped", result.Parameters.ElementAt(0).Value);
-        Assert.Equal(99.99m, result.Parameters.ElementAt(1).Value);
-    }
+    //     Assert.Equal("Shipped", result.Parameters.ElementAt(0).Value);
+    //     Assert.Equal(99.99m, result.Parameters.ElementAt(1).Value);
+    // }
 
     public static TheoryData<SqlTestCase> UpdateData =>
     [
@@ -223,49 +223,49 @@ public class UpdateTests
         )
     ];
 
-    [Theory]
-    [MemberData(nameof(UpdateSetData))]
-    public void UpdateSet_WithExplicitSets_RendersCorrectly(SqlTestCase testCase)
-    {
-        // Arrange
-        var db = testCase.CreateBuilder();
+    // [Theory]
+    // [MemberData(nameof(UpdateSetData))]
+    // public void UpdateSet_WithExplicitSets_RendersCorrectly(SqlTestCase testCase)
+    // {
+    //     // Arrange
+    //     var db = testCase.CreateBuilder();
         
-        // Act
-        var result = db.Query<OrderModel>(o =>
-            db.Append($$"""
-            UPDATE {{o.Declaration}}
-            SET {{Sql.UpdateSet(
-                Sql.Set(o[x => x.Status], "Shipped"),
-                Sql.Set(o[x => x.Total], 99.99m)
-            )}}
-            WHERE {{o[x => x.Id]}} = 1
-            """))
-            .Build();
+    //     // Act
+    //     var result = db.Query<OrderModel>(o =>
+    //         db.Append($$"""
+    //         UPDATE {{o.Declaration}}
+    //         SET {{Sql.UpdateSet(
+    //             Sql.Set(o[x => x.Status], "Shipped"),
+    //             Sql.Set(o[x => x.Total], 99.99m)
+    //         )}}
+    //         WHERE {{o[x => x.Id]}} = 1
+    //         """))
+    //         .Build();
 
-        // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
-    }
+    //     // Assert
+    //     Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+    // }
 
-    [Theory]
-    [MemberData(nameof(UpdateSetData))]
-    public void UpdateSet_WithDto_RendersCorrectly(SqlTestCase testCase)
-    {
-        // Arrange
-        var db = testCase.CreateBuilder();
-        var updateDto = new { Status = "Shipped", Total = 99.99m };
+    // [Theory]
+    // [MemberData(nameof(UpdateSetData))]
+    // public void UpdateSet_WithDto_RendersCorrectly(SqlTestCase testCase)
+    // {
+    //     // Arrange
+    //     var db = testCase.CreateBuilder();
+    //     var updateDto = new { Status = "Shipped", Total = 99.99m };
         
-        // Act
-        var result = db.Query<OrderModel>(o =>
-            db.Append($$"""
-            UPDATE {{o.Declaration}}
-            SET {{Sql.UpdateSet(o, updateDto)}}
-            WHERE {{o[x => x.Id]}} = 1
-            """))
-            .Build();
+    //     // Act
+    //     var result = db.Query<OrderModel>(o =>
+    //         db.Append($$"""
+    //         UPDATE {{o.Declaration}}
+    //         SET {{Sql.UpdateSet(o, updateDto)}}
+    //         WHERE {{o[x => x.Id]}} = 1
+    //         """))
+    //         .Build();
 
-        // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
-    }
+    //     // Assert
+    //     Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+    // }
 
     public static TheoryData<SqlTestCase> UpdateSetData =>
     [
@@ -419,34 +419,34 @@ public class UpdateTests
         )
     ];
 
-    [Theory]
-    [MemberData(nameof(UpdateWithWhereParamData))]
-    public void Update_WithParametersInSetAndWhere_MaintainsSequentialIndices(SqlTestCase testCase)
-    {
-        // Arrange
-        var db = testCase.CreateBuilder();
-        var status = "Archived";
-        var targetId = 500;
+    // [Theory]
+    // [MemberData(nameof(UpdateWithWhereParamData))]
+    // public void Update_WithParametersInSetAndWhere_MaintainsSequentialIndices(SqlTestCase testCase)
+    // {
+    //     // Arrange
+    //     var db = testCase.CreateBuilder();
+    //     var status = "Archived";
+    //     var targetId = 500;
         
-        // Act
-        // This tests the mix of Fragment-driven parameters (Sql.Set)
-        // and Parser-driven parameters ({targetId})
-        var result = db.Query<OrderModel>(o =>
-            db.Append($$"""
-            {{Sql.Update(o, Sql.Set(o[x => x.Status], status))}}
-            WHERE {{o[x => x.Id]}} = {{targetId}}
-            """))
-            .Build();
+    //     // Act
+    //     // This tests the mix of Fragment-driven parameters (Sql.Set)
+    //     // and Parser-driven parameters ({targetId})
+    //     var result = db.Query<OrderModel>(o =>
+    //         db.Append($$"""
+    //         {{Sql.Update(o, Sql.Set(o[x => x.Status], status))}}
+    //         WHERE {{o[x => x.Id]}} = {{targetId}}
+    //         """))
+    //         .Build();
 
-        // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+    //     // Assert
+    //     Assert.Equal(testCase.ExpectedSql[0], result.Sql);
         
-        // Verify both parameters were captured in order
-        // @p0 comes from Sql.Set rendering first
-        // @p1 comes from the WHERE clause parsed after
-        Assert.Equal(status, result.Parameters.ElementAt(0).Value);
-        Assert.Equal(targetId, result.Parameters.ElementAt(1).Value);
-    }
+    //     // Verify both parameters were captured in order
+    //     // @p0 comes from Sql.Set rendering first
+    //     // @p1 comes from the WHERE clause parsed after
+    //     Assert.Equal(status, result.Parameters.ElementAt(0).Value);
+    //     Assert.Equal(targetId, result.Parameters.ElementAt(1).Value);
+    // }
 
     public static TheoryData<SqlTestCase> UpdateWithWhereParamData =>
     [

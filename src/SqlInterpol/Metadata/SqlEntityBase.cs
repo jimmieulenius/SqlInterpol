@@ -22,12 +22,12 @@ public abstract class SqlEntityBase<T> : ISqlEntityBase<T>
         });
     }
 
-    public ISqlFragment Alias(string alias)
-    {
-        Reference.Alias = alias;
+    // public ISqlFragment Alias(string alias)
+    // {
+    //     Reference.Alias = alias;
 
-        return new SqlDeferredFragment(ctx => ctx.Dialect.QuoteIdentifier(alias));
-    }
+    //     return new SqlDeferredFragment(ctx => ctx.Dialect.QuoteIdentifier(alias));
+    // }
 
     public ISqlReference this[Expression<Func<T, object>> propertySelector]
     {

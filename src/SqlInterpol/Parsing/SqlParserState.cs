@@ -10,4 +10,6 @@ internal class SqlParserState : ISqlParserState
     public SqlSegment? LastSegment { get; set; }
     public Dictionary<ISqlEntityBase, SqlEntityRole> EntityRoles { get; } = [];
     public ISqlEntityBase? ActiveEntityTarget { get; set; }
+    public bool InBlockComment { get; set; }
+    public bool InLineComment { get; set; }
 }

@@ -17,7 +17,7 @@ public class OrderByAsTests
         var result = db.Query<Product>(p =>
             db.Append($$"""
             SELECT *
-            FROM {{p}} AS {{p.Alias("prod")}}
+            FROM {{p}} AS {{p.As("prod")}}
             ORDER BY
                 {{p.OrderBy(x => x.Name, SqlOrderDirection.Asc)}}
             """))

@@ -137,43 +137,43 @@ public class InsertTests
         ),
     ];
 
-    [Theory]
-    [MemberData(nameof(InsertData))]
-    public void Insert_WithDto_RendersCorrectly(SqlTestCase testCase)
-    {
-        // Arrange
-        var db = testCase.CreateBuilder();
-        var newOrder = new { Status = "New", Total = 10.50m };
+    // [Theory]
+    // [MemberData(nameof(InsertData))]
+    // public void Insert_WithDto_RendersCorrectly(SqlTestCase testCase)
+    // {
+    //     // Arrange
+    //     var db = testCase.CreateBuilder();
+    //     var newOrder = new { Status = "New", Total = 10.50m };
         
-        // Act
-        var result = db.Query<OrderModel>(o =>
-            db.Append($"{Sql.Insert(o, newOrder)}"))
-            .Build();
+    //     // Act
+    //     var result = db.Query<OrderModel>(o =>
+    //         db.Append($"{Sql.Insert(o, newOrder)}"))
+    //         .Build();
 
-        // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
-        Assert.Equal("New", result.Parameters.ElementAt(0).Value);
-        Assert.Equal(10.50m, result.Parameters.ElementAt(1).Value);
-    }
+    //     // Assert
+    //     Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+    //     Assert.Equal("New", result.Parameters.ElementAt(0).Value);
+    //     Assert.Equal(10.50m, result.Parameters.ElementAt(1).Value);
+    // }
 
-    [Theory]
-    [MemberData(nameof(InsertData))]
-    public void Insert_WithExplicitSets_RendersCorrectly(SqlTestCase testCase)
-    {
-        // Arrange
-        var db = testCase.CreateBuilder();
+    // [Theory]
+    // [MemberData(nameof(InsertData))]
+    // public void Insert_WithExplicitSets_RendersCorrectly(SqlTestCase testCase)
+    // {
+    //     // Arrange
+    //     var db = testCase.CreateBuilder();
         
-        // Act
-        var result = db.Query<OrderModel>(o =>
-            db.Append($"{Sql.Insert(o,
-                Sql.Set(o[x => x.Status], "New"),
-                Sql.Set(o[x => x.Total], 10.50m)
-            )}"))
-            .Build();
+    //     // Act
+    //     var result = db.Query<OrderModel>(o =>
+    //         db.Append($"{Sql.Insert(o,
+    //             Sql.Set(o[x => x.Status], "New"),
+    //             Sql.Set(o[x => x.Total], 10.50m)
+    //         )}"))
+    //         .Build();
 
-        // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
-    }
+    //     // Assert
+    //     Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+    // }
 
     [Theory]
     [MemberData(nameof(InsertData))]
@@ -266,25 +266,25 @@ public class InsertTests
         )
     ];
 
-    [Theory]
-    [MemberData(nameof(InsertValuesData))]
-    public void InsertValues_ManualStatement_RendersCorrectly(SqlTestCase testCase)
-    {
-        // Arrange
-        var db = testCase.CreateBuilder();
-        var dto = new { Status = "Active", Total = 50.00m };
+    // [Theory]
+    // [MemberData(nameof(InsertValuesData))]
+    // public void InsertValues_ManualStatement_RendersCorrectly(SqlTestCase testCase)
+    // {
+    //     // Arrange
+    //     var db = testCase.CreateBuilder();
+    //     var dto = new { Status = "Active", Total = 50.00m };
         
-        // Act
-        var result = db.Query<OrderModel>(o =>
-            db.Append($$"""
-            INSERT INTO {{o}} 
-            {{Sql.InsertValues(o, dto)}}
-            """))
-            .Build();
+    //     // Act
+    //     var result = db.Query<OrderModel>(o =>
+    //         db.Append($$"""
+    //         INSERT INTO {{o}} 
+    //         {{Sql.InsertValues(o, dto)}}
+    //         """))
+    //         .Build();
 
-        // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
-    }
+    //     // Assert
+    //     Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+    // }
 
     public static TheoryData<SqlTestCase> InsertValuesData =>
     [

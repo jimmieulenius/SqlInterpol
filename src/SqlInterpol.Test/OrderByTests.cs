@@ -114,10 +114,7 @@ public class OrderByTests
             db.Append($$"""
             SELECT *
             FROM {{o}}
-            ORDER BY {{Sql.OrderBy(
-                o.OrderBy("Total", SqlOrderDirection.Desc),
-                o.OrderBy(x => x.Id, SqlOrderDirection.Asc)
-            )}}
+            ORDER BY {{o["Total"]}}, {{o[x => x.Id]}} {{SqlOrderDirection.Desc}}
             """))
             .Build();
 
@@ -138,14 +135,14 @@ public class OrderByTests
             // Simulate generating fragments dynamically from an API request
             IEnumerable<ISqlOrderFragment> sorts = 
             [
-                o.OrderBy("Total", SqlOrderDirection.Desc),
-                o.OrderBy(x => x.Id, SqlOrderDirection.Asc)
+                o.OrderBy("Total"),
+                o.OrderBy(x => x.Id, SqlOrderDirection.Desc)
             ];
 
             db.Append($$"""
                 SELECT *
                 FROM {{o}}
-                ORDER BY {{Sql.OrderBy(sorts)}}
+                ORDER BY {{sorts}}
                 """);
         }).Build();
 
@@ -161,7 +158,7 @@ public class OrderByTests
                 """
                 SELECT *
                 FROM <<Orders>>
-                ORDER BY <<Orders>>.<<Total>> DESC, <<Orders>>.<<Id>> ASC
+                ORDER BY <<Orders>>.<<Total>>, <<Orders>>.<<Id>> DESC
                 """
             ]
         ),
@@ -171,7 +168,7 @@ public class OrderByTests
                 """
                 SELECT *
                 FROM `Orders`
-                ORDER BY `Orders`.`Total` DESC, `Orders`.`Id` ASC
+                ORDER BY `Orders`.`Total`, `Orders`.`Id` DESC
                 """
             ]
         ),
@@ -181,7 +178,7 @@ public class OrderByTests
                 """
                 SELECT *
                 FROM "Orders"
-                ORDER BY "Orders"."Total" DESC, "Orders"."Id" ASC
+                ORDER BY "Orders"."Total", "Orders"."Id" DESC
                 """
             ]
         ),
@@ -191,7 +188,7 @@ public class OrderByTests
                 """
                 SELECT *
                 FROM "Orders"
-                ORDER BY "Orders"."Total" DESC, "Orders"."Id" ASC
+                ORDER BY "Orders"."Total", "Orders"."Id" DESC
                 """
             ]
         ),
@@ -201,7 +198,7 @@ public class OrderByTests
                 """
                 SELECT *
                 FROM "Orders"
-                ORDER BY "Orders"."Total" DESC, "Orders"."Id" ASC
+                ORDER BY "Orders"."Total", "Orders"."Id" DESC
                 """
             ]
         ),
@@ -211,7 +208,7 @@ public class OrderByTests
                 """
                 SELECT *
                 FROM [Orders]
-                ORDER BY [Orders].[Total] DESC, [Orders].[Id] ASC
+                ORDER BY [Orders].[Total], [Orders].[Id] DESC
                 """
             ]
         )

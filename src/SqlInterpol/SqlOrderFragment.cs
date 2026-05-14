@@ -7,15 +7,15 @@ public class SqlOrderFragment : ISqlOrderFragment
     private readonly ISqlReference? _reference;
     private readonly ISqlEntityBase? _entity;
     private readonly string? _physicalColumnName;
-    private readonly SqlOrderDirection _direction;
+    private readonly SqlOrderDirection? _direction;
 
-    public SqlOrderFragment(ISqlReference reference, SqlOrderDirection direction)
+    public SqlOrderFragment(ISqlReference reference, SqlOrderDirection? direction = null)
     {
         _reference = reference;
         _direction = direction;
     }
 
-    public SqlOrderFragment(ISqlEntityBase entity, string physicalColumnName, SqlOrderDirection direction)
+    public SqlOrderFragment(ISqlEntityBase entity, string physicalColumnName, SqlOrderDirection? direction = null)
     {
         _entity = entity;
         _physicalColumnName = physicalColumnName;
@@ -47,10 +47,13 @@ public class SqlOrderFragment : ISqlOrderFragment
             throw new InvalidOperationException("Invalid SqlOrderFragment configuration.");
         }
 
-        string dirSql = _direction == SqlOrderDirection.Desc 
-            ? SqlKeyword.Desc.Value 
-            : SqlKeyword.Asc.Value;
+        string dirSql = _direction switch
+        {
+            SqlOrderDirection.Desc => $" {SqlKeyword.Desc.Value}",
+            SqlOrderDirection.Asc => $" {SqlKeyword.Asc.Value}",
+            _ => string.Empty
+        };
             
-        return $"{columnSql} {dirSql}";
+        return $"{columnSql}{dirSql}";
     }
 }

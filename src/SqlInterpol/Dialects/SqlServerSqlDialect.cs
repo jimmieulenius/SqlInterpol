@@ -29,13 +29,63 @@ public class SqlServerSqlDialect : SqlDialectBase
         {
             var segment = baseRewritten[i];
 
-            // 1. Transpile RETURNING -> OUTPUT (Now supports multiple columns!)
+            bool isOnConflict = segment.Tag == SqlSegmentTag.OnConflictKeyword || 
+                               (segment.Type == SqlSegmentType.Literal && segment.Value is string s1 && s1.Contains("ON CONFLICT", StringComparison.OrdinalIgnoreCase));
+
+            // 1. Transpile UPSERT -> ANSI MERGE
+            if (isOnConflict)
+            {
+                ISqlEntityBase? targetTable = null;
+                SqlInsertValuesFragment? insertFrag = null;
+                int tableIndex = -1;
+
+                for (int j = rewritten.Count - 1; j >= 0; j--)
+                {
+                    if (rewritten[j].Value is SqlInsertValuesFragment ins) insertFrag = ins;
+                    else if (rewritten[j].Value is ISqlEntityBase t && insertFrag != null) { targetTable = t; tableIndex = j; break; }
+                }
+
+                var conflictCols = new List<ISqlProjection>();
+                SqlSetFragment? setFrag = null;
+                int lookahead = 1;
+
+                while (i + lookahead < baseRewritten.Count)
+                {
+                    var next = baseRewritten[i + lookahead];
+                    
+                    bool isDoUpdate = next.Tag == SqlSegmentTag.DoUpdateSetKeyword || 
+                                     (next.Type == SqlSegmentType.Literal && next.Value is string s2 && s2.Contains("DO UPDATE", StringComparison.OrdinalIgnoreCase));
+
+                    if (next.Value is ISqlProjection p) conflictCols.Add(p);
+                    else if (isDoUpdate)
+                    {
+                        if (i + lookahead + 1 < baseRewritten.Count && baseRewritten[i + lookahead + 1].Value is SqlSetFragment sf)
+                        {
+                            setFrag = sf;
+                            lookahead++;
+                        }
+                        break;
+                    }
+                    lookahead++;
+                }
+
+                if (tableIndex > -1 && targetTable != null && insertFrag != null && conflictCols.Count > 0 && setFrag != null)
+                {
+                    int insertKeywordIndex = tableIndex > 0 ? tableIndex - 1 : 0;
+                    rewritten.RemoveRange(insertKeywordIndex, rewritten.Count - insertKeywordIndex);
+                    rewritten.Add(new SqlSegment(SqlSegmentType.Raw, new SqlServerMergeFragment(targetTable, insertFrag, conflictCols, setFrag)));
+
+                    i += lookahead; 
+                    goto NextSegment;
+                }
+            }
+
+            // 2. Transpile RETURNING -> OUTPUT 
             if (segment.Tag == SqlSegmentTag.ReturningKeyword)
             {
                 var projections = new List<ISqlProjection>();
                 int lookaheadOffset = 1;
 
-                // Look ahead to gather all projections and commas
                 while (i + lookaheadOffset < baseRewritten.Count)
                 {
                     var nextSeg = baseRewritten[i + lookaheadOffset];
@@ -45,38 +95,26 @@ public class SqlServerSqlDialect : SqlDialectBase
                         projections.Add(proj);
                         lookaheadOffset++;
                     }
-                    // If it's a literal containing ONLY whitespace or commas, swallow it and keep looking
                     else if (nextSeg.Type == SqlSegmentType.Literal && nextSeg.Value is string s && string.IsNullOrWhiteSpace(s.Replace(",", "")))
                     {
                         lookaheadOffset++;
                     }
-                    else
-                    {
-                        break; // We hit the end of the returning list
-                    }
+                    else break; 
                 }
 
                 if (projections.Count > 0)
                 {
-                    // Look backwards in our rewritten list to find the DTO Insert Fragment
                     for (int j = rewritten.Count - 1; j >= 0; j--)
                     {
                         if (rewritten[j].Value is SqlInsertValuesFragment insertFrag)
                         {
-                            // Upgrade the DTO fragment and pass the LIST of projections!
                             rewritten[j] = new SqlSegment(SqlSegmentType.Raw, new SqlServerInsertValuesFragment(insertFrag, projections));
                             
-                            // Preserve any formatting that came BEFORE the word RETURNING
                             if (segment.Value is string text)
                             {
-                                int index = text.LastIndexOf(SqlKeyword.Returning, StringComparison.OrdinalIgnoreCase);
-                                if (index > 0)
-                                {
-                                    rewritten.Add(new SqlSegment(SqlSegmentType.Literal, text[..index]));
-                                }
+                                int index = text.LastIndexOf("RETURNING", StringComparison.OrdinalIgnoreCase);
+                                if (index > 0) rewritten.Add(new SqlSegment(SqlSegmentType.Literal, text[..index]));
                             }
-
-                            // Advance 'i' past the RETURNING keyword and ALL the collected projections/commas
                             i += (lookaheadOffset - 1); 
                             goto NextSegment; 
                         }
@@ -84,19 +122,13 @@ public class SqlServerSqlDialect : SqlDialectBase
                 }
             }
 
-            // 2. Apply SQL Server specific paging logic
+            // 3. Apply SQL Server specific paging logic
             if (segment.Tag == SqlSegmentTag.Paging && segment.Value is string textPaging)
             {
-                if (i + 3 < baseRewritten.Count &&
-                    baseRewritten[i + 1].Type == SqlSegmentType.Parameter &&
-                    baseRewritten[i + 3].Type == SqlSegmentType.Parameter)
+                if (i + 3 < baseRewritten.Count && baseRewritten[i + 1].Type == SqlSegmentType.Parameter && baseRewritten[i + 3].Type == SqlSegmentType.Parameter)
                 {
                     int index = textPaging.LastIndexOf(SqlKeyword.Limit, StringComparison.OrdinalIgnoreCase);
-                    
-                    if (index > -1)
-                    {
-                        rewritten.Add(new SqlSegment(SqlSegmentType.Literal, textPaging[..index]));
-                    }
+                    if (index > -1) rewritten.Add(new SqlSegment(SqlSegmentType.Literal, textPaging[..index]));
 
                     rewritten.Add(new SqlSegment(SqlSegmentType.Literal, $"{SqlKeyword.Offset} "));
                     rewritten.Add(baseRewritten[i + 3]); // offset param
@@ -112,7 +144,6 @@ public class SqlServerSqlDialect : SqlDialectBase
             }
 
             rewritten.Add(segment);
-            
             NextSegment: continue;
         }
 
@@ -120,18 +151,42 @@ public class SqlServerSqlDialect : SqlDialectBase
     }
 }
 
-// 3. Update the Wrapper to handle a List of Projections
 public class SqlServerInsertValuesFragment(SqlInsertValuesFragment original, IReadOnlyList<ISqlProjection> returnedColumns) : ISqlFragment, ISqlParameterGenerator
 {
     public void GenerateParameters(ISqlContext context) => original.GenerateParameters(context);
-    
     public string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
     {
         var baseSql = original.ToSql(context, mode);
-        
-        // Map all columns to inserted.[Col] and join with commas
         var outputCols = string.Join(", ", returnedColumns.Select(c => $"inserted.{c.ToSql(context, SqlRenderMode.BaseName)}"));
-        
         return baseSql.Replace(SqlKeyword.Values, $"OUTPUT {outputCols}{Environment.NewLine}{SqlKeyword.Values}");
+    }
+}
+
+public class SqlServerMergeFragment(
+    ISqlEntityBase targetTable,
+    SqlInsertValuesFragment insertFragment,
+    IReadOnlyList<ISqlProjection> conflictColumns,
+    SqlSetFragment updateFragment) : ISqlFragment
+{
+    public string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
+    {
+        var target = targetTable.ToSql(context);
+        var insertCols = insertFragment.Assignments[0].Select(a => a.Reference.ToSql(context, SqlRenderMode.BaseName)).ToList();
+        
+        var sourceRows = new List<string>();
+        
+        foreach (var row in insertFragment.Assignments)
+        {
+            var vals = row.Select(a => a.ToSql(context).Split('=').Last().Trim());
+            sourceRows.Add($"({string.Join(", ", vals)})");
+        }
+        
+        var usingClause = $"USING (VALUES {string.Join(", ", sourceRows)}) AS source({string.Join(", ", insertCols)})";
+        var onClause = string.Join(" AND ", conflictColumns.Select(c => $"target.{c.ToSql(context, SqlRenderMode.BaseName)} = source.{c.ToSql(context, SqlRenderMode.BaseName)}"));
+        var updateSets = updateFragment.Assignments.Select(a => $"target.{a.Reference.ToSql(context, SqlRenderMode.BaseName)} = {a.ToSql(context).Split('=').Last().Trim()}");
+        var insertVals = insertFragment.Assignments[0].Select(a => $"source.{a.Reference.ToSql(context, SqlRenderMode.BaseName)}");
+
+        var nl = Environment.NewLine;
+        return $"MERGE INTO {target} AS target{nl}{usingClause}{nl}ON {onClause}{nl}WHEN MATCHED THEN{nl}  UPDATE SET {string.Join(", ", updateSets)}{nl}WHEN NOT MATCHED THEN{nl}  INSERT ({string.Join(", ", insertCols)}){nl}  VALUES ({string.Join(", ", insertVals)});";
     }
 }
