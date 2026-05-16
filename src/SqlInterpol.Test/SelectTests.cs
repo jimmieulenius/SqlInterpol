@@ -7,6 +7,23 @@ namespace SqlInterpol.Test;
 public class SelectTests
 {
     [Theory]
+    [MemberData(nameof(SelectExpansionData))]
+    public void Select_EntityExpansion_ExpandsColumnsAndAppliesAlias(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+
+        // Act
+        var result = db.Query<ProductWithIgnoreModel>(p => db.Append($$"""
+            SELECT {{p}}
+            FROM {{p}} AS p1
+            """)).Build();
+
+        // Assert SQL
+        testCase.AssertSql(result.Sql);
+    }
+
+    [Theory]
     [MemberData(nameof(SingleColumnData))]
     public void Select_SingleColumn(SqlTestCase testCase)
     {
@@ -111,6 +128,64 @@ public class SelectTests
         // Assert
         testCase.AssertSql(result.Sql);
     }
+
+    public static TheoryData<SqlTestCase> SelectExpansionData =>
+    [
+        new SqlTestCase(
+            SqlDialectKind.CustomDb,
+            [
+                """
+                SELECT <<p1>>.<<Id>>, <<p1>>.<<PROD_NAME>>
+                FROM <<dbo>>.<<Products>> AS p1
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.MySql,
+            [
+                """
+                SELECT `p1`.`Id`, `p1`.`PROD_NAME`
+                FROM `dbo`.`Products` AS p1
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Oracle,
+            [
+                """
+                SELECT "p1"."Id", "p1"."PROD_NAME"
+                FROM "dbo"."Products" AS p1
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.PostgreSql,
+            [
+                """
+                SELECT "p1"."Id", "p1"."PROD_NAME"
+                FROM "dbo"."Products" AS p1
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqLite,
+            [
+                """
+                SELECT "p1"."Id", "p1"."PROD_NAME"
+                FROM "dbo"."Products" AS p1
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqlServer,
+            [
+                """
+                SELECT [p1].[Id], [p1].[PROD_NAME]
+                FROM [dbo].[Products] AS p1
+                """
+            ]
+        )
+    ];
 
     public static TheoryData<SqlTestCase> SingleColumnData =>
     [
