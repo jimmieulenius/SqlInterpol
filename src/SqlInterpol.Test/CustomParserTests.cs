@@ -1,6 +1,7 @@
 using SqlInterpol.Config;
 using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
+using SqlInterpol.Test.Parsing;
 
 namespace SqlInterpol.Test;
 
@@ -10,7 +11,7 @@ public class CustomParserTests
 
     [Theory]
     [MemberData(nameof(CustomParserData))]
-    public void Builder_WithCustomParser_ShouldRenderCollectionCorrectly(SqlTestCase testCase)
+    public void CustomParser(SqlTestCase testCase)
     {
         // Arrange
         var activeIds = new List<int> { 10, 20, 30 };
@@ -25,7 +26,7 @@ public class CustomParserTests
         var result = db.Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+        testCase.AssertSql(result.Sql);
     }
 
     public static TheoryData<SqlTestCase> CustomParserData =>

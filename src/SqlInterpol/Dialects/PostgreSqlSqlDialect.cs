@@ -26,4 +26,46 @@ public class PostgreSqlSqlDialect : SqlDialectBase
     { 
         ParameterIndexStart = 1 
     };
+
+    public override IEnumerable<SqlSegment> RewriteSegments(IReadOnlyList<SqlSegment> segments)
+    {
+        // 1. Let the base dialect run first (this converts "FOR UPDATE" text into SqlLockFragments)
+        var rewritten = base.RewriteSegments(segments).ToList();
+        
+        SqlLockMode? deferredLock = null;
+
+        // 2. Scan the AST for locks and extract them
+        for (int i = 0; i < rewritten.Count; i++)
+        {
+            var segment = rewritten[i];
+            
+            if (segment.Type == SqlSegmentType.Raw && segment.Value is SqlLockFragment lockFrag)
+            {
+                deferredLock = lockFrag.Mode;
+                
+                // Erase the lock from its current position in the middle of the query
+                rewritten[i] = new SqlSegment(SqlSegmentType.Literal, ""); 
+            }
+        }
+
+        // 3. Append the lock to the absolute end of the query!
+        if (deferredLock == SqlLockMode.Update)
+        {
+            rewritten.Add(new SqlSegment(SqlSegmentType.Literal, "\nFOR UPDATE"));
+        }
+        else if (deferredLock == SqlLockMode.Share)
+        {
+            rewritten.Add(new SqlSegment(SqlSegmentType.Literal, "\nFOR SHARE"));
+        }
+
+        return rewritten;
+    }
+
+    public override string RenderFragment(ISqlFragment fragment, ISqlContext context)
+    {
+        // Postgres doesn't render locks inline, but if it accidentally hits one, return empty
+        if (fragment is SqlLockFragment) return string.Empty;
+
+        return base.RenderFragment(fragment, context);
+    }
 }

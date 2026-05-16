@@ -3,7 +3,7 @@ using SqlInterpol.Parsing;
 using System.Collections;
 using System.Text;
 
-namespace SqlInterpol.Test;
+namespace SqlInterpol.Test.Parsing;
 
 public class SqlInListFragment(IEnumerable items) : ISqlFragment
 {

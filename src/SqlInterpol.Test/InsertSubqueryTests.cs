@@ -1,5 +1,4 @@
 using SqlInterpol.Config;
-using SqlInterpol.Metadata;
 using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
 
@@ -7,19 +6,9 @@ namespace SqlInterpol.Test;
 
 public class InsertSubqueryTests
 {
-    [SqlTable("Orders", Schema = "dbo")]
-    public record OrderModel
-    {
-        public int Id { get; init; }
-
-        public string Status { get; init; } = "";
-        
-        public decimal Total { get; init; }
-    }
-
     [Theory]
     [MemberData(nameof(InsertSelectData))]
-    public void Insert_WithSelectSubquery_ChangesRenderModeCorrectly(SqlTestCase testCase)
+    public void Insert_WithSelectSubquery(SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
@@ -38,7 +27,7 @@ public class InsertSubqueryTests
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+        testCase.AssertSql(result.Sql);
         
         // Ensure the parameter was captured sequentially
         Assert.Equal(targetId, result.Parameters.ElementAt(0).Value);

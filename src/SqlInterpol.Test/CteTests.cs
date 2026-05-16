@@ -1,28 +1,20 @@
 using SqlInterpol.Config;
-using SqlInterpol.Metadata;
 using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
+using Xunit;
 
 namespace SqlInterpol.Test;
 
 public class CteTests
 {
-    [SqlTable("CategoryStats", Schema = "dbo")]
-    public record CategoryStats
-    {
-        public int CategoryId { get; init; }
-        public decimal TotalPrice { get; init; }
-    }
-
     [Theory]
-    [MemberData(nameof(AllDialectsCteData))]
-    public void Select_WithCte_AllDialects_RendersCorrectly(SqlTestCase testCase)
+    [MemberData(nameof(Select_WithCteData))]
+    public void Select_WithCte(SqlTestCase testCase)
     {
         // Arrange
-        // Create the builder for the specific dialect provided by the test case
         var db = testCase.CreateBuilder();
         
-        // 1. Define the inner query for the CTE
+        // Define the inner query for the CTE
         var innerQuery = db.Query<Product>(p => db.Append($$"""
             SELECT {{p[x => x.CategoryId]}}, SUM({{p[x => x.Price]}}) AS TotalPrice
             FROM {{p}}
@@ -30,7 +22,7 @@ public class CteTests
             """));
 
         // Act
-        // 2. Setup the main query. The parser will sniff "WITH" and treat cte as a CTE role
+        // The parser sniffs "WITH" and treats cte as a CTE role
         var result = db.Query<Category, CategoryStats>((c, cte) => 
             db.Append($$"""
             WITH {{cte}} AS (
@@ -44,10 +36,10 @@ public class CteTests
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+        testCase.AssertSql(result.Sql);
     }
 
-    public static TheoryData<SqlTestCase> AllDialectsCteData =>
+    public static TheoryData<SqlTestCase> Select_WithCteData =>
     [
         new SqlTestCase(
             SqlDialectKind.CustomDb,

@@ -1,19 +1,18 @@
 using SqlInterpol.Config;
 using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
+using Xunit;
 
 namespace SqlInterpol.Test;
 
 public class FromAsTests
 {
     [Theory]
-    [MemberData(nameof(FromEntityWithManualAliasData))]
-    public void From_Entity_WithManualAlias(SqlTestCase testCase)
+    [MemberData(nameof(From_EntityManualAliasData))]
+    public void From_EntityManualAlias(SqlTestCase testCase)
     {
-        // Arrange
         var db = testCase.CreateBuilder();
 
-        // Act
         var result = db.Query<Product>(p =>
             db.Append($$"""
             SELECT
@@ -22,11 +21,78 @@ public class FromAsTests
             """))
             .Build();
 
-        // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+        testCase.AssertSql(result.Sql);
     }
 
-    public static TheoryData<SqlTestCase> FromEntityWithManualAliasData =>
+    [Theory]
+    [MemberData(nameof(From_EntitySqlTableAttributeData))]
+    public void From_EntitySqlTableAttribute(SqlTestCase testCase)
+    {
+        var db = testCase.CreateBuilder();
+        
+        var result = db.Query<Product>(p =>
+            db.Append($$"""
+            SELECT
+                {{p[x => x.Id]}}
+            FROM {{p}} AS prod
+            """))
+            .Build();
+
+        testCase.AssertSql(result.Sql);
+    }
+
+    [Theory]
+    [MemberData(nameof(From_LiteralTableAsEntityWithoutAttributeData))]
+    public void From_LiteralTableAsEntityWithoutAttribute(SqlTestCase testCase)
+    {
+        var db = testCase.CreateBuilder();
+
+        var result = db.Query<OrderLine>(ol =>
+            db.Append($$"""
+            SELECT
+                {{ol[x => x.OrderId]}}
+            FROM ORDER_LINES AS {{ol}}
+            """))
+            .Build();
+
+        testCase.AssertSql(result.Sql);
+    }
+
+    [Theory]
+    [MemberData(nameof(From_LiteralTableAsExplicitAliasedEntityData))]
+    public void From_LiteralTableAsExplicitAliasedEntity(SqlTestCase testCase)
+    {
+        var db = testCase.CreateBuilder();
+
+        var result = db.Query<Product>(p =>
+            db.Append($$"""
+            SELECT
+                {{p[x => x.Id]}}
+            FROM products AS {{p.As("prod")}}
+            """))
+            .Build();
+
+        testCase.AssertSql(result.Sql);
+    }
+
+    [Theory]
+    [MemberData(nameof(From_EntityAsEntityWithSchemaData))]
+    public void From_EntityAsEntityWithSchema(SqlTestCase testCase)
+    {
+        var db = testCase.CreateBuilder();
+
+        var result = db.Query<Product>(p =>
+            db.Append($$"""
+            SELECT
+                {{p[x => x.Id]}}
+            FROM {{p}} AS {{p}}
+            """))
+            .Build();
+
+        testCase.AssertSql(result.Sql);
+    }
+
+    public static TheoryData<SqlTestCase> From_EntityManualAliasData =>
     [
         new SqlTestCase(
             SqlDialectKind.CustomDb,
@@ -90,27 +156,7 @@ public class FromAsTests
         )
     ];
 
-    [Theory]
-    [MemberData(nameof(FromEntityWithSqlTableAttributeData))]
-    public void From_Entity_WithSqlTableAttribute(SqlTestCase testCase)
-    {
-        // Arrange
-        var db = testCase.CreateBuilder();
-        
-        // Act
-        var result = db.Query<Product>(p =>
-            db.Append($$"""
-            SELECT
-                {{p[x => x.Id]}}
-            FROM {{p}} AS prod
-            """))
-            .Build();
-
-        // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
-    }
-
-    public static TheoryData<SqlTestCase> FromEntityWithSqlTableAttributeData =>
+    public static TheoryData<SqlTestCase> From_EntitySqlTableAttributeData =>
     [
         new SqlTestCase(
             SqlDialectKind.CustomDb,
@@ -174,27 +220,7 @@ public class FromAsTests
         )
     ];
 
-    [Theory]
-    [MemberData(nameof(FromLiteralAsEntityWithoutAttributeData))]
-    public void From_LiteralTable_As_Entity_WithoutSqlTableAttribute(SqlTestCase testCase)
-    {
-        // Arrange
-        var db = testCase.CreateBuilder();
-
-        // Act
-        var result = db.Query<OrderLine>(ol =>
-            db.Append($$"""
-            SELECT
-                {{ol[x => x.OrderId]}}
-            FROM ORDER_LINES AS {{ol}}
-            """))
-            .Build();
-
-        // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
-    }
-
-    public static TheoryData<SqlTestCase> FromLiteralAsEntityWithoutAttributeData =>
+    public static TheoryData<SqlTestCase> From_LiteralTableAsEntityWithoutAttributeData =>
     [
         new SqlTestCase(
             SqlDialectKind.CustomDb, 
@@ -258,27 +284,7 @@ public class FromAsTests
         )
     ];
 
-    [Theory]
-    [MemberData(nameof(FromLiteralAsExplicitAliasedEntityData))]
-    public void From_LiteralTable_As_ExplicitAliasedEntity(SqlTestCase testCase)
-    {
-        // Arrange
-        var db = testCase.CreateBuilder();
-
-        // Act
-        var result = db.Query<Product>(p =>
-            db.Append($$"""
-            SELECT
-                {{p[x => x.Id]}}
-            FROM products AS {{p.As("prod")}}
-            """))
-            .Build();
-
-        // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
-    }
-
-    public static TheoryData<SqlTestCase> FromLiteralAsExplicitAliasedEntityData =>
+    public static TheoryData<SqlTestCase> From_LiteralTableAsExplicitAliasedEntityData =>
     [
         new SqlTestCase(
             SqlDialectKind.CustomDb, 
@@ -342,27 +348,7 @@ public class FromAsTests
         )
     ];
 
-    [Theory]
-    [MemberData(nameof(FromEntityAsEntityWithSchemaData))]
-    public void From_Entity_As_Entity_WithSchema_ShouldUseTypeNameAsAliasFallback(SqlTestCase testCase)
-    {
-        // Arrange
-        var db = testCase.CreateBuilder();
-
-        // Act
-        var result = db.Query<Product>(p =>
-            db.Append($$"""
-            SELECT
-                {{p[x => x.Id]}}
-            FROM {{p}} AS {{p}}
-            """))
-            .Build();
-
-        // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
-    }
-
-    public static TheoryData<SqlTestCase> FromEntityAsEntityWithSchemaData =>
+    public static TheoryData<SqlTestCase> From_EntityAsEntityWithSchemaData =>
     [
         new SqlTestCase(
             SqlDialectKind.CustomDb, 

@@ -1,5 +1,4 @@
 using SqlInterpol.Config;
-using SqlInterpol.Metadata;
 using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
 
@@ -7,19 +6,9 @@ namespace SqlInterpol.Test;
 
 public class UpdateSubqueryTests
 {
-    // Local model for the subquery shape
-    [SqlTable("OrderStats")]
-    public record OrderStatsModel
-    {
-        public int CategoryId { get; init; }
-        
-        [SqlColumn("max_price")]
-        public decimal MaxPrice { get; init; }
-    }
-
     [Theory]
     [MemberData(nameof(UpdateSubqueryData))]
-    public void UpdateSet_AgainstSubquery_StripsPrefixInSetClause(SqlTestCase testCase)
+    public void Update_AgainstRawSubquery(SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
@@ -37,8 +26,39 @@ public class UpdateSubqueryTests
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+        testCase.AssertSql(result.Sql);
         
+        Assert.Equal(99.99m, result.Parameters.ElementAt(0).Value);
+    }
+
+    [Theory]
+    [MemberData(nameof(UpdateTypeSafeSubqueryData))]
+    public void Update_AgainstTypeSafeSubquery(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        var updateDto = new { MaxPrice = 99.99m };
+
+        // Act
+        var result = db
+            .Entity<OrderStatsModel>()
+            .Entity<Product>(alias: "p")
+            .Query((stats, p) =>
+            db.Append($$"""
+            UPDATE (
+                SELECT 
+                    {{p[x => x.CategoryId]}} AS {{stats[x => x.CategoryId]}}, 
+                    MAX({{p[x => x.Price]}}) AS {{stats[x => x.MaxPrice]}} 
+                FROM {{p}} 
+                GROUP BY {{p[x => x.CategoryId]}}
+            ) AS {{stats.As("stats")}}
+            SET {{updateDto}}
+            WHERE {{stats[x => x.CategoryId]}} = 5
+            """))
+            .Build();
+
+        // Assert
+        testCase.AssertSql(result.Sql);
         Assert.Equal(99.99m, result.Parameters.ElementAt(0).Value);
     }
 
@@ -117,37 +137,6 @@ public class UpdateSubqueryTests
             ]
         )
     ];
-
-    [Theory]
-    [MemberData(nameof(UpdateTypeSafeSubqueryData))]
-    public void UpdateSet_AgainstTypeSafeSubquery_StripsPrefixInSetClause(SqlTestCase testCase)
-    {
-        // Arrange
-        var db = testCase.CreateBuilder();
-        var updateDto = new { MaxPrice = 99.99m };
-
-        // Act
-        var result = db
-            .Entity<OrderStatsModel>()
-            .Entity<Product>(alias: "p")
-            .Query((stats, p) =>
-            db.Append($$"""
-            UPDATE (
-                SELECT 
-                    {{p[x => x.CategoryId]}} AS {{stats[x => x.CategoryId]}}, 
-                    MAX({{p[x => x.Price]}}) AS {{stats[x => x.MaxPrice]}} 
-                FROM {{p}} 
-                GROUP BY {{p[x => x.CategoryId]}}
-            ) AS {{stats.As("stats")}}
-            SET {{updateDto}}
-            WHERE {{stats[x => x.CategoryId]}} = 5
-            """))
-            .Build();
-
-        // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
-        Assert.Equal(99.99m, result.Parameters.ElementAt(0).Value);
-    }
 
     public static TheoryData<SqlTestCase> UpdateTypeSafeSubqueryData =>
     [

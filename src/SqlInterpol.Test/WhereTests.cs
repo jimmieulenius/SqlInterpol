@@ -8,7 +8,7 @@ public class WhereTests
 {
     [Theory]
     [MemberData(nameof(WhereSimpleParameterData))]
-    public void Where_SimpleParameter_ShouldCaptureCorrectly(SqlTestCase testCase)
+    public void Where_SimpleParameter(SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
@@ -25,9 +25,37 @@ public class WhereTests
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+        testCase.AssertSql(result.Sql);
         Assert.Single(result.Parameters);
         Assert.Equal(42, result.Parameters.Values.First());
+    }
+
+    [Theory]
+    [MemberData(nameof(WhereInCollectionData))]
+    public void Where_InCollection(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        int[] categoryIds = [10, 20, 30];
+
+        // Act
+        var result = db.Query<Product>(p =>
+            db.Append($$"""
+            SELECT
+                {{p[x => x.Id]}}
+            FROM {{p}}
+            WHERE {{p[x => x.CategoryId]}} IN ({{categoryIds}})
+            """))
+            .Build();
+
+        // Assert
+        testCase.AssertSql(result.Sql);
+        Assert.Equal(3, result.Parameters.Count);
+        
+        var paramValues = result.Parameters.Values.ToList();
+        Assert.Equal(10, paramValues[0]);
+        Assert.Equal(20, paramValues[1]);
+        Assert.Equal(30, paramValues[2]);
     }
 
     public static TheoryData<SqlTestCase> WhereSimpleParameterData =>
@@ -99,34 +127,6 @@ public class WhereTests
             ]
         )
     ];
-
-    [Theory]
-    [MemberData(nameof(WhereInCollectionData))]
-    public void Where_InCollection_ShouldExpandToCommaSeparatedParameters(SqlTestCase testCase)
-    {
-        // Arrange
-        var db = testCase.CreateBuilder();
-        int[] categoryIds = [10, 20, 30];
-
-        // Act
-        var result = db.Query<Product>(p =>
-            db.Append($$"""
-            SELECT
-                {{p[x => x.Id]}}
-            FROM {{p}}
-            WHERE {{p[x => x.CategoryId]}} IN ({{categoryIds}})
-            """))
-            .Build();
-
-        // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
-        Assert.Equal(3, result.Parameters.Count);
-        
-        var paramValues = result.Parameters.Values.ToList();
-        Assert.Equal(10, paramValues[0]);
-        Assert.Equal(20, paramValues[1]);
-        Assert.Equal(30, paramValues[2]);
-    }
 
     public static TheoryData<SqlTestCase> WhereInCollectionData =>
     [

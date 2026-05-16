@@ -1,5 +1,4 @@
 using SqlInterpol.Config;
-using SqlInterpol.Metadata;
 using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
 
@@ -7,20 +6,9 @@ namespace SqlInterpol.Test;
 
 public class OrderByTests
 {
-    [SqlTable("Orders")]
-    public record OrderModel
-    {
-        public int Id { get; init; }
-
-        public decimal Total { get; init; }
-
-        [SqlColumn("created_at")]
-        public DateTime CreatedAt { get; init; }
-    }
-
     [Theory]
     [MemberData(nameof(OrderByExpressionData))]
-    public void OrderBy_EntityExpression_ResolvesMetadata(SqlTestCase testCase)
+    public void OrderBy_EntityExpression(SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
@@ -35,76 +23,12 @@ public class OrderByTests
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+        testCase.AssertSql(result.Sql);
     }
-
-    public static TheoryData<SqlTestCase> OrderByExpressionData =>
-    [
-        new SqlTestCase(
-            SqlDialectKind.CustomDb,
-            [
-                """
-                SELECT *
-                FROM <<Orders>>
-                ORDER BY <<Orders>>.<<created_at>> DESC
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.MySql,
-            [
-                """
-                SELECT *
-                FROM `Orders`
-                ORDER BY `Orders`.`created_at` DESC
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.Oracle,
-            [
-                """
-                SELECT *
-                FROM "Orders"
-                ORDER BY "Orders"."created_at" DESC
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.PostgreSql,
-            [
-                """
-                SELECT *
-                FROM "Orders"
-                ORDER BY "Orders"."created_at" DESC
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.SqLite,
-            [
-                """
-                SELECT *
-                FROM "Orders"
-                ORDER BY "Orders"."created_at" DESC
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.SqlServer,
-            [
-                """
-                SELECT *
-                FROM [Orders]
-                ORDER BY [Orders].[created_at] DESC
-                """
-            ]
-        )
-    ];
 
     [Theory]
     [MemberData(nameof(OrderByCombinerData))]
-    public void OrderBy_WithParamsCombiner_RendersCorrectly(SqlTestCase testCase)
+    public void OrderBy_WithParamsCombiner(SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
@@ -119,12 +43,12 @@ public class OrderByTests
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+        testCase.AssertSql(result.Sql);
     }
 
     [Theory]
     [MemberData(nameof(OrderByCombinerData))]
-    public void OrderBy_WithEnumerableCombiner_RendersCorrectly(SqlTestCase testCase)
+    public void OrderBy_WithEnumerableCombiner(SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
@@ -147,76 +71,12 @@ public class OrderByTests
         }).Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+        testCase.AssertSql(result.Sql);
     }
-
-    public static TheoryData<SqlTestCase> OrderByCombinerData =>
-    [
-        new SqlTestCase(
-            SqlDialectKind.CustomDb,
-            [
-                """
-                SELECT *
-                FROM <<Orders>>
-                ORDER BY <<Orders>>.<<Total>>, <<Orders>>.<<Id>> DESC
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.MySql,
-            [
-                """
-                SELECT *
-                FROM `Orders`
-                ORDER BY `Orders`.`Total`, `Orders`.`Id` DESC
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.Oracle,
-            [
-                """
-                SELECT *
-                FROM "Orders"
-                ORDER BY "Orders"."Total", "Orders"."Id" DESC
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.PostgreSql,
-            [
-                """
-                SELECT *
-                FROM "Orders"
-                ORDER BY "Orders"."Total", "Orders"."Id" DESC
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.SqLite,
-            [
-                """
-                SELECT *
-                FROM "Orders"
-                ORDER BY "Orders"."Total", "Orders"."Id" DESC
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.SqlServer,
-            [
-                """
-                SELECT *
-                FROM [Orders]
-                ORDER BY [Orders].[Total], [Orders].[Id] DESC
-                """
-            ]
-        )
-    ];
 
     [Theory]
     [MemberData(nameof(OrderByRawData))]
-    public void OrderBy_WithSqlRaw_RendersCorrectly(SqlTestCase testCase)
+    public void OrderBy_WithSqlRaw(SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
@@ -231,76 +91,12 @@ public class OrderByTests
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+        testCase.AssertSql(result.Sql);
     }
-
-    public static TheoryData<SqlTestCase> OrderByRawData =>
-    [
-        new SqlTestCase(
-            SqlDialectKind.CustomDb,
-            [
-                """
-                SELECT *
-                FROM <<Orders>>
-                ORDER BY Total DESC
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.MySql,
-            [
-                """
-                SELECT *
-                FROM `Orders`
-                ORDER BY Total DESC
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.Oracle,
-            [
-                """
-                SELECT *
-                FROM "Orders"
-                ORDER BY Total DESC
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.PostgreSql,
-            [
-                """
-                SELECT *
-                FROM "Orders"
-                ORDER BY Total DESC
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.SqLite,
-            [
-                """
-                SELECT *
-                FROM "Orders"
-                ORDER BY Total DESC
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.SqlServer,
-            [
-                """
-                SELECT *
-                FROM [Orders]
-                ORDER BY Total DESC
-                """
-            ]
-        )
-    ];
 
     [Theory]
     [MemberData(nameof(OrderByMixedRawData))]
-    public void OrderBy_MixingTypedAndRaw_RendersCorrectly(SqlTestCase testCase)
+    public void OrderBy_MixingTypedAndRaw(SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
@@ -315,18 +111,18 @@ public class OrderByTests
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+        testCase.AssertSql(result.Sql);
     }
 
-    public static TheoryData<SqlTestCase> OrderByMixedRawData =>
+    public static TheoryData<SqlTestCase> OrderByExpressionData =>
     [
         new SqlTestCase(
             SqlDialectKind.CustomDb,
             [
                 """
                 SELECT *
-                FROM <<Orders>>
-                ORDER BY <<Orders>>.<<created_at>> ASC, (Total * 0.9) DESC
+                FROM <<dbo>>.<<Orders>>
+                ORDER BY <<dbo>>.<<Orders>>.<<created_at>> DESC
                 """
             ]
         ),
@@ -335,8 +131,8 @@ public class OrderByTests
             [
                 """
                 SELECT *
-                FROM `Orders`
-                ORDER BY `Orders`.`created_at` ASC, (Total * 0.9) DESC
+                FROM `dbo`.`Orders`
+                ORDER BY `dbo`.`Orders`.`created_at` DESC
                 """
             ]
         ),
@@ -345,8 +141,8 @@ public class OrderByTests
             [
                 """
                 SELECT *
-                FROM "Orders"
-                ORDER BY "Orders"."created_at" ASC, (Total * 0.9) DESC
+                FROM "dbo"."Orders"
+                ORDER BY "dbo"."Orders"."created_at" DESC
                 """
             ]
         ),
@@ -355,8 +151,8 @@ public class OrderByTests
             [
                 """
                 SELECT *
-                FROM "Orders"
-                ORDER BY "Orders"."created_at" ASC, (Total * 0.9) DESC
+                FROM "dbo"."Orders"
+                ORDER BY "dbo"."Orders"."created_at" DESC
                 """
             ]
         ),
@@ -365,8 +161,8 @@ public class OrderByTests
             [
                 """
                 SELECT *
-                FROM "Orders"
-                ORDER BY "Orders"."created_at" ASC, (Total * 0.9) DESC
+                FROM "dbo"."Orders"
+                ORDER BY "dbo"."Orders"."created_at" DESC
                 """
             ]
         ),
@@ -375,8 +171,200 @@ public class OrderByTests
             [
                 """
                 SELECT *
-                FROM [Orders]
-                ORDER BY [Orders].[created_at] ASC, (Total * 0.9) DESC
+                FROM [dbo].[Orders]
+                ORDER BY [dbo].[Orders].[created_at] DESC
+                """
+            ]
+        )
+    ];
+
+    public static TheoryData<SqlTestCase> OrderByCombinerData =>
+    [
+        new SqlTestCase(
+            SqlDialectKind.CustomDb,
+            [
+                """
+                SELECT *
+                FROM <<dbo>>.<<Orders>>
+                ORDER BY <<dbo>>.<<Orders>>.<<Total>>, <<dbo>>.<<Orders>>.<<Id>> DESC
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.MySql,
+            [
+                """
+                SELECT *
+                FROM `dbo`.`Orders`
+                ORDER BY `dbo`.`Orders`.`Total`, `dbo`.`Orders`.`Id` DESC
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Oracle,
+            [
+                """
+                SELECT *
+                FROM "dbo"."Orders"
+                ORDER BY "dbo"."Orders"."Total", "dbo"."Orders"."Id" DESC
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.PostgreSql,
+            [
+                """
+                SELECT *
+                FROM "dbo"."Orders"
+                ORDER BY "dbo"."Orders"."Total", "dbo"."Orders"."Id" DESC
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqLite,
+            [
+                """
+                SELECT *
+                FROM "dbo"."Orders"
+                ORDER BY "dbo"."Orders"."Total", "dbo"."Orders"."Id" DESC
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqlServer,
+            [
+                """
+                SELECT *
+                FROM [dbo].[Orders]
+                ORDER BY [dbo].[Orders].[Total], [dbo].[Orders].[Id] DESC
+                """
+            ]
+        )
+    ];
+
+    public static TheoryData<SqlTestCase> OrderByRawData =>
+    [
+        new SqlTestCase(
+            SqlDialectKind.CustomDb,
+            [
+                """
+                SELECT *
+                FROM <<dbo>>.<<Orders>>
+                ORDER BY Total DESC
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.MySql,
+            [
+                """
+                SELECT *
+                FROM `dbo`.`Orders`
+                ORDER BY Total DESC
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Oracle,
+            [
+                """
+                SELECT *
+                FROM "dbo"."Orders"
+                ORDER BY Total DESC
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.PostgreSql,
+            [
+                """
+                SELECT *
+                FROM "dbo"."Orders"
+                ORDER BY Total DESC
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqLite,
+            [
+                """
+                SELECT *
+                FROM "dbo"."Orders"
+                ORDER BY Total DESC
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqlServer,
+            [
+                """
+                SELECT *
+                FROM [dbo].[Orders]
+                ORDER BY Total DESC
+                """
+            ]
+        )
+    ];
+
+    public static TheoryData<SqlTestCase> OrderByMixedRawData =>
+    [
+        new SqlTestCase(
+            SqlDialectKind.CustomDb,
+            [
+                """
+                SELECT *
+                FROM <<dbo>>.<<Orders>>
+                ORDER BY <<dbo>>.<<Orders>>.<<created_at>> ASC, (Total * 0.9) DESC
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.MySql,
+            [
+                """
+                SELECT *
+                FROM `dbo`.`Orders`
+                ORDER BY `dbo`.`Orders`.`created_at` ASC, (Total * 0.9) DESC
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Oracle,
+            [
+                """
+                SELECT *
+                FROM "dbo"."Orders"
+                ORDER BY "dbo"."Orders"."created_at" ASC, (Total * 0.9) DESC
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.PostgreSql,
+            [
+                """
+                SELECT *
+                FROM "dbo"."Orders"
+                ORDER BY "dbo"."Orders"."created_at" ASC, (Total * 0.9) DESC
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqLite,
+            [
+                """
+                SELECT *
+                FROM "dbo"."Orders"
+                ORDER BY "dbo"."Orders"."created_at" ASC, (Total * 0.9) DESC
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqlServer,
+            [
+                """
+                SELECT *
+                FROM [dbo].[Orders]
+                ORDER BY [dbo].[Orders].[created_at] ASC, (Total * 0.9) DESC
                 """
             ]
         )

@@ -8,7 +8,7 @@ public class SelectSubqueryTests
 {
     [Theory]
     [MemberData(nameof(SelectSubqueryData))]
-    public void Select_WithInlineSubquery_ShouldCorrelateAndTrackAlias(SqlTestCase testCase)
+    public void Select_WithInlineSubquery(SqlTestCase testCase)
     {
         // Arrange
         var activeStatus = true;
@@ -41,13 +41,13 @@ public class SelectSubqueryTests
         }).Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+        testCase.AssertSql(result.Sql, 0); // Assert against the first expected string
         Assert.Equal(2, result.Parameters.Count);
     }
 
     [Theory]
     [MemberData(nameof(SelectSubqueryData))]
-    public void Select_WithFunctionSubquery_ShouldCorrelateAndTrackAlias(SqlTestCase testCase)
+    public void Select_WithFunctionSubquery(SqlTestCase testCase)
     {
         // Arrange
         var activeStatus = true;
@@ -85,11 +85,12 @@ public class SelectSubqueryTests
         }).Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result1.Sql);
-        Assert.Equal(testCase.ExpectedSql[1], result2.Sql);
+        testCase.AssertSql(result1.Sql, 0); // Assert against the first expected string
+        testCase.AssertSql(result2.Sql, 1); // Assert against the second expected string
     }
 
-    ISqlQuery BuildCategorySubquery(SqlBuilder db, ISqlEntity<Product> p, bool activeStatus) => 
+    // Helper method used by the function test
+    private ISqlQuery BuildCategorySubquery(SqlBuilder db, ISqlEntity<Product> p, bool activeStatus) => 
         db.Entity<Category>().Query(c => 
             db.Append($$"""
             SELECT

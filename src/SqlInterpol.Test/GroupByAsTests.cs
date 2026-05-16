@@ -8,7 +8,7 @@ public class GroupByAsTests
 {
     [Theory]
     [MemberData(nameof(GroupByWithExplicitAliasData))]
-    public void GroupBy_WithExplicitAlias_FormatsCorrectly(SqlTestCase testCase)
+    public void GroupBy_WithExplicitAlias(SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
@@ -25,7 +25,7 @@ public class GroupByAsTests
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+        testCase.AssertSql(result.Sql);
     }
 
     public static TheoryData<SqlTestCase> GroupByWithExplicitAliasData =>

@@ -1,7 +1,7 @@
 using SqlInterpol.Parsing;
 using System.Collections;
 
-namespace SqlInterpol.Test;
+namespace SqlInterpol.Test.Parsing;
 
 public class CustomSqlParser : SqlInterpolationParser
 {

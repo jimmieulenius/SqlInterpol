@@ -23,7 +23,93 @@ public class SelectTests
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+        testCase.AssertSql(result.Sql);
+    }
+
+    [Theory]
+    [MemberData(nameof(MultipleColumnsData))]
+    public void Select_MultipleColumns(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        
+        // Act
+        var result = db.Query<Product>(p =>
+            db.Append($$"""
+            SELECT
+                {{p[x => x.Id]}},
+                {{p[x => x.CategoryId]}}
+            FROM {{p}}
+            """))
+            .Build();
+
+        // Assert
+        testCase.AssertSql(result.Sql);
+    }
+
+    [Theory]
+    [MemberData(nameof(SqlFunctionData))]
+    public void Select_SqlFunction(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        
+        // Act
+        var result = db.Query<Product>(p =>
+            db.Append($$"""
+            SELECT
+                COUNT({{p[x => x.Id]}})
+            FROM {{p}}
+            """))
+            .Build();
+
+        // Assert
+        testCase.AssertSql(result.Sql);
+    }
+
+    [Theory]
+    [MemberData(nameof(LiteralParameterData))]
+    public void Select_LiteralParameter(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        int activeStatus = 1;
+
+        // Act
+        var result = db.Query<Product>(p =>
+            db.Append($$"""
+            SELECT
+                {{activeStatus}}
+            FROM {{p}}
+            """))
+            .Build();
+
+        // Assert
+        testCase.AssertSql(result.Sql);
+        
+        // Verify the parameter was captured correctly
+        Assert.Single(result.Parameters);
+        Assert.Equal(1, result.Parameters.Values.First());
+    }
+
+    [Theory]
+    [MemberData(nameof(CustomColumnAttributeData))]
+    public void Select_CustomColumnAttribute(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+
+        // Act
+        var result = db.Query<Product>(p =>
+            db.Append($$"""
+            SELECT
+                {{p[x => x.Name]}}
+            FROM {{p}}
+            """))
+            .Build();
+
+        // Assert
+        testCase.AssertSql(result.Sql);
     }
 
     public static TheoryData<SqlTestCase> SingleColumnData =>
@@ -89,27 +175,6 @@ public class SelectTests
             ]
         )
     ];
-
-    [Theory]
-    [MemberData(nameof(MultipleColumnsData))]
-    public void Select_MultipleColumns(SqlTestCase testCase)
-    {
-        // Arrange
-        var db = testCase.CreateBuilder();
-        
-        // Act
-        var result = db.Query<Product>(p =>
-            db.Append($$"""
-            SELECT
-                {{p[x => x.Id]}},
-                {{p[x => x.CategoryId]}}
-            FROM {{p}}
-            """))
-            .Build();
-
-        // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
-    }
 
     public static TheoryData<SqlTestCase> MultipleColumnsData =>
     [
@@ -181,26 +246,6 @@ public class SelectTests
         )
     ];
 
-    [Theory]
-    [MemberData(nameof(SqlFunctionData))]
-    public void Select_SqlFunction(SqlTestCase testCase)
-    {
-        // Arrange
-        var db = testCase.CreateBuilder();
-        
-        // Act
-        var result = db.Query<Product>(p =>
-            db.Append($$"""
-            SELECT
-                COUNT({{p[x => x.Id]}})
-            FROM {{p}}
-            """))
-            .Build();
-
-        // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
-    }
-
     public static TheoryData<SqlTestCase> SqlFunctionData =>
     [
         new SqlTestCase(
@@ -264,31 +309,6 @@ public class SelectTests
             ]
         )
     ];
-
-    [Theory]
-    [MemberData(nameof(LiteralParameterData))]
-    public void Select_LiteralParameter(SqlTestCase testCase)
-    {
-        // Arrange
-        var db = testCase.CreateBuilder();
-        int activeStatus = 1;
-
-        // Act
-        var result = db.Query<Product>(p =>
-            db.Append($$"""
-            SELECT
-                {{activeStatus}}
-            FROM {{p}}
-            """))
-            .Build();
-
-        // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
-        
-        // Verify the parameter was captured correctly
-        Assert.Single(result.Parameters);
-        Assert.Equal(1, result.Parameters.Values.First());
-    }
 
     public static TheoryData<SqlTestCase> LiteralParameterData =>
     [
@@ -355,32 +375,12 @@ public class SelectTests
         )
     ];
 
-    [Theory]
-    [MemberData(nameof(CustomColumnAttributeData))]
-    public void Select_CustomColumnAttribute(SqlTestCase testCase)
-    {
-        // Arrange
-        var db = testCase.CreateBuilder();
-
-        // Act
-        var result = db.Query<Product>(p =>
-            db.Append($$"""
-            SELECT
-                {{p[x => x.Name]}}
-            FROM {{p}}
-            """))
-            .Build();
-
-        // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
-    }
-
     public static TheoryData<SqlTestCase> CustomColumnAttributeData =>
     [
         new SqlTestCase(
             SqlDialectKind.CustomDb,
             [
-                $$"""
+                """
                 SELECT
                     <<dbo>>.<<Products>>.<<PROD_NAME>>
                 FROM <<dbo>>.<<Products>>

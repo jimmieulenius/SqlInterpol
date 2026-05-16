@@ -8,7 +8,7 @@ public class SelectAsTests
 {
     [Theory]
     [MemberData(nameof(ProjectionAsLiteralData))]
-    public void Select_Projection_As_Literal(SqlTestCase testCase)
+    public void SelectAs_LiteralProjection(SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
@@ -23,7 +23,47 @@ public class SelectAsTests
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+        testCase.AssertSql(result.Sql);
+    }
+
+    [Theory]
+    [MemberData(nameof(RawColumnAsProjectionData))]
+    public void SelectAs_RawColumnProjection(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        
+        // Act
+        var result = db.Query<Product>(p =>
+            db.Append($$"""
+            SELECT
+                {{p["ProductId"]}} AS {{p[x => x.Id]}}
+            FROM {{p}}
+            """))
+            .Build();
+
+        // Assert
+        testCase.AssertSql(result.Sql);
+    }
+
+    [Theory]
+    [MemberData(nameof(ProjectionAsProjectionWithAttributeData))]
+    public void SelectAs_ProjectionWithAttribute(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        
+        // Act
+        var result = db.Query<Product>(p =>
+            db.Append($$"""
+            SELECT
+                {{p[x => x.Name]}} AS {{p[x => x.Name]}}
+            FROM {{p}}
+            """))
+            .Build();
+
+        // Assert
+        testCase.AssertSql(result.Sql);
     }
 
     public static TheoryData<SqlTestCase> ProjectionAsLiteralData =>
@@ -90,26 +130,6 @@ public class SelectAsTests
         )
     ];
 
-    [Theory]
-    [MemberData(nameof(RawColumnAsProjectionData))]
-    public void Select_RawColumn_As_Projection(SqlTestCase testCase)
-    {
-        // Arrange
-        var db = testCase.CreateBuilder();
-        
-        // Act
-        var result = db.Query<Product>(p =>
-            db.Append($$"""
-            SELECT
-                {{p["ProductId"]}} AS {{p[x => x.Id]}}
-            FROM {{p}}
-            """))
-            .Build();
-
-        // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
-    }
-
     public static TheoryData<SqlTestCase> RawColumnAsProjectionData =>
     [
         new SqlTestCase(
@@ -173,26 +193,6 @@ public class SelectAsTests
             ]
         )
     ];
-
-    [Theory]
-    [MemberData(nameof(ProjectionAsProjectionWithAttributeData))]
-    public void Select_Projection_As_Projection_WithAttribute(SqlTestCase testCase)
-    {
-        // Arrange
-        var db = testCase.CreateBuilder();
-        
-        // Act
-        var result = db.Query<Product>(p =>
-            db.Append($$"""
-            SELECT
-                {{p[x => x.Name]}} AS {{p[x => x.Name]}}
-            FROM {{p}}
-            """))
-            .Build();
-
-        // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
-    }
 
     public static TheoryData<SqlTestCase> ProjectionAsProjectionWithAttributeData =>
     [

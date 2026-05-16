@@ -1,5 +1,4 @@
 using SqlInterpol.Config;
-using SqlInterpol.Metadata;
 using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
 
@@ -7,20 +6,87 @@ namespace SqlInterpol.Test;
 
 public class FormattingTests
 {
-    [SqlTable("Orders", Schema = "dbo")]
-    public record OrderModel
+    [Theory]
+    [MemberData(nameof(Select_WithNewLinesData))]
+    public void Select_WithNewLines(SqlTestCase testCase)
     {
-        public int Id { get; init; }
+        var db = testCase.CreateBuilder();
 
-        [SqlColumn("order_status")]
-        public string Status { get; init; } = "";
-        
-        public decimal Total { get; init; }
+        var result = db.Query<Product>(p => db.Append($$"""
+            SELECT 
+                {{p[x => x.Id]}}, 
+                {{p[x => x.Name]}}
+            FROM 
+                {{p}}
+            """)).Build();
+
+        testCase.AssertSql(result.Sql);
     }
 
     [Theory]
-    [MemberData(nameof(VerticalInsertData))]
-    public void ContextualInsert_WithVerticalLayout_IndentsCorrectly(SqlTestCase testCase)
+    [MemberData(nameof(Select_WithTabsData))]
+    public void Select_WithTabs(SqlTestCase testCase)
+    {
+        var db = testCase.CreateBuilder();
+
+        var result = db.Query<Product>(p => db.Append($$"""
+            SELECT	{{p[x => x.Id]}},	{{p[x => x.Name]}}
+            FROM	{{p}}
+            """)).Build();
+
+        testCase.AssertSql(result.Sql);
+    }
+
+    [Theory]
+    [MemberData(nameof(Select_WithExtraSpacesData))]
+    public void Select_WithExtraSpaces(SqlTestCase testCase)
+    {
+        var db = testCase.CreateBuilder();
+
+        // Testing right-aligned keywords (common in some style guides)
+        var result = db.Query<Product>(p => db.Append($$"""
+            SELECT {{p[x => x.Id]}}
+              FROM {{p}}
+             WHERE {{p[x => x.Id]}} = 1
+            """)).Build();
+
+        testCase.AssertSql(result.Sql);
+    }
+
+    [Theory]
+    [MemberData(nameof(Select_WithMixedWhitespaceData))]
+    public void Select_WithMixedWhitespace(SqlTestCase testCase)
+    {
+        var db = testCase.CreateBuilder();
+
+        // Testing a mix of leading/trailing blank lines and indentation
+        var result = db.Query<Product>(p => db.Append($$"""
+
+            SELECT {{p[x => x.Id]}}
+            FROM {{p}}
+
+            """)).Build();
+
+        testCase.AssertSql(result.Sql);
+    }
+
+    [Theory]
+    [MemberData(nameof(Select_WithCommentsData))]
+    public void Select_WithComments(SqlTestCase testCase)
+    {
+        var db = testCase.CreateBuilder();
+
+        var result = db.Query<Product>(p => db.Append($$"""
+            SELECT {{p[x => x.Id]}} -- This is the primary key
+            FROM {{p}} /* This is the table */
+            """)).Build();
+
+        testCase.AssertSql(result.Sql);
+    }
+
+    [Theory]
+    [MemberData(nameof(InsertVerticalLayoutData))]
+    public void Insert_VerticalLayout(SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
@@ -37,14 +103,12 @@ public class FormattingTests
             .Build();
 
         // Assert
-        var expectedSql = testCase.ExpectedSql[0].Replace("\r\n", "\n").Trim();
-        var actualSql = result.Sql.Replace("\r\n", "\n").Trim();
-        Assert.Equal(expectedSql, actualSql);
+        testCase.AssertSql(result.Sql);
     }
 
     [Theory]
-    [MemberData(nameof(VerticalUpdateData))]
-    public void ContextualUpdate_WithVerticalLayout_IndentsCorrectly(SqlTestCase testCase)
+    [MemberData(nameof(UpdateVerticalLayoutData))]
+    public void Update_VerticalLayout(SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
@@ -62,139 +126,12 @@ public class FormattingTests
             .Build();
 
         // Assert
-        var expectedSql = testCase.ExpectedSql[0].Replace("\r\n", "\n").Trim();
-        var actualSql = result.Sql.Replace("\r\n", "\n").Trim();
-        Assert.Equal(expectedSql, actualSql);
+        testCase.AssertSql(result.Sql);
     }
 
-    // [Theory]
-    // [MemberData(nameof(VerticalInsertData))]
-    // public void Insert_WithVerticalLayout_IndentsCorrectly(SqlTestCase testCase)
-    // {
-    //     // Arrange
-    //     var db = testCase.CreateBuilder();
-    //     db.Context.Options.CollectionLayout = SqlCollectionLayout.Vertical;
-    //     db.Context.Options.IndentSize = 4;
-    //     var dto = new { Status = "New", Total = 10m };
-
-    //     // Act
-    //     var result = db.Query<OrderModel>(o => 
-    //         db.Append($"{Sql.Insert(o, dto)}"))
-    //         .Build();
-
-    //     // Assert
-    //     Assert.Equal(testCase.ExpectedSql[0], result.Sql);
-    // }
-
-    public static TheoryData<SqlTestCase> VerticalInsertData =>
-    [
-        new SqlTestCase(
-            SqlDialectKind.CustomDb,
-            [
-                $$"""
-                INSERT INTO <<dbo>>.<<Orders>>{{Environment.NewLine
-                }}({{Environment.NewLine
-                }}    <<order_status>>,{{Environment.NewLine
-                }}    <<Total>>{{Environment.NewLine
-                }}){{Environment.NewLine
-                }}VALUES{{Environment.NewLine
-                }}({{Environment.NewLine
-                }}    !!100,{{Environment.NewLine
-                }}    !!101{{Environment.NewLine
-                }})
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.MySql,
-            [
-                $$"""
-                INSERT INTO `dbo`.`Orders`{{Environment.NewLine
-                }}({{Environment.NewLine
-                }}    `order_status`,{{Environment.NewLine
-                }}    `Total`{{Environment.NewLine
-                }}){{Environment.NewLine
-                }}VALUES{{Environment.NewLine
-                }}({{Environment.NewLine
-                }}    @p0,{{Environment.NewLine
-                }}    @p1{{Environment.NewLine
-                }})
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.Oracle,
-            [
-                $$"""
-                INSERT INTO "dbo"."Orders"{{Environment.NewLine
-                }}({{Environment.NewLine
-                }}    "order_status",{{Environment.NewLine
-                }}    "Total"{{Environment.NewLine
-                }}){{Environment.NewLine
-                }}VALUES{{Environment.NewLine
-                }}({{Environment.NewLine
-                }}    :0,{{Environment.NewLine
-                }}    :1{{Environment.NewLine
-                }})
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.PostgreSql,
-            [
-                $$"""
-                INSERT INTO "dbo"."Orders"{{Environment.NewLine
-                }}({{Environment.NewLine
-                }}    "order_status",{{Environment.NewLine
-                }}    "Total"{{Environment.NewLine
-                }}){{Environment.NewLine
-                }}VALUES{{Environment.NewLine
-                }}({{Environment.NewLine
-                }}    $1,{{Environment.NewLine
-                }}    $2{{Environment.NewLine
-                }})
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.SqLite,
-            [
-                $$"""
-                INSERT INTO "dbo"."Orders"{{Environment.NewLine
-                }}({{Environment.NewLine
-                }}    "order_status",{{Environment.NewLine
-                }}    "Total"{{Environment.NewLine
-                }}){{Environment.NewLine
-                }}VALUES{{Environment.NewLine
-                }}({{Environment.NewLine
-                }}    ?0,{{Environment.NewLine
-                }}    ?1{{Environment.NewLine
-                }})
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.SqlServer,
-            [
-                $$"""
-                INSERT INTO [dbo].[Orders]{{Environment.NewLine
-                }}({{Environment.NewLine
-                }}    [order_status],{{Environment.NewLine
-                }}    [Total]{{Environment.NewLine
-                }}){{Environment.NewLine
-                }}VALUES{{Environment.NewLine
-                }}({{Environment.NewLine
-                }}    @p0,{{Environment.NewLine
-                }}    @p1{{Environment.NewLine
-                }})
-                """
-            ]
-        )
-    ];
-
     [Theory]
-    [MemberData(nameof(VerticalBulkInsertData))]
-    public void ContextualBulkInsert_WithVerticalLayout_IndentsCorrectly(SqlTestCase testCase)
+    [MemberData(nameof(BulkInsertVerticalLayoutData))]
+    public void BulkInsert_VerticalLayout(SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
@@ -217,10 +154,568 @@ public class FormattingTests
             .Build();
 
         // Assert        
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+        testCase.AssertSql(result.Sql);
     }
 
-    public static TheoryData<SqlTestCase> VerticalBulkInsertData =>
+    [Theory]
+    [MemberData(nameof(WhereInVerticalLayoutData))]
+    public void WhereIn_VerticalLayout(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        db.Context.Options.CollectionLayout = SqlCollectionLayout.Vertical;
+        db.Context.Options.IndentSize = 4;
+        var ids = new[] { 1, 2, 3 };
+
+        // Act
+        var result = db.Query<OrderModel>(o => 
+            db.Append($$"""
+            SELECT *
+            FROM {{o}}
+            WHERE {{o[x => x.Id]}} IN (
+                {{ids}}
+            )
+            """))   
+            .Build();
+
+        // Assert
+        testCase.AssertSql(result.Sql);
+    }
+
+    [Theory]
+    [MemberData(nameof(OrderByEnumerableVerticalLayoutData))]
+    public void OrderBy_EnumerableCombiner_VerticalLayout(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        
+        // Force Vertical Layout for this specific test
+        db.Context.Options.CollectionLayout = SqlCollectionLayout.Vertical;
+        db.Context.Options.IndentSize = 4; // Ensure the indent matches our expected string
+
+        // Act
+        var result = db.Query<OrderModel>(o =>
+        {
+            IEnumerable<ISqlOrderFragment> sorts = 
+            [
+                o.OrderBy("Total"),
+                o.OrderBy(x => x.Id, SqlOrderDirection.Desc)
+            ];
+
+            db.Append($$"""
+                SELECT *
+                FROM {{o}}
+                ORDER BY {{sorts}}
+                """);
+        }).Build();
+
+        // Assert
+        testCase.AssertSql(result.Sql);
+    }
+
+    public static TheoryData<SqlTestCase> Select_WithNewLinesData =>
+    [
+        new SqlTestCase(
+            SqlDialectKind.CustomDb,
+            [
+                """
+                SELECT 
+                    <<dbo>>.<<Products>>.<<Id>>, 
+                    <<dbo>>.<<Products>>.<<PROD_NAME>>
+                FROM 
+                    <<dbo>>.<<Products>>
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.MySql,
+            [
+                """
+                SELECT 
+                    `dbo`.`Products`.`Id`, 
+                    `dbo`.`Products`.`PROD_NAME`
+                FROM 
+                    `dbo`.`Products`
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Oracle,
+            [
+                """
+                SELECT 
+                    "dbo"."Products"."Id", 
+                    "dbo"."Products"."PROD_NAME"
+                FROM 
+                    "dbo"."Products"
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.PostgreSql,
+            [
+                """
+                SELECT 
+                    "dbo"."Products"."Id", 
+                    "dbo"."Products"."PROD_NAME"
+                FROM 
+                    "dbo"."Products"
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqLite,
+            [
+                """
+                SELECT 
+                    "dbo"."Products"."Id", 
+                    "dbo"."Products"."PROD_NAME"
+                FROM 
+                    "dbo"."Products"
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqlServer,
+            [
+                """
+                SELECT 
+                    [dbo].[Products].[Id], 
+                    [dbo].[Products].[PROD_NAME]
+                FROM 
+                    [dbo].[Products]
+                """
+            ]
+        )
+    ];
+
+    public static TheoryData<SqlTestCase> Select_WithTabsData =>
+    [
+        new SqlTestCase(
+            SqlDialectKind.CustomDb,
+            [
+                """
+                SELECT	<<dbo>>.<<Products>>.<<Id>>,	<<dbo>>.<<Products>>.<<PROD_NAME>>
+                FROM	<<dbo>>.<<Products>>
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.MySql,
+            [
+                """
+                SELECT	`dbo`.`Products`.`Id`,	`dbo`.`Products`.`PROD_NAME`
+                FROM	`dbo`.`Products`
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Oracle,
+            [
+                """
+                SELECT	"dbo"."Products"."Id",	"dbo"."Products"."PROD_NAME"
+                FROM	"dbo"."Products"
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.PostgreSql,
+            [
+                """
+                SELECT	"dbo"."Products"."Id",	"dbo"."Products"."PROD_NAME"
+                FROM	"dbo"."Products"
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqLite,
+            [
+                """
+                SELECT	"dbo"."Products"."Id",	"dbo"."Products"."PROD_NAME"
+                FROM	"dbo"."Products"
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqlServer,
+            [
+                """
+                SELECT	[dbo].[Products].[Id],	[dbo].[Products].[PROD_NAME]
+                FROM	[dbo].[Products]
+                """
+            ]
+        )
+    ];
+
+    public static TheoryData<SqlTestCase> Select_WithExtraSpacesData =>
+    [
+        new SqlTestCase(
+            SqlDialectKind.CustomDb,
+            [
+                """
+                SELECT <<dbo>>.<<Products>>.<<Id>>
+                  FROM <<dbo>>.<<Products>>
+                 WHERE <<dbo>>.<<Products>>.<<Id>> = 1
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.MySql,
+            [
+                """
+                SELECT `dbo`.`Products`.`Id`
+                  FROM `dbo`.`Products`
+                 WHERE `dbo`.`Products`.`Id` = 1
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Oracle,
+            [
+                """
+                SELECT "dbo"."Products"."Id"
+                  FROM "dbo"."Products"
+                 WHERE "dbo"."Products"."Id" = 1
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.PostgreSql,
+            [
+                """
+                SELECT "dbo"."Products"."Id"
+                  FROM "dbo"."Products"
+                 WHERE "dbo"."Products"."Id" = 1
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqLite,
+            [
+                """
+                SELECT "dbo"."Products"."Id"
+                  FROM "dbo"."Products"
+                 WHERE "dbo"."Products"."Id" = 1
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqlServer,
+            [
+                """
+                SELECT [dbo].[Products].[Id]
+                  FROM [dbo].[Products]
+                 WHERE [dbo].[Products].[Id] = 1
+                """
+            ]
+        )
+    ];
+
+    public static TheoryData<SqlTestCase> Select_WithMixedWhitespaceData =>
+    [
+        new SqlTestCase(
+            SqlDialectKind.CustomDb,
+            [
+                """
+
+                SELECT <<dbo>>.<<Products>>.<<Id>>
+                FROM <<dbo>>.<<Products>>
+
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.MySql,
+            [
+                """
+
+                SELECT `dbo`.`Products`.`Id`
+                FROM `dbo`.`Products`
+
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Oracle,
+            [
+                """
+
+                SELECT "dbo"."Products"."Id"
+                FROM "dbo"."Products"
+
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.PostgreSql,
+            [
+                """
+
+                SELECT "dbo"."Products"."Id"
+                FROM "dbo"."Products"
+
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqLite,
+            [
+                """
+
+                SELECT "dbo"."Products"."Id"
+                FROM "dbo"."Products"
+
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqlServer,
+            [
+                """
+
+                SELECT [dbo].[Products].[Id]
+                FROM [dbo].[Products]
+
+                """
+            ]
+        )
+    ];
+
+    public static TheoryData<SqlTestCase> Select_WithCommentsData =>
+    [
+        new SqlTestCase(
+            SqlDialectKind.CustomDb,
+            [
+                """
+                SELECT <<dbo>>.<<Products>>.<<Id>> -- This is the primary key
+                FROM <<dbo>>.<<Products>> /* This is the table */
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.MySql,
+            [
+                """
+                SELECT `dbo`.`Products`.`Id` -- This is the primary key
+                FROM `dbo`.`Products` /* This is the table */
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Oracle,
+            [
+                """
+                SELECT "dbo"."Products"."Id" -- This is the primary key
+                FROM "dbo"."Products" /* This is the table */
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.PostgreSql,
+            [
+                """
+                SELECT "dbo"."Products"."Id" -- This is the primary key
+                FROM "dbo"."Products" /* This is the table */
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqLite,
+            [
+                """
+                SELECT "dbo"."Products"."Id" -- This is the primary key
+                FROM "dbo"."Products" /* This is the table */
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqlServer,
+            [
+                """
+                SELECT [dbo].[Products].[Id] -- This is the primary key
+                FROM [dbo].[Products] /* This is the table */
+                """
+            ]
+        )
+    ];
+
+    public static TheoryData<SqlTestCase> InsertVerticalLayoutData =>
+    [
+        new SqlTestCase(
+            SqlDialectKind.CustomDb,
+            [
+                $$"""
+                INSERT INTO <<dbo>>.<<Orders>>
+                (
+                    <<order_status>>,
+                    <<Total>>
+                )
+                VALUES
+                (
+                    !!100,
+                    !!101
+                )
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.MySql,
+            [
+                $$"""
+                INSERT INTO `dbo`.`Orders`
+                (
+                    `order_status`,
+                    `Total`
+                )
+                VALUES
+                (
+                    @p0,
+                    @p1
+                )
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Oracle,
+            [
+                $$"""
+                INSERT INTO "dbo"."Orders"
+                (
+                    "order_status",
+                    "Total"
+                )
+                VALUES
+                (
+                    :0,
+                    :1
+                )
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.PostgreSql,
+            [
+                $$"""
+                INSERT INTO "dbo"."Orders"
+                (
+                    "order_status",
+                    "Total"
+                )
+                VALUES
+                (
+                    $1,
+                    $2
+                )
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqLite,
+            [
+                $$"""
+                INSERT INTO "dbo"."Orders"
+                (
+                    "order_status",
+                    "Total"
+                )
+                VALUES
+                (
+                    ?0,
+                    ?1
+                )
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqlServer,
+            [
+                $$"""
+                INSERT INTO [dbo].[Orders]
+                (
+                    [order_status],
+                    [Total]
+                )
+                VALUES
+                (
+                    @p0,
+                    @p1
+                )
+                """
+            ]
+        )
+    ];
+
+    public static TheoryData<SqlTestCase> UpdateVerticalLayoutData =>
+    [
+        new SqlTestCase(
+            SqlDialectKind.CustomDb,
+            [
+                $$"""
+                UPDATE <<dbo>>.<<Orders>>
+                SET
+                    <<order_status>> = !!100,
+                    <<Total>> = !!101
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.MySql,
+            [
+                $$"""
+                UPDATE `dbo`.`Orders`
+                SET
+                    `order_status` = @p0,
+                    `Total` = @p1
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Oracle,
+            [
+                $$"""
+                UPDATE "dbo"."Orders"
+                SET
+                    "order_status" = :0,
+                    "Total" = :1
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.PostgreSql,
+            [
+                $$"""
+                UPDATE "dbo"."Orders"
+                SET
+                    "order_status" = $1,
+                    "Total" = $2
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqLite,
+            [
+                $$"""
+                UPDATE "dbo"."Orders"
+                SET
+                    "order_status" = ?0,
+                    "Total" = ?1
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqlServer,
+            [
+                $$"""
+                UPDATE [dbo].[Orders]
+                SET
+                    [order_status] = @p0,
+                    [Total] = @p1
+                """
+            ]
+        )
+    ];
+
+    public static TheoryData<SqlTestCase> BulkInsertVerticalLayoutData =>
     [
         new SqlTestCase(
             SqlDialectKind.CustomDb,
@@ -368,321 +863,95 @@ public class FormattingTests
         )
     ];
 
-    // [Theory]
-    // [MemberData(nameof(HorizontalInsertData))]
-    // public void Insert_WithHorizontalLayout_RendersInline(SqlTestCase testCase)
-    // {
-    //     // Arrange
-    //     var db = testCase.CreateBuilder(); 
-    //     var dto = new { Status = "New", Total = 10m };
-
-    //     // Act
-    //     var result = db.Query<OrderModel>(o => 
-    //         db.Append($"{Sql.Insert(o, dto)}"))
-    //         .Build();
-
-    //     // Assert
-    //     Assert.Equal(testCase.ExpectedSql[0], result.Sql);
-    // }
-
-    public static TheoryData<SqlTestCase> HorizontalInsertData =>
-    [
-        new SqlTestCase(
-            SqlDialectKind.CustomDb,
-            [
-                """
-                INSERT INTO <<dbo>>.<<Orders>>
-                (<<order_status>>, <<Total>>)
-                VALUES (!!100, !!101)
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.MySql,
-            [
-                """
-                INSERT INTO `dbo`.`Orders`
-                (`order_status`, `Total`)
-                VALUES (@p0, @p1)
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.Oracle,
-            [
-                """
-                INSERT INTO "dbo"."Orders"
-                ("order_status", "Total")
-                VALUES (:0, :1)
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.PostgreSql,
-            [
-                """
-                INSERT INTO "dbo"."Orders"
-                ("order_status", "Total")
-                VALUES ($1, $2)
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.SqLite,
-            [
-                """
-                INSERT INTO "dbo"."Orders"
-                ("order_status", "Total")
-                VALUES (?0, ?1)
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.SqlServer,
-            [
-                """
-                INSERT INTO [dbo].[Orders]
-                ([order_status], [Total])
-                VALUES (@p0, @p1)
-                """
-            ]
-        )
-    ];
-
-    // [Theory]
-    // [MemberData(nameof(VerticalUpdateData))]
-    // public void Update_WithVerticalLayout_IndentsCorrectly(SqlTestCase testCase)
-    // {
-    //     // Arrange
-    //     var db = testCase.CreateBuilder();
-    //     db.Context.Options.CollectionLayout = SqlCollectionLayout.Vertical;
-    //     db.Context.Options.IndentSize = 4;
-    //     var dto = new { Status = "Processing", Total = 50.00m };
-
-    //     // Act
-    //     var result = db.Query<OrderModel>(o => 
-    //         db.Append($"{Sql.Update(o, dto)}"))
-    //         .Build();
-
-    //     // Assert
-    //     Assert.Equal(testCase.ExpectedSql[0], result.Sql);
-    // }
-
-    public static TheoryData<SqlTestCase> VerticalUpdateData =>
+    public static TheoryData<SqlTestCase> WhereInVerticalLayoutData =>
     [
         new SqlTestCase(
             SqlDialectKind.CustomDb,
             [
                 $$"""
-                UPDATE <<dbo>>.<<Orders>>{{Environment.NewLine
-                }}SET{{Environment.NewLine
-                }}    <<order_status>> = !!100,{{Environment.NewLine
-                }}    <<Total>> = !!101
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.MySql,
-            [
-                $$"""
-                UPDATE `dbo`.`Orders`{{Environment.NewLine
-                }}SET{{Environment.NewLine
-                }}    `order_status` = @p0,{{Environment.NewLine
-                }}    `Total` = @p1
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.Oracle,
-            [
-                $$"""
-                UPDATE "dbo"."Orders"{{Environment.NewLine
-                }}SET{{Environment.NewLine
-                }}    "order_status" = :0,{{Environment.NewLine
-                }}    "Total" = :1
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.PostgreSql,
-            [
-                $$"""
-                UPDATE "dbo"."Orders"{{Environment.NewLine
-                }}SET{{Environment.NewLine
-                }}    "order_status" = $1,{{Environment.NewLine
-                }}    "Total" = $2
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.SqLite,
-            [
-                $$"""
-                UPDATE "dbo"."Orders"{{Environment.NewLine
-                }}SET{{Environment.NewLine
-                }}    "order_status" = ?0,{{Environment.NewLine
-                }}    "Total" = ?1
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.SqlServer,
-            [
-                $$"""
-                UPDATE [dbo].[Orders]{{Environment.NewLine
-                }}SET{{Environment.NewLine
-                }}    [order_status] = @p0,{{Environment.NewLine
-                }}    [Total] = @p1
-                """
-            ]
-        )
-    ];
-
-    [Theory]
-    [MemberData(nameof(VerticalWhereInData))]
-    public void WhereIn_WithVerticalLayout_IndentsCorrectly(SqlTestCase testCase)
-    {
-        // Arrange
-        var db = testCase.CreateBuilder();
-        db.Context.Options.CollectionLayout = SqlCollectionLayout.Vertical;
-        db.Context.Options.IndentSize = 4;
-        var ids = new[] { 1, 2, 3 };
-
-        // Act
-        var result = db.Query<OrderModel>(o => 
-            db.Append($$"""
-            SELECT *
-            FROM {{o}}
-            WHERE {{o[x => x.Id]}} IN (
-                {{ids}}
-            )
-            """))   
-            .Build();
-
-        // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
-    }
-
-    public static TheoryData<SqlTestCase> VerticalWhereInData =>
-    [
-        new SqlTestCase(
-            SqlDialectKind.CustomDb,
-            [
-                $$"""
-                SELECT *{{Environment.NewLine
-                }}FROM <<dbo>>.<<Orders>>{{Environment.NewLine
-                }}WHERE <<dbo>>.<<Orders>>.<<Id>> IN ({{Environment.NewLine
-                }}    !!100,{{Environment.NewLine
-                }}    !!101,{{Environment.NewLine
-                }}    !!102{{Environment.NewLine
-                }})
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.MySql,
-            [
-                $$"""
-                SELECT *{{Environment.NewLine
-                }}FROM `dbo`.`Orders`{{Environment.NewLine
-                }}WHERE `dbo`.`Orders`.`Id` IN ({{Environment.NewLine
-                }}    @p0,{{Environment.NewLine
-                }}    @p1,{{Environment.NewLine
-                }}    @p2{{Environment.NewLine
-                }})
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.Oracle,
-            [
-                $$"""
-                SELECT *{{Environment.NewLine
-                }}FROM "dbo"."Orders"{{Environment.NewLine
-                }}WHERE "dbo"."Orders"."Id" IN ({{Environment.NewLine
-                }}    :0,{{Environment.NewLine
-                }}    :1,{{Environment.NewLine
-                }}    :2{{Environment.NewLine
-                }})
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.PostgreSql,
-            [
-                $$"""
-                SELECT *{{Environment.NewLine
-                }}FROM "dbo"."Orders"{{Environment.NewLine
-                }}WHERE "dbo"."Orders"."Id" IN ({{Environment.NewLine
-                }}    $1,{{Environment.NewLine
-                }}    $2,{{Environment.NewLine
-                }}    $3{{Environment.NewLine
-                }})
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.SqLite,
-            [
-                $$"""
-                SELECT *{{Environment.NewLine
-                }}FROM "dbo"."Orders"{{Environment.NewLine
-                }}WHERE "dbo"."Orders"."Id" IN ({{Environment.NewLine
-                }}    ?0,{{Environment.NewLine
-                }}    ?1,{{Environment.NewLine
-                }}    ?2{{Environment.NewLine
-                }})
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.SqlServer,
-            [
-                $$"""
-                SELECT *{{Environment.NewLine
-                }}FROM [dbo].[Orders]{{Environment.NewLine
-                }}WHERE [dbo].[Orders].[Id] IN ({{Environment.NewLine
-                }}    @p0,{{Environment.NewLine
-                }}    @p1,{{Environment.NewLine
-                }}    @p2{{Environment.NewLine
-                }})
-                """
-            ]
-        )
-    ];
-
-    [Theory]
-    [MemberData(nameof(OrderByEnumerableVerticalData))]
-    public void OrderBy_WithEnumerableCombiner_RendersVertically(SqlTestCase testCase)
-    {
-        // Arrange
-        var db = testCase.CreateBuilder();
-        
-        // Force Vertical Layout for this specific test
-        db.Context.Options.CollectionLayout = SqlCollectionLayout.Vertical;
-        db.Context.Options.IndentSize = 4; // Ensure the indent matches our expected string
-
-        // Act
-        var result = db.Query<OrderModel>(o =>
-        {
-            IEnumerable<ISqlOrderFragment> sorts = 
-            [
-                o.OrderBy("Total"),
-                o.OrderBy(x => x.Id, SqlOrderDirection.Desc)
-            ];
-
-            db.Append($$"""
                 SELECT *
-                FROM {{o}}
-                ORDER BY {{sorts}}
-                """);
-        }).Build();
+                FROM <<dbo>>.<<Orders>>
+                WHERE <<dbo>>.<<Orders>>.<<Id>> IN (
+                    !!100,
+                    !!101,
+                    !!102
+                )
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.MySql,
+            [
+                $$"""
+                SELECT *
+                FROM `dbo`.`Orders`
+                WHERE `dbo`.`Orders`.`Id` IN (
+                    @p0,
+                    @p1,
+                    @p2
+                )
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Oracle,
+            [
+                $$"""
+                SELECT *
+                FROM "dbo"."Orders"
+                WHERE "dbo"."Orders"."Id" IN (
+                    :0,
+                    :1,
+                    :2
+                )
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.PostgreSql,
+            [
+                $$"""
+                SELECT *
+                FROM "dbo"."Orders"
+                WHERE "dbo"."Orders"."Id" IN (
+                    $1,
+                    $2,
+                    $3
+                )
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqLite,
+            [
+                $$"""
+                SELECT *
+                FROM "dbo"."Orders"
+                WHERE "dbo"."Orders"."Id" IN (
+                    ?0,
+                    ?1,
+                    ?2
+                )
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqlServer,
+            [
+                $$"""
+                SELECT *
+                FROM [dbo].[Orders]
+                WHERE [dbo].[Orders].[Id] IN (
+                    @p0,
+                    @p1,
+                    @p2
+                )
+                """
+            ]
+        )
+    ];
 
-        // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
-    }
-
-    public static TheoryData<SqlTestCase> OrderByEnumerableVerticalData =>
+    public static TheoryData<SqlTestCase> OrderByEnumerableVerticalLayoutData =>
     [
         new SqlTestCase(
             SqlDialectKind.CustomDb, 

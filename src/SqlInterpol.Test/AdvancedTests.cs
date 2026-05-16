@@ -2,22 +2,24 @@ using SqlInterpol.Config;
 using SqlInterpol.Metadata;
 using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
+using Xunit;
 
 namespace SqlInterpol.Test;
 
 public class AdvancedTests
 {
-    
-
     [Theory]
-    [MemberData(nameof(DynamicApiQueryData))]
-    public void BuildUltimateDynamicQuery_FormatsCorrectly(SqlTestCase testCase)
+    [MemberData(nameof(DynamicQueryData))]
+    public void DynamicQuery(SqlTestCase testCase)
     {
         var db = testCase.CreateBuilder();
         var request = new GetOrderStatsRequest
         {
-            CustomerId = 5, SelectFields = ["OrderId", "TotalAmount"],
-            SortFields = [new SortCriteria("TotalAmount", true)], Page = 2, PageSize = 20
+            CustomerId = 5,
+            SelectFields = ["OrderId", "TotalAmount"],
+            SortFields = [new SortCriteria("TotalAmount", true)],
+            Page = 2,
+            PageSize = 20
         };
 
         var result = db
@@ -53,10 +55,74 @@ public class AdvancedTests
                 db.Append($"LIMIT {request.PageSize} OFFSET {offset}");
             }).Build();
 
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+        testCase.AssertSql(result.Sql);
     }
 
-    public static TheoryData<SqlTestCase> DynamicApiQueryData =>
+    [Theory]
+    [MemberData(nameof(AdvancedDynamicQueryData))]
+    public void AdvancedDynamicQuery(SqlTestCase testCase)
+    {
+        var db = testCase.CreateBuilder();
+        var request = new GetMassiveStatsRequest
+        {
+            ProductNameFilter = "Laptop",
+            SelectFields = ["OrderId", "ProductName", "TotalAmount"],
+            SortFields = [new SortCriteria("TotalAmount", true)], 
+            Page = 2, 
+            PageSize = 20
+        };
+
+        var o = db.AddEntity<OrderModel>(alias: "o");
+        var ol = db.AddEntity<OrderLine>(alias: "ol");
+        var p = db.AddEntity<Product>(alias: "p");
+        var cat = db.AddEntity<Category>(alias: "cat");
+        
+        var olAgg = db.AddEntity<OrderLineAggModel>(alias: "ol_agg");
+
+        var result = db.Query<MassiveOrderStatsModel>(stats =>
+        {
+            var dynamicSelects = request.SelectFields.Select(f => stats[f]);
+            var dynamicSorts = request.SortFields.Select(sort => 
+                stats.OrderBy(sort.Field, sort.Descending ? SqlOrderDirection.Desc : SqlOrderDirection.Asc));
+
+            db.AppendLine($$"""
+                SELECT {{dynamicSelects}}
+                FROM (
+                    SELECT 
+                        {{o[x => x.Id]}} AS {{stats[x => x.OrderId]}}, 
+                        {{p[x => x.Name]}} AS {{stats[x => x.ProductName]}},
+                        {{olAgg[x => x.TotalAmount]}} AS {{stats[x => x.TotalAmount]}}
+                    FROM {{o}}
+                    
+                    JOIN (
+                        SELECT 
+                            {{ol[x => x.OrderId]}} AS {{olAgg[x => x.OrderId]}},
+                            {{ol[x => x.ProductId]}} AS {{olAgg[x => x.ProductId]}},
+                            SUM({{ol[x => x.Price]}}) AS {{olAgg[x => x.TotalAmount]}}
+                        -- JOIN {{"ol_agg"}} ON ...
+                        FROM {{ol}}
+                        GROUP BY {{ol[x => x.OrderId]}}, {{ol[x => x.ProductId]}}
+                    ) AS {{olAgg.As("ol_agg")}} ON {{o[x => x.Id]}} = {{olAgg[x => x.OrderId]}}
+                    
+                    JOIN {{p}} ON {{olAgg[x => x.ProductId]}} = {{p[x => x.Id]}}
+                    JOIN {{cat}} ON {{p[x => x.CategoryId]}} = {{cat[x => x.Id]}}
+                ) AS {{stats.As("stats")}}
+                """);
+
+            if (!string.IsNullOrEmpty(request.ProductNameFilter)) 
+                db.AppendLine($"WHERE {stats[x => x.ProductName]} = {request.ProductNameFilter}"); 
+            
+            if (dynamicSorts.Any()) 
+                db.AppendLine($"ORDER BY {dynamicSorts}");
+
+            int offset = (request.Page - 1) * request.PageSize;
+            db.Append($"LIMIT {request.PageSize} OFFSET {offset}");
+        }).Build();
+
+        testCase.AssertSql(result.Sql);
+    }
+
+    public static TheoryData<SqlTestCase> DynamicQueryData =>
     [
         new SqlTestCase(
             SqlDialectKind.CustomDb,
@@ -180,71 +246,7 @@ public class AdvancedTests
         )
     ];
 
-    [Theory]
-    [MemberData(nameof(MassiveJoinApiQueryData))]
-    public void BuildMassiveDynamicJoinQuery_FormatsCorrectly(SqlTestCase testCase)
-    {
-        var db = testCase.CreateBuilder();
-        var request = new GetMassiveStatsRequest
-        {
-            ProductNameFilter = "Laptop",
-            SelectFields = ["OrderId", "ProductName", "TotalAmount"],
-            SortFields = [new SortCriteria("TotalAmount", true)], 
-            Page = 2, PageSize = 20
-        };
-
-        var o = db.AddEntity<OrderModel>(alias: "o");
-        var ol = db.AddEntity<OrderLine>(alias: "ol");
-        var p = db.AddEntity<Product>(alias: "p");
-        var cat = db.AddEntity<Category>(alias: "cat");
-        
-        // The entity representing our inner aggregated subquery
-        var olAgg = db.AddEntity<OrderLineAggModel>(alias: "ol_agg");
-
-        var result = db.Query<MassiveOrderStatsModel>(stats =>
-        {
-            var dynamicSelects = request.SelectFields.Select(f => stats[f]);
-            var dynamicSorts = request.SortFields.Select(sort => 
-                stats.OrderBy(sort.Field, sort.Descending ? SqlOrderDirection.Desc : SqlOrderDirection.Asc));
-
-            db.AppendLine($$"""
-                SELECT {{dynamicSelects}}
-                FROM (
-                    SELECT 
-                        {{o[x => x.Id]}} AS {{stats[x => x.OrderId]}}, 
-                        {{p[x => x.Name]}} AS {{stats[x => x.ProductName]}},
-                        {{olAgg[x => x.TotalAmount]}} AS {{stats[x => x.TotalAmount]}}
-                    FROM {{o}}
-                    
-                    JOIN (
-                        SELECT 
-                            {{ol[x => x.OrderId]}} AS {{olAgg[x => x.OrderId]}},
-                            {{ol[x => x.ProductId]}} AS {{olAgg[x => x.ProductId]}},
-                            SUM({{ol[x => x.Price]}}) AS {{olAgg[x => x.TotalAmount]}}
-                        -- JOIN {{"ol_agg"}} ON ...
-                        FROM {{ol}}
-                        GROUP BY {{ol[x => x.OrderId]}}, {{ol[x => x.ProductId]}}
-                    ) AS {{olAgg.As("ol_agg")}} ON {{o[x => x.Id]}} = {{olAgg[x => x.OrderId]}}
-                    
-                    JOIN {{p}} ON {{olAgg[x => x.ProductId]}} = {{p[x => x.Id]}}
-                    JOIN {{cat}} ON {{p[x => x.CategoryId]}} = {{cat[x => x.Id]}}
-                ) AS {{stats.As("stats")}}
-                """);
-
-            if (!string.IsNullOrEmpty(request.ProductNameFilter)) 
-                db.AppendLine($"WHERE {stats[x => x.ProductName]} = {request.ProductNameFilter}"); 
-            
-            if (dynamicSorts.Any()) 
-                db.AppendLine($"ORDER BY {dynamicSorts}");
-
-            int offset = (request.Page - 1) * request.PageSize;
-            db.Append($"LIMIT {request.PageSize} OFFSET {offset}");
-        }).Build();
-
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
-    }
-
-    public static TheoryData<SqlTestCase> MassiveJoinApiQueryData =>
+    public static TheoryData<SqlTestCase> AdvancedDynamicQueryData =>
     [
         new SqlTestCase(
             SqlDialectKind.CustomDb,
@@ -433,61 +435,4 @@ public class AdvancedTests
             ]
         )
     ];
-
-    public record SortCriteria(string Field, bool Descending);
-        
-    public record GetOrderStatsRequest
-    {
-        public int? CustomerId { get; init; }
-        public List<string> SelectFields { get; init; } = new();
-        public List<SortCriteria> SortFields { get; init; } = new();
-        public int Page { get; init; } = 1;
-        public int PageSize { get; init; } = 20;
-    }
-
-    [SqlTable("OrderStats")]
-    public record ApiOrderStatsModel
-    {
-        public int CustomerId { get; init; }
-        public int OrderId { get; init; }
-        public decimal TotalAmount { get; init; }
-    }
-
-    [SqlTable("Orders", Schema = "dbo")]
-    public record OrderModel
-    {
-        public int Id { get; init; }
-
-        [SqlColumn("order_status")]
-        public string Status { get; init; } = "";
-        
-        public decimal Total { get; init; }
-
-        public int CustomerId { get; init; }
-    }
-
-    public record GetMassiveStatsRequest
-    {
-        public string? ProductNameFilter { get; init; }
-        public List<string> SelectFields { get; init; } = new();
-        public List<SortCriteria> SortFields { get; init; } = new();
-        public int Page { get; init; } = 1;
-        public int PageSize { get; init; } = 20;
-    }
-
-    [SqlTable("MassiveOrderStats")]
-    public record MassiveOrderStatsModel
-    {
-        public int OrderId { get; init; }
-        public string ProductName { get; init; } = string.Empty;
-        public decimal TotalAmount { get; init; }
-    }
-
-    [SqlTable("OrderLineAgg")]
-    public record OrderLineAggModel
-    {
-        public int OrderId { get; init; }
-        public int ProductId { get; init; }
-        public decimal TotalAmount { get; init; }
-    }
 }

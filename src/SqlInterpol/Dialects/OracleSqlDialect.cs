@@ -16,21 +16,33 @@ public class OracleSqlDialect : SqlDialectBase
         {
             return $"OFFSET {p.Offset} ROWS FETCH NEXT {p.Limit} ROWS ONLY";
         }
+        
+        // Just in case a lock fragment bypasses the rewriter, return empty
+        if (fragment is SqlLockFragment) return string.Empty;
 
         return base.RenderFragment(fragment, context);
     }
 
     public override IEnumerable<SqlSegment> RewriteSegments(IReadOnlyList<SqlSegment> segments)
     {
-        // 1. Let the base class swallow VALUES or apply universal rules FIRST
+        // 1. Let the base class swallow VALUES, inject Locks, etc FIRST
         var baseRewritten = base.RewriteSegments(segments).ToList();
         var rewritten = new List<SqlSegment>(baseRewritten.Count);
+        
+        SqlLockMode? deferredLock = null;
 
         for (int i = 0; i < baseRewritten.Count; i++)
         {
             var segment = baseRewritten[i];
 
-            // 2. Apply Oracle specific paging logic to the cleaned AST
+            // 2. Extract and swallow Lock Fragments
+            if (segment.Type == SqlSegmentType.Raw && segment.Value is SqlLockFragment lockFrag)
+            {
+                deferredLock = lockFrag.Mode;
+                continue; // Do not add it to the rewritten stream
+            }
+
+            // 3. Apply Oracle specific paging logic to the cleaned AST
             if (segment.Tag == SqlSegmentTag.Paging && segment.Value is string text)
             {
                 if (i + 3 < baseRewritten.Count &&
@@ -61,6 +73,12 @@ public class OracleSqlDialect : SqlDialectBase
             }
 
             rewritten.Add(segment);
+        }
+
+        // 4. Append deferred locks to the end of the query (Oracle maps Share to Update)
+        if (deferredLock == SqlLockMode.Update || deferredLock == SqlLockMode.Share)
+        {
+            rewritten.Add(new SqlSegment(SqlSegmentType.Literal, "\nFOR UPDATE"));
         }
 
         return rewritten;

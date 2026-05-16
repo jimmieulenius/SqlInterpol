@@ -6,12 +6,9 @@ namespace SqlInterpol.Test;
 
 public class JoinSubqueryTests
 {
-    // The Type-Safe Projection Model
-    public record CategoryStats(int CategoryId, decimal TotalPrice);
-
     [Theory]
     [MemberData(nameof(JoinSubqueryData))]
-    public void Join_Subquery_With_TypeSafe_Projection(SqlTestCase testCase)
+    public void Join_Subquery_WithTypeSafeProjection(SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
@@ -42,7 +39,7 @@ public class JoinSubqueryTests
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+        testCase.AssertSql(result.Sql);
     }
 
     public static TheoryData<SqlTestCase> JoinSubqueryData =>

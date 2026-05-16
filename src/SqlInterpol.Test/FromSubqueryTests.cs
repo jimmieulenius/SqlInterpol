@@ -6,12 +6,9 @@ namespace SqlInterpol.Test;
 
 public class FromSubqueryTests
 {
-    // The Type-Safe Projection Model
-    public record CategoryStats(int CategoryId, decimal TotalPrice);
-
     [Theory]
-    [MemberData(nameof(FromSubqueryData))]
-    public void From_Subquery_With_TypeSafe_Projection(SqlTestCase testCase)
+    [MemberData(nameof(From_SubqueryData))]
+    public void From_Subquery(SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
@@ -41,10 +38,10 @@ public class FromSubqueryTests
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+        testCase.AssertSql(result.Sql);
     }
 
-    public static TheoryData<SqlTestCase> FromSubqueryData =>
+    public static TheoryData<SqlTestCase> From_SubqueryData =>
     [
         new SqlTestCase(
             SqlDialectKind.CustomDb,

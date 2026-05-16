@@ -1,5 +1,4 @@
 using SqlInterpol.Config;
-using SqlInterpol.Metadata;
 using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
 
@@ -7,10 +6,6 @@ namespace SqlInterpol.Test;
 
 public class OrderBySubqueryTests
 {
-    // Local model for the subquery shape
-    [SqlTable("Stats")]
-    public record StatsModel(int CategoryId, decimal MaxPrice);
-
     [Theory]
     [MemberData(nameof(OrderBySubqueryData))]
     public void OrderBy_AgainstSubquery_FormatsCorrectly(SqlTestCase testCase)
@@ -35,7 +30,7 @@ public class OrderBySubqueryTests
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+        testCase.AssertSql(result.Sql);
     }
 
     public static TheoryData<SqlTestCase> OrderBySubqueryData =>

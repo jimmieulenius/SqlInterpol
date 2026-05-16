@@ -1,6 +1,5 @@
 using SqlInterpol.Config;
 using SqlInterpol.Test.Models;
-using Xunit;
 
 namespace SqlInterpol.Test;
 
@@ -8,23 +7,22 @@ public class UpsertTests
 {
     [Theory]
     [MemberData(nameof(AllDialectsUpsertData))]
-    public void Upsert_CrossDialect_RendersCorrectly(SqlTestCase testCase)
+    public void Upsert_CrossDialect(SqlTestCase testCase)
     {
+        // Arrange
         var db = testCase.CreateBuilder();
-        
         var newProduct = new { Id = 42, Name = "Apple", CategoryId = 1, Price = 10m };
         var updateProduct = new { Name = "Apple", Price = 10m };
 
+        // Act
         var result = db.Query<Product>(p => db.Append($$"""
             INSERT INTO {{p}} {{newProduct}}
             ON CONFLICT {{p[x => x.Id]}}
             DO UPDATE SET {{updateProduct}}
             """)).Build();
 
-        var expectedSql = testCase.ExpectedSql[0].Replace("\r\n", "\n").Trim();
-        var actualSql = result.Sql.Replace("\r\n", "\n").Trim();
-        
-        Assert.Equal(expectedSql, actualSql);
+        // Assert
+        testCase.AssertSql(result.Sql);
     }
 
     public static TheoryData<SqlTestCase> AllDialectsUpsertData =>

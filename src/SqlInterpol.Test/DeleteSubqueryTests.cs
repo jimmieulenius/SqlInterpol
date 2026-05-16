@@ -1,5 +1,4 @@
 using SqlInterpol.Config;
-using SqlInterpol.Metadata;
 using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
 
@@ -7,20 +6,9 @@ namespace SqlInterpol.Test;
 
 public class DeleteSubqueryTests
 {
-    [SqlTable("Orders", Schema = "dbo")]
-    public record OrderModel
-    {
-        public int Id { get; init; }
-
-        [SqlColumn("order_status")]
-        public string Status { get; init; } = "";
-        
-        public decimal Total { get; init; }
-    }
-
     [Theory]
-    [MemberData(nameof(DeleteWithSubqueryData))]
-    public void Delete_WithSubquery_RendersCorrectly(SqlTestCase testCase)
+    [MemberData(nameof(Delete_WithSubqueryData))]
+    public void Delete_WithSubquery(SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
@@ -39,91 +27,88 @@ public class DeleteSubqueryTests
             .Build();
 
         // Assert
-        var expectedSql = testCase.ExpectedSql[0].Replace("\r\n", "\n");
-        var actualSql = result.Sql.Replace("\r\n", "\n");
-
-        Assert.Equal(expectedSql, actualSql);
+        testCase.AssertSql(result.Sql);
         Assert.Equal(status, result.Parameters.ElementAt(0).Value);
     }
 
-    public static TheoryData<SqlTestCase> DeleteWithSubqueryData =>
+    public static TheoryData<SqlTestCase> Delete_WithSubqueryData =>
     [
         new SqlTestCase(
             SqlDialectKind.CustomDb,
             [
-                 """
-                 DELETE FROM <<OrderLine>> 
-                 WHERE <<OrderLine>>.<<OrderId>> IN (
-                     SELECT <<dbo>>.<<Orders>>.<<Id>> 
-                     FROM <<dbo>>.<<Orders>> 
-                     WHERE <<dbo>>.<<Orders>>.<<order_status>> = !!100
-                 )
-                 """
-             ]
+                """
+                DELETE FROM <<OrderLine>> 
+                WHERE <<OrderLine>>.<<OrderId>> IN (
+                    SELECT <<dbo>>.<<Orders>>.<<Id>> 
+                    FROM <<dbo>>.<<Orders>> 
+                    WHERE <<dbo>>.<<Orders>>.<<order_status>> = !!100
+                )
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.MySql,
             [
-                 """
-                 DELETE FROM `OrderLine` 
-                 WHERE `OrderLine`.`OrderId` IN (
-                     SELECT `dbo`.`Orders`.`Id` 
-                     FROM `dbo`.`Orders` 
-                     WHERE `dbo`.`Orders`.`order_status` = @p0
-                 )
-                 """
-             ]
+                """
+                DELETE FROM `OrderLine` 
+                WHERE `OrderLine`.`OrderId` IN (
+                    SELECT `dbo`.`Orders`.`Id` 
+                    FROM `dbo`.`Orders` 
+                    WHERE `dbo`.`Orders`.`order_status` = @p0
+                )
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.Oracle,
             [
-                 """
-                 DELETE FROM "OrderLine" 
-                 WHERE "OrderLine"."OrderId" IN (
-                     SELECT "dbo"."Orders"."Id" 
-                     FROM "dbo"."Orders" 
-                     WHERE "dbo"."Orders"."order_status" = :0
-                 )
-                 """
-             ]
+                """
+                DELETE FROM "OrderLine" 
+                WHERE "OrderLine"."OrderId" IN (
+                    SELECT "dbo"."Orders"."Id" 
+                    FROM "dbo"."Orders" 
+                    WHERE "dbo"."Orders"."order_status" = :0
+                )
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.PostgreSql,
             [
-                 """
-                 DELETE FROM "OrderLine" 
-                 WHERE "OrderLine"."OrderId" IN (
-                     SELECT "dbo"."Orders"."Id" 
-                     FROM "dbo"."Orders" 
-                     WHERE "dbo"."Orders"."order_status" = $1
-                 )
-                 """
-             ]
+                """
+                DELETE FROM "OrderLine" 
+                WHERE "OrderLine"."OrderId" IN (
+                    SELECT "dbo"."Orders"."Id" 
+                    FROM "dbo"."Orders" 
+                    WHERE "dbo"."Orders"."order_status" = $1
+                )
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.SqLite,
             [
-                 """
-                 DELETE FROM "OrderLine" 
-                 WHERE "OrderLine"."OrderId" IN (
-                     SELECT "dbo"."Orders"."Id" 
-                     FROM "dbo"."Orders" 
-                     WHERE "dbo"."Orders"."order_status" = ?0
-                 )
-                 """
-             ]
+                """
+                DELETE FROM "OrderLine" 
+                WHERE "OrderLine"."OrderId" IN (
+                    SELECT "dbo"."Orders"."Id" 
+                    FROM "dbo"."Orders" 
+                    WHERE "dbo"."Orders"."order_status" = ?0
+                )
+                """
+            ]
         ),
         new SqlTestCase(
             SqlDialectKind.SqlServer,
             [
-                 """
-                 DELETE FROM [OrderLine] 
-                 WHERE [OrderLine].[OrderId] IN (
-                     SELECT [dbo].[Orders].[Id] 
-                     FROM [dbo].[Orders] 
-                     WHERE [dbo].[Orders].[order_status] = @p0
-                 )
-                 """
+                """
+                DELETE FROM [OrderLine] 
+                WHERE [OrderLine].[OrderId] IN (
+                    SELECT [dbo].[Orders].[Id] 
+                    FROM [dbo].[Orders] 
+                    WHERE [dbo].[Orders].[order_status] = @p0
+                )
+                """
             ]
         )
     ];

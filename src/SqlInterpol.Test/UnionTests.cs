@@ -7,8 +7,8 @@ namespace SqlInterpol.Test;
 public class UnionTests
 {
     [Theory]
-    [MemberData(nameof(AllDialectsUnionData))]
-    public void Select_UnionAll_RendersCorrectlyWithParameters(SqlTestCase testCase)
+    [MemberData(nameof(Select_UnionAllData))]
+    public void Select_UnionAll(SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
@@ -38,7 +38,7 @@ public class UnionTests
             """).Build();
 
         // Assert SQL
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+        testCase.AssertSql(result.Sql);
 
         // Assert Parameters - Proof that the context successfully shared the parameter counter!
         Assert.Equal(2, result.Parameters.Count);
@@ -49,7 +49,7 @@ public class UnionTests
         Assert.Equal(2, parametersList[1]);
     }
 
-    public static TheoryData<SqlTestCase> AllDialectsUnionData =>
+    public static TheoryData<SqlTestCase> Select_UnionAllData =>
     [
         new SqlTestCase(
             SqlDialectKind.CustomDb,

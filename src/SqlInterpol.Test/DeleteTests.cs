@@ -1,5 +1,4 @@
 using SqlInterpol.Config;
-using SqlInterpol.Metadata;
 using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
 
@@ -7,20 +6,9 @@ namespace SqlInterpol.Test;
 
 public class DeleteTests
 {
-    [SqlTable("Orders", Schema = "dbo")]
-    public record OrderModel
-    {
-        public int Id { get; init; }
-
-        [SqlColumn("order_status")]
-        public string Status { get; init; } = "";
-        
-        public decimal Total { get; init; }
-    }
-
     [Theory]
-    [MemberData(nameof(DeleteData))]
-    public void Delete_PureManual_RendersCorrectly(SqlTestCase testCase)
+    [MemberData(nameof(DeletePureManualData))]
+    public void Delete_PureManual(SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
@@ -35,11 +23,11 @@ public class DeleteTests
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+        testCase.AssertSql(result.Sql);
         Assert.Equal(targetId, result.Parameters.ElementAt(0).Value);
     }
 
-    public static TheoryData<SqlTestCase> DeleteData =>
+    public static TheoryData<SqlTestCase> DeletePureManualData =>
     [
         new SqlTestCase(
             SqlDialectKind.CustomDb,

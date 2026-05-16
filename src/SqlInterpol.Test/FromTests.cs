@@ -1,21 +1,14 @@
 using SqlInterpol.Config;
-using SqlInterpol.Metadata;
 using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
+using Xunit;
 
 namespace SqlInterpol.Test;
 
 public class FromTests
 {
-    // Local models to test the specific attribute configurations
-    [SqlTable("MyTable")]
-    public record TableOnlyModel(int Id);
-
-    [SqlTable("MyTable", Schema = "MySchema")]
-    public record TableAndSchemaModel(int Id);
-
     [Theory]
-    [MemberData(nameof(FromSingleEntityData))]
+    [MemberData(nameof(From_SingleEntityData))]
     public void From_SingleEntity(SqlTestCase testCase)
     {
         // Arrange
@@ -30,10 +23,48 @@ public class FromTests
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+        testCase.AssertSql(result.Sql);
     }
 
-    public static TheoryData<SqlTestCase> FromSingleEntityData =>
+    [Theory]
+    [MemberData(nameof(From_EntityWithSqlTableNameOnlyData))]
+    public void From_Entity_WithSqlTableNameOnly(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        
+        // Act
+        var result = db.Query<TableOnlyModel>(m =>
+            db.Append($$"""
+            SELECT *
+            FROM {{m}}
+            """))
+            .Build();
+
+        // Assert
+        testCase.AssertSql(result.Sql);
+    }
+
+    [Theory]
+    [MemberData(nameof(From_Entity_WithSqlTableNameAndSchemaData))]
+    public void From_Entity_WithSqlTableNameAndSchema(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+
+        // Act
+        var result = db.Query<TableAndSchemaModel>(m =>
+            db.Append($$"""
+            SELECT *
+            FROM {{m}}
+            """))
+            .Build();
+
+        // Assert
+        testCase.AssertSql(result.Sql);
+    }
+
+    public static TheoryData<SqlTestCase> From_SingleEntityData =>
     [
         new SqlTestCase(
             SqlDialectKind.CustomDb,
@@ -91,26 +122,7 @@ public class FromTests
         )
     ];
 
-    [Theory]
-    [MemberData(nameof(FromTableNameOnlyData))]
-    public void From_Entity_WithSqlTableNameOnly(SqlTestCase testCase)
-    {
-        // Arrange
-        var db = testCase.CreateBuilder();
-        
-        // Act
-        var result = db.Query<TableOnlyModel>(m =>
-            db.Append($$"""
-            SELECT *
-            FROM {{m}}
-            """))
-            .Build();
-
-        // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
-    }
-
-    public static TheoryData<SqlTestCase> FromTableNameOnlyData =>
+    public static TheoryData<SqlTestCase> From_EntityWithSqlTableNameOnlyData =>
     [
         new SqlTestCase(
             SqlDialectKind.CustomDb,
@@ -168,26 +180,7 @@ public class FromTests
         )
     ];
 
-    [Theory]
-    [MemberData(nameof(FromTableNameAndSchemaData))]
-    public void From_Entity_WithSqlTableNameAndSchema(SqlTestCase testCase)
-    {
-        // Arrange
-        var db = testCase.CreateBuilder();
-
-        // Act
-        var result = db.Query<TableAndSchemaModel>(m =>
-            db.Append($$"""
-            SELECT *
-            FROM {{m}}
-            """))
-            .Build();
-
-        // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
-    }
-
-    public static TheoryData<SqlTestCase> FromTableNameAndSchemaData =>
+    public static TheoryData<SqlTestCase> From_Entity_WithSqlTableNameAndSchemaData =>
     [
         new SqlTestCase(
             SqlDialectKind.CustomDb,

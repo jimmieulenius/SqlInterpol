@@ -7,13 +7,9 @@ namespace SqlInterpol.Test;
 
 public class GroupBySubqueryTests
 {
-    // Local model for the subquery shape
-    [SqlTable("Stats")]
-    public record StatsModel(int CategoryId, decimal MaxPrice);
-
     [Theory]
     [MemberData(nameof(GroupBySubqueryData))]
-    public void GroupBy_AgainstSubquery_FormatsCorrectly(SqlTestCase testCase)
+    public void GroupBy_AgainstSubquery(SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
@@ -30,7 +26,7 @@ public class GroupBySubqueryTests
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+        testCase.AssertSql(result.Sql);
     }
 
     public static TheoryData<SqlTestCase> GroupBySubqueryData =>

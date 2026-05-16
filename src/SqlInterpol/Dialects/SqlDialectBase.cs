@@ -5,7 +5,6 @@ namespace SqlInterpol.Dialects;
 
 public abstract class SqlDialectBase : ISqlDialect
 {
-    // Specific dialects define these symbols
     public abstract SqlDialectKind Kind { get; }
     public abstract string OpenQuote { get; }
     public abstract string CloseQuote { get; }
@@ -148,9 +147,12 @@ public abstract class SqlDialectBase : ISqlDialect
                         return true;
                     }
                 }
+
                 rewritten.Add(new SqlSegment(SqlSegmentType.Literal, " "));
+
                 return true; 
             }
+
             return false;
         }
 
@@ -171,9 +173,11 @@ public abstract class SqlDialectBase : ISqlDialect
                 if (segment.Value is string text)
                 {
                     string clean = text.EndsWith(" ") ? text[..^1] : text;
+
                     if (!clean.EndsWith('(')) clean += " (";
                     
                     rewritten.Add(new SqlSegment(SqlSegmentType.Literal, clean));
+
                     continue;
                 }
             }
@@ -189,13 +193,42 @@ public abstract class SqlDialectBase : ISqlDialect
                     if (!clean.TrimStart().StartsWith(')')) clean = ")\n" + clean.TrimStart();
                     
                     int keywordIndex = clean.LastIndexOf(SqlKeyword.Set, StringComparison.OrdinalIgnoreCase);
+
                     if (keywordIndex > -1 && i + 1 < segments.Count && segments[i + 1].Value is SqlSetFragment)
                     {
                         rewritten.Add(new SqlSegment(SqlSegmentType.Literal, clean[..keywordIndex]));
+
                         continue;
                     }
                     
                     rewritten.Add(new SqlSegment(SqlSegmentType.Literal, clean));
+
+                    continue;
+                }
+            }
+            else if (segment.Tag == SqlSegmentTag.ForUpdateKeyword && segment.Value is string updateText)
+            {
+                int idx = updateText.IndexOf("FOR UPDATE", StringComparison.OrdinalIgnoreCase);
+
+                if (idx > -1)
+                {
+                    rewritten.Add(new SqlSegment(SqlSegmentType.Literal, updateText[..idx].TrimEnd(' ', '\t')));
+                    rewritten.Add(new SqlSegment(SqlSegmentType.Raw, new SqlLockFragment(SqlLockMode.Update)));
+                    rewritten.Add(new SqlSegment(SqlSegmentType.Literal, updateText[(idx + 10)..]));
+
+                    continue;
+                }
+            }
+            else if (segment.Tag == SqlSegmentTag.ForShareKeyword && segment.Value is string shareText)
+            {
+                int idx = shareText.IndexOf("FOR SHARE", StringComparison.OrdinalIgnoreCase);
+
+                if (idx > -1)
+                {
+                    rewritten.Add(new SqlSegment(SqlSegmentType.Literal, shareText[..idx].TrimEnd(' ', '\t')));
+                    rewritten.Add(new SqlSegment(SqlSegmentType.Raw, new SqlLockFragment(SqlLockMode.Share)));
+                    rewritten.Add(new SqlSegment(SqlSegmentType.Literal, shareText[(idx + 9)..]));
+                    
                     continue;
                 }
             }
@@ -203,6 +236,7 @@ public abstract class SqlDialectBase : ISqlDialect
             if (forceBaseNamePhase && segment.Type == SqlSegmentType.Projection && segment.Value is ISqlProjection proj)
             {
                 rewritten.Add(new SqlSegment(SqlSegmentType.Projection, proj, SqlRenderMode.BaseName));
+
                 continue;
             }
 

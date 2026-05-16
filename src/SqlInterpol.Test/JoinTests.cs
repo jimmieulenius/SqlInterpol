@@ -8,7 +8,7 @@ public class JoinTests
 {
     [Theory]
     [MemberData(nameof(JoinTwoEntitiesData))]
-    public void Join_TwoEntities_NoAliases(SqlTestCase testCase)
+    public void Join_TwoEntities(SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
@@ -26,7 +26,7 @@ public class JoinTests
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+        testCase.AssertSql(result.Sql);
     }
 
     public static TheoryData<SqlTestCase> JoinTwoEntitiesData =>

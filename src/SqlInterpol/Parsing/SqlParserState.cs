@@ -12,4 +12,8 @@ internal class SqlParserState : ISqlParserState
     public ISqlEntityBase? ActiveEntityTarget { get; set; }
     public bool InBlockComment { get; set; }
     public bool InLineComment { get; set; }
+    public int ParenDepth { get; set; }
+
+    private Dictionary<string, object?>? _properties;
+    public IDictionary<string, object?> Properties => _properties ??= new();
 }

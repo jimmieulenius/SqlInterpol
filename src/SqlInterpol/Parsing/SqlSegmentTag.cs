@@ -10,4 +10,6 @@ public static class SqlSegmentTag
     public const string ReturningKeyword = "ReturningKeyword";
     public const string OnConflictKeyword = "OnConflictKeyword";
     public const string DoUpdateSetKeyword = "DoUpdateSetKeyword";
+    public const string ForUpdateKeyword = "ForUpdateKeyword";
+    public const string ForShareKeyword = "ForShareKeyword";
 }

@@ -8,7 +8,7 @@ public class SqlBuilderTests
 {
     [Theory]
     [MemberData(nameof(AppendData))]
-    public void Projection_Append(SqlTestCase testCase)
+    public void SqlBuilder_Append(SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
@@ -19,7 +19,43 @@ public class SqlBuilderTests
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+        testCase.AssertSql(result.Sql);
+    }
+
+    [Theory]
+    [MemberData(nameof(AppendLineData))]
+    public void SqlBuilder_AppendLine(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        
+        // Act
+        var result = db.Query<Product>((p) =>
+            db.AppendLine($"SELECT {p[x => x.Id]}")
+            .Append($"FROM {p}"))
+            .Build();
+    
+        // Assert
+        testCase.AssertSql(result.Sql);
+    }
+
+    [Theory]
+    [MemberData(nameof(RawStringData))]
+    public void SqlBuilder_RawString(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        
+        // Act
+        var result = db.Query<Product>(p =>
+            db.Append($$"""
+            SELECT
+                {{p[x => x.Id]}}
+            FROM {{p}}
+            """)).Build();
+
+        // Assert
+        testCase.AssertSql(result.Sql);
     }
 
     public static TheoryData<SqlTestCase> AppendData =>
@@ -62,25 +98,8 @@ public class SqlBuilderTests
         )
     ];
 
-    [Theory]
-    [MemberData(nameof(AppendLineData))]
-    public void Projection_AppendLine(SqlTestCase testCase)
-    {
-        // Arrange
-        var db = testCase.CreateBuilder();
-        
-        // Act
-        var result = db.Query<Product>((p) =>
-            db.AppendLine($"SELECT {p[x => x.Id]}")
-            .Append($"FROM {p}"))
-            .Build();
-    
-        // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
-    }
-
-    public static TheoryData<SqlTestCase> AppendLineData => new()
-    {
+    public static TheoryData<SqlTestCase> AppendLineData => 
+    [
         new SqlTestCase(
             SqlDialectKind.CustomDb,
             [
@@ -117,26 +136,7 @@ public class SqlBuilderTests
                 $"SELECT [dbo].[Products].[Id]{Environment.NewLine}FROM [dbo].[Products]"
             ]
         )
-    };
-
-    [Theory]
-    [MemberData(nameof(RawStringData))]
-    public void Projection_RawString(SqlTestCase testCase)
-    {
-        // Arrange
-        var db = testCase.CreateBuilder();
-        
-        // Act
-        var result = db.Query<Product>(p =>
-            db.Append($$"""
-            SELECT
-                {{p[x => x.Id]}}
-            FROM {{p}}
-            """)).Build();
-
-        // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
-    }
+    ];
 
     public static TheoryData<SqlTestCase> RawStringData =>
     [

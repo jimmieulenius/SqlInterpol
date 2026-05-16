@@ -1,25 +1,13 @@
 using SqlInterpol.Config;
-using SqlInterpol.Metadata;
 using SqlInterpol.Test.Models;
 
 namespace SqlInterpol.Test;
 
 public class DeleteAsTests
 {
-    [SqlTable("Orders", Schema = "dbo")]
-    public record OrderModel
-    {
-        public int Id { get; init; }
-
-        [SqlColumn("order_status")]
-        public string Status { get; init; } = "";
-        
-        public decimal Total { get; init; }
-    }
-
     [Theory]
     [MemberData(nameof(SqlServerDeleteAsData))]
-    public void Delete_WithAlias_SqlServerSyntax_RendersCorrectly(SqlTestCase testCase)
+    public void SqlServerDeleteAs(SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
@@ -36,7 +24,7 @@ public class DeleteAsTests
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+        testCase.AssertSql(result.Sql);
         Assert.Equal(targetId, result.Parameters.ElementAt(0).Value);
     }
 
@@ -54,7 +42,7 @@ public class DeleteAsTests
 
     [Theory]
     [MemberData(nameof(PostgresDeleteAsData))]
-    public void Delete_WithAlias_PostgresSyntax_RendersCorrectly(SqlTestCase testCase)
+    public void PostgresDeleteAs(SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
@@ -71,7 +59,7 @@ public class DeleteAsTests
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+        testCase.AssertSql(result.Sql);
         Assert.Equal(targetId, result.Parameters.ElementAt(0).Value);
     }
 

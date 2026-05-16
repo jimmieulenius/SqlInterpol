@@ -1,5 +1,4 @@
 using SqlInterpol.Config;
-using SqlInterpol.Metadata;
 using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
 
@@ -7,36 +6,27 @@ namespace SqlInterpol.Test;
 
 public class UpdateAsTests
 {
-    [SqlTable("Orders", Schema = "dbo")]
-    public record OrderModel
-    {
-        public int Id { get; init; }
-
-        [SqlColumn("order_status")]
-        public string Status { get; init; } = "";
-        
-        public decimal Total { get; init; }
-    }
-
     [Theory]
     [MemberData(nameof(UpdateSetWithAliasData))]
-    public void UpdateSet_WithExplicitAlias_StripsPrefixInSetClause(SqlTestCase testCase)
+    public void Update_WithExplicitAlias_StripsPrefixInSetClause(SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
         var updateDto = new { Status = "Shipped", Total = 99.99m };
         
         // Act
-        var result = db.Query<OrderModel>(o =>
+        var result = db
+            .Entity<OrderModel>(alias: "ord")
+            .Query(o =>
             db.Append($$"""
-            UPDATE {{o}} AS {{o.As("ord")}}
+            UPDATE {{o}}
             SET {{updateDto}}
             WHERE {{o[x => x.Id]}} = 1
             """))
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+        testCase.AssertSql(result.Sql);
         
         Assert.Equal("Shipped", result.Parameters.ElementAt(0).Value);
         Assert.Equal(99.99m, result.Parameters.ElementAt(1).Value);

@@ -193,156 +193,139 @@ public class SqlInterpolationParser : ISqlInterpolationParser
     }
 
     public virtual string? ProcessLiteral(ISqlParserContext context, ReadOnlySpan<char> span)
-{
-    // 1. --- ZERO-ALLOCATION COMMENT SCRUBBING ---
-    int length = span.Length;
-    char[]? rented = null;
-    
-    // Use the stack for small strings, ArrayPool for massive chunks
-    Span<char> cleanBuffer = length <= 1024 
-        ? stackalloc char[length] 
-        : (rented = ArrayPool<char>.Shared.Rent(length));
-    
-    int cleanIndex = 0;
-
-    for (int i = 0; i < length; i++)
     {
-        char c = span[i];
-
-        // Start Block Comment /*
-        if (!context.ParserState.InLineComment && !context.ParserState.InBlockComment && 
-            c == '/' && i + 1 < length && span[i + 1] == '*')
-        {
-            context.ParserState.InBlockComment = true;
-            i++; continue;
-        }
+        // 1. --- ZERO-ALLOCATION, STRING-AWARE COMMENT SCRUBBING ---
+        int length = span.Length;
+        char[]? rented = null;
+        Span<char> cleanBuffer = length <= 1024 
+            ? stackalloc char[length] 
+            : (rented = ArrayPool<char>.Shared.Rent(length));
         
-        // End Block Comment */
-        if (context.ParserState.InBlockComment && 
-            c == '*' && i + 1 < length && span[i + 1] == '/')
+        int cleanIndex = 0;
+
+        for (int i = 0; i < length; i++)
         {
-            context.ParserState.InBlockComment = false;
-            cleanBuffer[cleanIndex++] = ' '; // Pad with space so words don't merge
-            i++; continue;
+            char c = span[i];
+
+            // Toggle String State (Ignore comments inside 'strings')
+            if (c == '\'' && !context.ParserState.InBlockComment && !context.ParserState.InLineComment)
+            {
+                context.ParserState.IsInsideString = !context.ParserState.IsInsideString;
+                cleanBuffer[cleanIndex++] = c;
+                continue;
+            }
+
+            if (context.ParserState.IsInsideString)
+            {
+                cleanBuffer[cleanIndex++] = c;
+                continue;
+            }
+
+            if (!context.ParserState.InLineComment && c == '/' && i + 1 < length && span[i + 1] == '*')
+            {
+                context.ParserState.InBlockComment = true;
+                i++; continue;
+            }
+            
+            if (context.ParserState.InBlockComment && c == '*' && i + 1 < length && span[i + 1] == '/')
+            {
+                context.ParserState.InBlockComment = false;
+                cleanBuffer[cleanIndex++] = ' '; // Pad with space
+                i++; continue;
+            }
+            
+            if (!context.ParserState.InBlockComment && c == '-' && i + 1 < length && span[i + 1] == '-')
+            {
+                context.ParserState.InLineComment = true;
+                i++; continue;
+            }
+            
+            if (context.ParserState.InLineComment && (c == '\n' || c == '\r'))
+            {
+                context.ParserState.InLineComment = false;
+            }
+
+            if (!context.ParserState.InLineComment && !context.ParserState.InBlockComment)
+            {
+                cleanBuffer[cleanIndex++] = c;
+            }
         }
+
+        var activeSpan = cleanBuffer.Slice(0, cleanIndex);
+
+        // 3. --- EXISTING KEYWORD LOGIC ---
+        var trimmed = activeSpan.Trim();
+        string? tag = null;
+        SqlKeyword? forcedKeyword = null; 
+
+        if (trimmed.Contains(SqlKeyword.ForUpdate, StringComparison.OrdinalIgnoreCase))
+            tag = SqlSegmentTag.ForUpdateKeyword;
+        else if (trimmed.Contains(SqlKeyword.ForShare, StringComparison.OrdinalIgnoreCase))
+            tag = SqlSegmentTag.ForShareKeyword;
+        if (trimmed.Contains(SqlKeyword.Limit, StringComparison.OrdinalIgnoreCase))
+            tag = SqlSegmentTag.Paging;
+        else if (trimmed.EndsWith(SqlKeyword.DoUpdateSet, StringComparison.OrdinalIgnoreCase))
+        {
+            forcedKeyword = SqlKeyword.Set;
+            tag = SqlSegmentTag.DoUpdateSetKeyword;
+        }
+        else if (trimmed.EndsWith(SqlKeyword.OnConflict, StringComparison.OrdinalIgnoreCase))
+            tag = SqlSegmentTag.OnConflictKeyword;
+        else if (trimmed.EndsWith(SqlKeyword.Update, StringComparison.OrdinalIgnoreCase))
+            forcedKeyword = SqlKeyword.Update;
+        else if (trimmed.EndsWith(SqlKeyword.Set, StringComparison.OrdinalIgnoreCase) || trimmed.EndsWith(SqlKeyword.Set, StringComparison.OrdinalIgnoreCase))
+        {
+            forcedKeyword = SqlKeyword.Set;
+            tag = SqlSegmentTag.UpdateSetKeyword;
+        }
+        else if (trimmed.EndsWith($"{SqlKeyword.Insert} {SqlKeyword.Into}", StringComparison.OrdinalIgnoreCase) || trimmed.EndsWith(SqlKeyword.Insert, StringComparison.OrdinalIgnoreCase))
+            forcedKeyword = SqlKeyword.Insert;
+        else if (trimmed.EndsWith(SqlKeyword.Values, StringComparison.OrdinalIgnoreCase) || trimmed.EndsWith(SqlKeyword.Values, StringComparison.OrdinalIgnoreCase))
+        {
+            forcedKeyword = SqlKeyword.Values;
+            tag = SqlSegmentTag.InsertValuesKeyword;
+        }
+        else if (trimmed.EndsWith(SqlKeyword.Returning, StringComparison.OrdinalIgnoreCase))
+            tag = SqlSegmentTag.ReturningKeyword;
+
+        if (trimmed.IsEmpty)
+        {
+            UpdateScannerState(context, activeSpan);
+            if (forcedKeyword != null) context.ParserState.CurrentKeyword = forcedKeyword;
+            if (rented != null) ArrayPool<char>.Shared.Return(rented);
+            return tag;
+        }
+
+        bool endsWithAs = EndsWithAsKeyword(activeSpan);
+
+        if (context.ParserState.LastAliasableTarget != null)
+        {
+            if (TryPeekAlias(context, activeSpan, out var alias))
+            {
+                if (context.ParserState.LastAliasableTarget is ISqlEntityBase entity && entity.Reference is ISqlReference entRef)
+                    entRef.Alias = alias;
+                else if (context.ParserState.LastAliasableTarget is ISqlProjection projection && projection.Reference is ISqlReference projRef)
+                    projRef.Alias = alias;
+                
+                context.ParserState.LastAliasableTarget = null;
+            }
+            else if (!endsWithAs)
+            {
+                context.ParserState.LastAliasableTarget = null;
+            }
+        }
+
+        context.ParserState.ExpectsAliasOnly = endsWithAs;
         
-        // Start Line Comment --
-        if (!context.ParserState.InBlockComment && !context.ParserState.InLineComment && 
-            c == '-' && i + 1 < length && span[i + 1] == '-')
-        {
-            context.ParserState.InLineComment = true;
-            i++; continue;
-        }
-        
-        // End Line Comment \n or \r
-        if (context.ParserState.InLineComment && (c == '\n' || c == '\r'))
-        {
-            context.ParserState.InLineComment = false;
-            // Let it fall through so the newline is kept in the clean buffer!
-        }
+        UpdateScannerState(context, activeSpan);
 
-        // Only append characters if we are NOT inside a comment
-        if (!context.ParserState.InLineComment && !context.ParserState.InBlockComment)
-        {
-            cleanBuffer[cleanIndex++] = c;
-        }
-    }
+        if (forcedKeyword != null)
+            context.ParserState.CurrentKeyword = forcedKeyword;
 
-    // This is our safe, comment-free string chunk!
-    var cleanSpan = cleanBuffer.Slice(0, cleanIndex);
-    var trimmed = cleanSpan.Trim();
-    
-    // 2. --- EXISTING LOGIC (Now using safe `cleanSpan` and `trimmed`) ---
-    
-    string? tag = null;
-    SqlKeyword? forcedKeyword = null; 
-
-    if (cleanSpan.Contains("LIMIT", StringComparison.OrdinalIgnoreCase))
-    {
-        tag = SqlSegmentTag.Paging;
-    }
-    else if (trimmed.EndsWith("DO UPDATE SET", StringComparison.OrdinalIgnoreCase))
-    {
-        forcedKeyword = SqlKeyword.Set;
-        tag = SqlSegmentTag.DoUpdateSetKeyword;
-    }
-    else if (trimmed.EndsWith("ON CONFLICT", StringComparison.OrdinalIgnoreCase))
-    {
-        tag = SqlSegmentTag.OnConflictKeyword;
-    }
-    else if (trimmed.EndsWith(SqlKeyword.Update, StringComparison.OrdinalIgnoreCase))
-    {
-        forcedKeyword = SqlKeyword.Update;
-    }
-    else if (trimmed.EndsWith(SqlKeyword.Set, StringComparison.OrdinalIgnoreCase) || trimmed.EndsWith("SET", StringComparison.OrdinalIgnoreCase))
-    {
-        forcedKeyword = SqlKeyword.Set;
-        tag = SqlSegmentTag.UpdateSetKeyword;
-    }
-    else if (trimmed.EndsWith($"{SqlKeyword.Insert} INTO", StringComparison.OrdinalIgnoreCase) || trimmed.EndsWith(SqlKeyword.Insert, StringComparison.OrdinalIgnoreCase))
-    {
-        forcedKeyword = SqlKeyword.Insert;
-    }
-    else if (trimmed.EndsWith(SqlKeyword.Values, StringComparison.OrdinalIgnoreCase) || trimmed.EndsWith("VALUES", StringComparison.OrdinalIgnoreCase))
-    {
-        forcedKeyword = SqlKeyword.Values;
-        tag = SqlSegmentTag.InsertValuesKeyword;
-    }
-    else if (trimmed.EndsWith("RETURNING", StringComparison.OrdinalIgnoreCase))
-    {
-        tag = SqlSegmentTag.ReturningKeyword;
-    }
-
-    if (trimmed.IsEmpty)
-    {
-        UpdateScannerState(context, cleanSpan);
-        if (forcedKeyword != null) context.ParserState.CurrentKeyword = forcedKeyword;
-        
         if (rented != null) ArrayPool<char>.Shared.Return(rented);
+
         return tag;
     }
-
-    bool endsWithAs = EndsWithAsKeyword(cleanSpan);
-
-    if (context.ParserState.LastAliasableTarget != null)
-    {
-        if (TryPeekAlias(context, cleanSpan, out var alias))
-        {
-            if (context.ParserState.LastAliasableTarget is ISqlEntityBase entity)
-            {
-                if (entity.Reference is ISqlReference entRef) entRef.Alias = alias;
-            }
-            else if (context.ParserState.LastAliasableTarget is ISqlProjection projection)
-            {
-                if (projection.Reference is ISqlReference entRef) entRef.Alias = alias;
-            }
-            context.ParserState.LastAliasableTarget = null;
-        }
-        else if (!endsWithAs)
-        {
-            context.ParserState.LastAliasableTarget = null;
-        }
-    }
-
-    context.ParserState.ExpectsAliasOnly = endsWithAs;
-    
-    // Let the scanner run its dumb word-by-word checks ON THE CLEAN SPAN
-    UpdateScannerState(context, cleanSpan);
-
-    // PROTECT THE STATE: Overwrite the scanner with our explicitly detected keyword
-    if (forcedKeyword != null)
-    {
-        context.ParserState.CurrentKeyword = forcedKeyword;
-    }
-
-    // Clean up our rented array if we used one
-    if (rented != null)
-    {
-        ArrayPool<char>.Shared.Return(rented);
-    }
-
-    return tag;
-}
 
     protected virtual SqlSegment CreateParameter(ISqlParserContext context, object? value)
     {
@@ -371,7 +354,7 @@ public class SqlInterpolationParser : ISqlInterpolationParser
 
         if (current.IsEmpty) return false;
 
-        if (current.StartsWith("AS", StringComparison.OrdinalIgnoreCase))
+        if (current.StartsWith(SqlKeyword.As, StringComparison.OrdinalIgnoreCase))
         {
             if (current.Length == 2 || !char.IsLetterOrDigit(current[2]))
             {
@@ -404,12 +387,12 @@ public class SqlInterpolationParser : ISqlInterpolationParser
         if (end > 0)
         {
             var token = current[..end].ToString();
-            
-            // Explicitly ignore UPSERT keywords!
+
             if (IsSqlKeyword(token) || 
-                token.Equals("RETURNING", StringComparison.OrdinalIgnoreCase) ||
-                token.Equals("ON", StringComparison.OrdinalIgnoreCase) ||
-                token.Equals("DO", StringComparison.OrdinalIgnoreCase)) 
+                token.Equals(SqlKeyword.Returning, StringComparison.OrdinalIgnoreCase) ||
+                token.Equals(SqlKeyword.On, StringComparison.OrdinalIgnoreCase) ||
+                token.Equals(SqlKeyword.Do, StringComparison.OrdinalIgnoreCase) ||
+                token.Equals(SqlKeyword.For, StringComparison.OrdinalIgnoreCase)) 
                 return false;
             
             alias = token;
@@ -423,41 +406,23 @@ public class SqlInterpolationParser : ISqlInterpolationParser
     {
         var trimmed = span.TrimEnd();
         if (trimmed.Length < 2) return false;
-        if (!trimmed.EndsWith("AS", StringComparison.OrdinalIgnoreCase)) return false;
+        if (!trimmed.EndsWith(SqlKeyword.As, StringComparison.OrdinalIgnoreCase)) return false;
         if (trimmed.Length == 2) return true;
 
-        char prefix = trimmed[trimmed.Length - 3];
+        char prefix = trimmed[^3];
         return char.IsWhiteSpace(prefix) || prefix == ')' || prefix == ']' || prefix == '"' || prefix == '`';
     }
 
     private void UpdateScannerState(ISqlParserContext context, ReadOnlySpan<char> span)
     {
-        int localParenDepth = 0; // NEW: Track parenthesis depth
-
         for (int i = 0; i < span.Length; i++)
         {
             var slice = span[i..];
 
-            if (span[i] == '\'' && (i == 0 || span[i - 1] != '\\'))
-            {
-                context.ParserState.IsInsideString = !context.ParserState.IsInsideString;
-                continue;
-            }
-            if (context.ParserState.IsInsideString) continue;
+            if (span[i] == '(') context.ParserState.ParenDepth++;
+            else if (span[i] == ')') context.ParserState.ParenDepth--;
 
-            if (slice.StartsWith("--"))
-            {
-                int nl = slice.IndexOfAny('\r', '\n');
-                i += (nl == -1) ? slice.Length : nl;
-                continue;
-            }
-
-            // NEW: Adjust depth
-            if (span[i] == '(') localParenDepth++;
-            else if (span[i] == ')') localParenDepth--;
-
-            // NEW: Completely ignore any SQL keywords if we are inside a subquery/parenthesis!
-            if (localParenDepth > 0) continue;
+            if (context.ParserState.ParenDepth > 0) continue;
 
             if (i == 0 || char.IsWhiteSpace(span[i - 1]) || span[i - 1] == '(' || span[i - 1] == ')')
             {

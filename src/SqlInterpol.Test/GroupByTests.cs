@@ -1,48 +1,36 @@
+using System.Collections.Generic;
 using SqlInterpol.Config;
-using SqlInterpol.Metadata;
 using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
+using Xunit;
 
 namespace SqlInterpol.Test;
 
 public class GroupByTests
 {
-    [SqlTable("Orders")]
-    public record OrderModel
-    {
-        public int Id { get; init; }
-
-        public int CategoryId { get; init; }
-
-        public string Status { get; init; } = "";
-
-        [SqlColumn("created_at")]
-        public DateTime CreatedAt { get; init; }
-    }
-
     [Theory]
     [MemberData(nameof(GroupByCombinerData))]
-    public void GroupBy_EntityExpression_ResolvesMetadata(SqlTestCase testCase)
+    public void GroupBy_EntityExpression(SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
         
-        // Act - Testing strongly-typed grouping using the params combiner
+        // Act
         var result = db.Query<OrderModel>(o =>
             db.Append($$"""
-            SELECT CategoryId, Status, COUNT(*)
+            SELECT CategoryId, order_status, COUNT(*)
             FROM {{o}}
             GROUP BY {{o[x => x.CategoryId]}}, {{o[x => x.Status]}}
             """))
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+        testCase.AssertSql(result.Sql);
     }
 
     [Theory]
     [MemberData(nameof(GroupByCombinerData))]
-    public void GroupBy_WithEnumerableCombiner_RendersCorrectly(SqlTestCase testCase)
+    public void GroupBy_WithEnumerableCombiner(SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
@@ -54,87 +42,23 @@ public class GroupByTests
             IEnumerable<ISqlFragment> groups = 
             [
                 o["CategoryId"],
-                o["Status"]
+                o["order_status"]
             ];
 
             db.Append($$"""
-                SELECT CategoryId, Status, COUNT(*)
+                SELECT CategoryId, order_status, COUNT(*)
                 FROM {{o}}
                 GROUP BY {{groups}}
                 """);
         }).Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+        testCase.AssertSql(result.Sql);
     }
 
-    public static TheoryData<SqlTestCase> GroupByCombinerData =>
-    [
-        new SqlTestCase(
-            SqlDialectKind.CustomDb,
-            [
-                """
-                SELECT CategoryId, Status, COUNT(*)
-                FROM <<Orders>>
-                GROUP BY <<Orders>>.<<CategoryId>>, <<Orders>>.<<Status>>
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.MySql,
-            [
-                """
-                SELECT CategoryId, Status, COUNT(*)
-                FROM `Orders`
-                GROUP BY `Orders`.`CategoryId`, `Orders`.`Status`
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.Oracle,
-            [
-                """
-                SELECT CategoryId, Status, COUNT(*)
-                FROM "Orders"
-                GROUP BY "Orders"."CategoryId", "Orders"."Status"
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.PostgreSql,
-            [
-                """
-                SELECT CategoryId, Status, COUNT(*)
-                FROM "Orders"
-                GROUP BY "Orders"."CategoryId", "Orders"."Status"
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.SqLite,
-            [
-                """
-                SELECT CategoryId, Status, COUNT(*)
-                FROM "Orders"
-                GROUP BY "Orders"."CategoryId", "Orders"."Status"
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.SqlServer,
-            [
-                """
-                SELECT CategoryId, Status, COUNT(*)
-                FROM [Orders]
-                GROUP BY [Orders].[CategoryId], [Orders].[Status]
-                """
-            ]
-        )
-    ];
-
     [Theory]
-    [MemberData(nameof(GroupByRawData))]
-    public void GroupBy_WithSqlRaw_RendersCorrectly(SqlTestCase testCase)
+    [MemberData(nameof(GroupByWithSqlRawData))]
+    public void GroupBy_WithSqlRaw(SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
@@ -149,76 +73,12 @@ public class GroupByTests
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+        testCase.AssertSql(result.Sql);
     }
 
-    public static TheoryData<SqlTestCase> GroupByRawData =>
-    [
-        new SqlTestCase(
-            SqlDialectKind.CustomDb,
-            [
-                """
-                SELECT YEAR(created_at), COUNT(*)
-                FROM <<Orders>>
-                GROUP BY YEAR(created_at)
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.MySql,
-            [
-                """
-                SELECT YEAR(created_at), COUNT(*)
-                FROM `Orders`
-                GROUP BY YEAR(created_at)
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.Oracle,
-            [
-                """
-                SELECT YEAR(created_at), COUNT(*)
-                FROM "Orders"
-                GROUP BY YEAR(created_at)
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.PostgreSql,
-            [
-                """
-                SELECT YEAR(created_at), COUNT(*)
-                FROM "Orders"
-                GROUP BY YEAR(created_at)
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.SqLite,
-            [
-                """
-                SELECT YEAR(created_at), COUNT(*)
-                FROM "Orders"
-                GROUP BY YEAR(created_at)
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.SqlServer,
-            [
-                """
-                SELECT YEAR(created_at), COUNT(*)
-                FROM [Orders]
-                GROUP BY YEAR(created_at)
-                """
-            ]
-        )
-    ];
-
     [Theory]
-    [MemberData(nameof(GroupByMixedRawData))]
-    public void GroupBy_MixingTypedAndRaw_RendersCorrectly(SqlTestCase testCase)
+    [MemberData(nameof(GroupByMixingTypedAndRawData))]
+    public void GroupBy_MixingTypedAndRaw(SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
@@ -226,25 +86,25 @@ public class GroupByTests
         // Act
         var result = db.Query<OrderModel>(o =>
             db.Append($$"""
-            SELECT Status, YEAR(created_at), COUNT(*)
+            SELECT order_status, YEAR(created_at), COUNT(*)
             FROM {{o}}
             GROUP BY {{o[x => x.Status]}}, {{Sql.Raw("YEAR(created_at)")}}
             """))
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+        testCase.AssertSql(result.Sql);
     }
 
-    public static TheoryData<SqlTestCase> GroupByMixedRawData =>
+    public static TheoryData<SqlTestCase> GroupByCombinerData =>
     [
         new SqlTestCase(
             SqlDialectKind.CustomDb,
             [
                 """
-                SELECT Status, YEAR(created_at), COUNT(*)
-                FROM <<Orders>>
-                GROUP BY <<Orders>>.<<Status>>, YEAR(created_at)
+                SELECT CategoryId, order_status, COUNT(*)
+                FROM <<dbo>>.<<Orders>>
+                GROUP BY <<dbo>>.<<Orders>>.<<CategoryId>>, <<dbo>>.<<Orders>>.<<order_status>>
                 """
             ]
         ),
@@ -252,9 +112,9 @@ public class GroupByTests
             SqlDialectKind.MySql,
             [
                 """
-                SELECT Status, YEAR(created_at), COUNT(*)
-                FROM `Orders`
-                GROUP BY `Orders`.`Status`, YEAR(created_at)
+                SELECT CategoryId, order_status, COUNT(*)
+                FROM `dbo`.`Orders`
+                GROUP BY `dbo`.`Orders`.`CategoryId`, `dbo`.`Orders`.`order_status`
                 """
             ]
         ),
@@ -262,9 +122,9 @@ public class GroupByTests
             SqlDialectKind.Oracle,
             [
                 """
-                SELECT Status, YEAR(created_at), COUNT(*)
-                FROM "Orders"
-                GROUP BY "Orders"."Status", YEAR(created_at)
+                SELECT CategoryId, order_status, COUNT(*)
+                FROM "dbo"."Orders"
+                GROUP BY "dbo"."Orders"."CategoryId", "dbo"."Orders"."order_status"
                 """
             ]
         ),
@@ -272,9 +132,9 @@ public class GroupByTests
             SqlDialectKind.PostgreSql,
             [
                 """
-                SELECT Status, YEAR(created_at), COUNT(*)
-                FROM "Orders"
-                GROUP BY "Orders"."Status", YEAR(created_at)
+                SELECT CategoryId, order_status, COUNT(*)
+                FROM "dbo"."Orders"
+                GROUP BY "dbo"."Orders"."CategoryId", "dbo"."Orders"."order_status"
                 """
             ]
         ),
@@ -282,9 +142,9 @@ public class GroupByTests
             SqlDialectKind.SqLite,
             [
                 """
-                SELECT Status, YEAR(created_at), COUNT(*)
-                FROM "Orders"
-                GROUP BY "Orders"."Status", YEAR(created_at)
+                SELECT CategoryId, order_status, COUNT(*)
+                FROM "dbo"."Orders"
+                GROUP BY "dbo"."Orders"."CategoryId", "dbo"."Orders"."order_status"
                 """
             ]
         ),
@@ -292,9 +152,137 @@ public class GroupByTests
             SqlDialectKind.SqlServer,
             [
                 """
-                SELECT Status, YEAR(created_at), COUNT(*)
-                FROM [Orders]
-                GROUP BY [Orders].[Status], YEAR(created_at)
+                SELECT CategoryId, order_status, COUNT(*)
+                FROM [dbo].[Orders]
+                GROUP BY [dbo].[Orders].[CategoryId], [dbo].[Orders].[order_status]
+                """
+            ]
+        )
+    ];
+
+    public static TheoryData<SqlTestCase> GroupByWithSqlRawData =>
+    [
+        new SqlTestCase(
+            SqlDialectKind.CustomDb,
+            [
+                """
+                SELECT YEAR(created_at), COUNT(*)
+                FROM <<dbo>>.<<Orders>>
+                GROUP BY YEAR(created_at)
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.MySql,
+            [
+                """
+                SELECT YEAR(created_at), COUNT(*)
+                FROM `dbo`.`Orders`
+                GROUP BY YEAR(created_at)
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Oracle,
+            [
+                """
+                SELECT YEAR(created_at), COUNT(*)
+                FROM "dbo"."Orders"
+                GROUP BY YEAR(created_at)
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.PostgreSql,
+            [
+                """
+                SELECT YEAR(created_at), COUNT(*)
+                FROM "dbo"."Orders"
+                GROUP BY YEAR(created_at)
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqLite,
+            [
+                """
+                SELECT YEAR(created_at), COUNT(*)
+                FROM "dbo"."Orders"
+                GROUP BY YEAR(created_at)
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqlServer,
+            [
+                """
+                SELECT YEAR(created_at), COUNT(*)
+                FROM [dbo].[Orders]
+                GROUP BY YEAR(created_at)
+                """
+            ]
+        )
+    ];
+
+    public static TheoryData<SqlTestCase> GroupByMixingTypedAndRawData =>
+    [
+        new SqlTestCase(
+            SqlDialectKind.CustomDb,
+            [
+                """
+                SELECT order_status, YEAR(created_at), COUNT(*)
+                FROM <<dbo>>.<<Orders>>
+                GROUP BY <<dbo>>.<<Orders>>.<<order_status>>, YEAR(created_at)
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.MySql,
+            [
+                """
+                SELECT order_status, YEAR(created_at), COUNT(*)
+                FROM `dbo`.`Orders`
+                GROUP BY `dbo`.`Orders`.`order_status`, YEAR(created_at)
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Oracle,
+            [
+                """
+                SELECT order_status, YEAR(created_at), COUNT(*)
+                FROM "dbo"."Orders"
+                GROUP BY "dbo"."Orders"."order_status", YEAR(created_at)
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.PostgreSql,
+            [
+                """
+                SELECT order_status, YEAR(created_at), COUNT(*)
+                FROM "dbo"."Orders"
+                GROUP BY "dbo"."Orders"."order_status", YEAR(created_at)
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqLite,
+            [
+                """
+                SELECT order_status, YEAR(created_at), COUNT(*)
+                FROM "dbo"."Orders"
+                GROUP BY "dbo"."Orders"."order_status", YEAR(created_at)
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqlServer,
+            [
+                """
+                SELECT order_status, YEAR(created_at), COUNT(*)
+                FROM [dbo].[Orders]
+                GROUP BY [dbo].[Orders].[order_status], YEAR(created_at)
                 """
             ]
         )

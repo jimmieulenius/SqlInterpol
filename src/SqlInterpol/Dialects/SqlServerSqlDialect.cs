@@ -12,12 +12,20 @@ public class SqlServerSqlDialect : SqlDialectBase
 
     public override string RenderFragment(ISqlFragment fragment, ISqlContext context)
     {
-        if (fragment is SqlPagingFragment p)
+        return fragment switch
         {
-            return $"OFFSET {p.Offset} ROWS FETCH NEXT {p.Limit} ROWS ONLY";
-        }
-
-        return base.RenderFragment(fragment, context);
+            // The leading space here is intentional! 
+            // It perfectly replaces the space that .TrimEnd(' ', '\t') removed in SqlDialectBase.
+            SqlLockFragment { Mode: SqlLockMode.Update } => " WITH (UPDLOCK)",
+            SqlLockFragment { Mode: SqlLockMode.Share }  => " WITH (ROWLOCK, HOLDLOCK)",
+            SqlLockFragment { Mode: SqlLockMode.NoLock } => " WITH (NOLOCK)",
+            
+            // Handle SQL Server specific pagination (OFFSET / FETCH)
+            SqlPagingFragment p => $"OFFSET {p.Offset} ROWS FETCH NEXT {p.Limit} ROWS ONLY",
+            
+            // Pass everything else down to the base dialect
+            _ => base.RenderFragment(fragment, context)
+        };
     }
 
     public override IEnumerable<SqlSegment> RewriteSegments(IReadOnlyList<SqlSegment> segments)
@@ -30,7 +38,7 @@ public class SqlServerSqlDialect : SqlDialectBase
             var segment = baseRewritten[i];
 
             bool isOnConflict = segment.Tag == SqlSegmentTag.OnConflictKeyword || 
-                               (segment.Type == SqlSegmentType.Literal && segment.Value is string s1 && s1.Contains("ON CONFLICT", StringComparison.OrdinalIgnoreCase));
+                (segment.Type == SqlSegmentType.Literal && segment.Value is string s1 && s1.Contains("ON CONFLICT", StringComparison.OrdinalIgnoreCase));
 
             // 1. Transpile UPSERT -> ANSI MERGE
             if (isOnConflict)
@@ -113,7 +121,7 @@ public class SqlServerSqlDialect : SqlDialectBase
                             if (segment.Value is string text)
                             {
                                 int index = text.LastIndexOf("RETURNING", StringComparison.OrdinalIgnoreCase);
-                                if (index > 0) rewritten.Add(new SqlSegment(SqlSegmentType.Literal, text[..index]));
+                                if (index > 0) rewritten.Add(new SqlSegment(SqlSegmentType.Literal, text[..index].TrimEnd()));
                             }
                             i += (lookaheadOffset - 1); 
                             goto NextSegment; 
@@ -174,7 +182,7 @@ public class SqlServerMergeFragment(
         var insertCols = insertFragment.Assignments[0].Select(a => a.Reference.ToSql(context, SqlRenderMode.BaseName)).ToList();
         
         var sourceRows = new List<string>();
-        
+
         foreach (var row in insertFragment.Assignments)
         {
             var vals = row.Select(a => a.ToSql(context).Split('=').Last().Trim());

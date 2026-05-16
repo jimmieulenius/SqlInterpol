@@ -24,7 +24,7 @@ public class OrderByAsTests
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+        testCase.AssertSql(result.Sql);
     }
 
     public static TheoryData<SqlTestCase> OrderByWithExplicitAliasData =>

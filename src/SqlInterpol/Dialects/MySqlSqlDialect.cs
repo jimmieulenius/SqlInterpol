@@ -14,11 +14,21 @@ public class MySqlSqlDialect : SqlDialectBase
     {
         var baseRewritten = base.RewriteSegments(segments).ToList();
         var rewritten = new List<SqlSegment>(baseRewritten.Count);
+        
+        SqlLockMode? deferredLock = null;
 
         for (int i = 0; i < baseRewritten.Count; i++)
         {
             var segment = baseRewritten[i];
 
+            // 1. Extract and swallow Lock Fragments
+            if (segment.Type == SqlSegmentType.Raw && segment.Value is SqlLockFragment lockFrag)
+            {
+                deferredLock = lockFrag.Mode;
+                continue; // Do not add it to the rewritten stream (erases it inline)
+            }
+
+            // 2. Existing ON CONFLICT -> ON DUPLICATE KEY UPDATE logic
             bool isOnConflict = segment.Tag == SqlSegmentTag.OnConflictKeyword || 
                                (segment.Type == SqlSegmentType.Literal && segment.Value is string s1 && s1.Contains("ON CONFLICT", StringComparison.OrdinalIgnoreCase));
 
@@ -39,15 +49,12 @@ public class MySqlSqlDialect : SqlDialectBase
                     if (segment.Value is string text)
                     {
                         int idx = text.LastIndexOf("ON CONFLICT", StringComparison.OrdinalIgnoreCase);
-                        
-                        // FIX: Preserve formatting exactly like VALUES and SET!
                         if (idx > -1) 
                         {
                             rewritten.Add(new SqlSegment(SqlSegmentType.Literal, text[..idx]));
                         }
                     }
 
-                    // FIX: Removed the hardcoded \n so it relies purely on the preserved formatting
                     rewritten.Add(new SqlSegment(SqlSegmentType.Literal, "ON DUPLICATE KEY UPDATE"));
 
                     i = doUpdateIdx;
@@ -60,9 +67,25 @@ public class MySqlSqlDialect : SqlDialectBase
                     continue;
                 }
             }
+            
             rewritten.Add(segment);
         }
+
+        // 3. Append deferred locks to the end of the query
+        if (deferredLock == SqlLockMode.Update)
+            rewritten.Add(new SqlSegment(SqlSegmentType.Literal, "\nFOR UPDATE"));
+        else if (deferredLock == SqlLockMode.Share)
+            rewritten.Add(new SqlSegment(SqlSegmentType.Literal, "\nFOR SHARE"));
+
         return rewritten;
+    }
+
+    public override string RenderFragment(ISqlFragment fragment, ISqlContext context)
+    {
+        // Just in case a lock fragment bypasses the rewriter, return empty
+        if (fragment is SqlLockFragment) return string.Empty;
+        
+        return base.RenderFragment(fragment, context);
     }
 }
 

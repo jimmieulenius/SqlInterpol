@@ -27,6 +27,8 @@ public sealed class SqlKeyword
     public static readonly SqlKeyword OnConflict = new("ON CONFLICT", true, false);
     public static readonly SqlKeyword DoUpdateSet = new("DO UPDATE SET", true, false);
     public static readonly SqlKeyword Do = new("DO");
+    public static readonly SqlKeyword ForUpdate = new("FOR UPDATE");
+    public static readonly SqlKeyword ForShare = new("FOR SHARE");
 
     // --- Filtering & Grouping ---
     public static readonly SqlKeyword Where = new("WHERE", true, false);
@@ -57,6 +59,7 @@ public sealed class SqlKeyword
     // --- Structural & Logical ---
     public static readonly SqlKeyword As = new("AS");
     public static readonly SqlKeyword On = new("ON");
+    public static readonly SqlKeyword For = new("FOR");
     public static readonly SqlKeyword And = new("AND");
     public static readonly SqlKeyword Or = new("OR");
     public static readonly SqlKeyword Not = new("NOT");
@@ -88,6 +91,9 @@ public sealed class SqlKeyword
         Returning,
         OnConflict,
         DoUpdateSet,
+        Do,
+        ForUpdate,
+        ForShare,
         Where,
         GroupBy,
         Having,
@@ -109,6 +115,7 @@ public sealed class SqlKeyword
         Distinct,
         As,
         On,
+        For,
         And,
         Or,
         Not,
@@ -118,6 +125,7 @@ public sealed class SqlKeyword
         Null,
         Any,
         All,
+        Some,
         Asc,
         Desc
     ];

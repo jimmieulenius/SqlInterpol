@@ -8,7 +8,7 @@ public class JoinAsTests
 {
     [Theory]
     [MemberData(nameof(JoinWithLiteralAliasesData))]
-    public void Join_WithLiteralAliases_ShouldAvoidDoubleAs(SqlTestCase testCase)
+    public void Join_WithLiteralAliases(SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
@@ -26,7 +26,78 @@ public class JoinAsTests
             .Build();
 
         // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
+        testCase.AssertSql(result.Sql);
+    }
+
+    [Theory]
+    [MemberData(nameof(JoinWithExplicitApiAliasesData))]
+    public void Join_WithExplicitApiAliases(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        
+        // Act
+        var result = db.Query<Product, OrderLine>((p, ol) =>
+            db.Append($$"""
+            SELECT
+                {{p[x => x.Id]}},
+                {{ol[x => x.OrderId]}}
+            FROM dbo.Products AS {{p.As("prod")}}
+            JOIN order_lines AS {{ol}}
+                ON {{p[x => x.Id]}} = {{ol[x => x.ProductItemNumber]}}
+            """))
+            .Build();
+
+        // Assert
+        testCase.AssertSql(result.Sql);
+    }
+
+    [Theory]
+    [MemberData(nameof(SelfJoinData))]
+    public void Join_SelfJoin(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+
+        // Act
+        var result = db.Query<Product, Product>((p1, p2) =>
+            db.Append($$"""
+            SELECT
+                {{p1[x => x.Id]}},
+                {{p2[x => x.Id]}}
+            FROM {{p1}} AS original
+            JOIN {{p2}} AS related
+                ON {{p1[x => x.CategoryId]}} = {{p2[x => x.CategoryId]}}
+            """))
+            .Build();
+
+        // Assert
+        testCase.AssertSql(result.Sql);
+    }
+
+    [Theory]
+    [MemberData(nameof(JoinWithConfigOverrideData))]
+    public void Join_WithSqlEntityConfig(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        
+        // Act
+        var result = db.Entity<Product>(name: "Archive_Products", schema: "history")
+        .Entity<OrderLine>()
+        .Query((p, ol) =>
+            db.Append($$"""
+            SELECT
+                {{p[x => x.Id]}},
+                {{ol[x => x.OrderId]}}
+            FROM {{p}}
+            JOIN {{ol}}
+                ON {{p[x => x.Id]}} = {{ol[x => x.ProductItemNumber]}}
+            """))
+            .Build();
+
+        // Assert
+        testCase.AssertSql(result.Sql);
     }
 
     public static TheoryData<SqlTestCase> JoinWithLiteralAliasesData =>
@@ -111,29 +182,6 @@ public class JoinAsTests
         )
     ];
 
-    [Theory]
-    [MemberData(nameof(JoinWithExplicitApiAliasesData))]
-    public void Join_WithExplicitApiAliases_ShouldRenderCorrectly(SqlTestCase testCase)
-    {
-        // Arrange
-        var db = testCase.CreateBuilder();
-        
-        // Act
-        var result = db.Query<Product, OrderLine>((p, ol) =>
-            db.Append($$"""
-            SELECT
-                {{p[x => x.Id]}},
-                {{ol[x => x.OrderId]}}
-            FROM dbo.Products AS {{p.As("prod")}}
-            JOIN order_lines AS {{ol}}
-                ON {{p[x => x.Id]}} = {{ol[x => x.ProductItemNumber]}}
-            """))
-            .Build();
-
-        // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
-    }
-
     public static TheoryData<SqlTestCase> JoinWithExplicitApiAliasesData =>
     [
         new SqlTestCase(
@@ -216,29 +264,6 @@ public class JoinAsTests
         )
     ];
 
-    [Theory]
-    [MemberData(nameof(SelfJoinData))]
-    public void Join_SelfJoin_ShouldIsolateAliases(SqlTestCase testCase)
-    {
-        // Arrange
-        var db = testCase.CreateBuilder();
-
-        // Act
-        var result = db.Query<Product, Product>((p1, p2) =>
-            db.Append($$"""
-            SELECT
-                {{p1[x => x.Id]}},
-                {{p2[x => x.Id]}}
-            FROM {{p1}} AS original
-            JOIN {{p2}} AS related
-                ON {{p1[x => x.CategoryId]}} = {{p2[x => x.CategoryId]}}
-            """))
-            .Build();
-
-        // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
-    }
-
     public static TheoryData<SqlTestCase> SelfJoinData =>
     [
         new SqlTestCase(
@@ -320,31 +345,6 @@ public class JoinAsTests
             ]
         )
     ];
-
-    [Theory]
-    [MemberData(nameof(JoinWithConfigOverrideData))]
-    public void Join_WithSqlEntityConfig_ShouldOverrideBaseNames(SqlTestCase testCase)
-    {
-        // Arrange
-        var db = testCase.CreateBuilder();
-        
-        // Act
-        var result = db.Entity<Product>(name: "Archive_Products", schema: "history")
-        .Entity<OrderLine>()
-        .Query((p, ol) =>
-            db.Append($$"""
-            SELECT
-                {{p[x => x.Id]}},
-                {{ol[x => x.OrderId]}}
-            FROM {{p}}
-            JOIN {{ol}}
-                ON {{p[x => x.Id]}} = {{ol[x => x.ProductItemNumber]}}
-            """))
-            .Build();
-
-        // Assert
-        Assert.Equal(testCase.ExpectedSql[0], result.Sql);
-    }
 
     public static TheoryData<SqlTestCase> JoinWithConfigOverrideData =>
     [
