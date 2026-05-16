@@ -7,7 +7,7 @@ namespace SqlInterpol.Test;
 public class InsertTests
 {
     [Theory]
-    [MemberData(nameof(AllDialectsInsertData))]
+    [MemberData(nameof(InsertData))]
     public void Insert_WithImplicitSyntax(SqlTestCase testCase)
     {
         // Arrange
@@ -33,7 +33,7 @@ public class InsertTests
     }
 
     [Theory]
-    [MemberData(nameof(AllDialectsInsertData))]
+    [MemberData(nameof(InsertData))]
     public void Insert_WithExplicitValuesKeyword(SqlTestCase testCase)
     {
         // Arrange
@@ -58,7 +58,7 @@ public class InsertTests
     }
 
     [Theory]
-    [MemberData(nameof(InsertData))]
+    [MemberData(nameof(ManualInsertData))]
     public void Insert_PureManual(SqlTestCase testCase)
     {
         // Arrange
@@ -84,7 +84,7 @@ public class InsertTests
     }
 
     [Theory]
-    [MemberData(nameof(AllDialectsBulkInsertData))]
+    [MemberData(nameof(BulkInsertData))]
     public void Insert_BulkImplicitSyntax(SqlTestCase testCase)
     {
         // Arrange
@@ -117,7 +117,7 @@ public class InsertTests
     }
 
     [Theory]
-    [MemberData(nameof(AllDialectsReturningSingleData))]
+    [MemberData(nameof(ReturningSingleData))]
     public void Insert_ReturningSingleColumn(SqlTestCase testCase)
     {
         // Arrange
@@ -135,7 +135,7 @@ public class InsertTests
     }
 
     [Theory]
-    [MemberData(nameof(AllDialectsReturningMultipleData))]
+    [MemberData(nameof(ReturningMultipleData))]
     public void Insert_ReturningMultipleColumns(SqlTestCase testCase)
     {
         // Arrange
@@ -152,7 +152,34 @@ public class InsertTests
         testCase.AssertSql(result.Sql);
     }
 
-    public static TheoryData<SqlTestCase> AllDialectsInsertData =>
+    [Theory]
+    [MemberData(nameof(InsertWithIgnoreData))]
+    public void Insert_WithIgnoredProperty(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        var product = new ProductWithIgnoreModel 
+        { 
+            Id = 1, 
+            Name = "Gadget", 
+            RuntimeCacheToken = "OmitThisColumn" 
+        };
+
+        // Act
+        var result = db.Query<ProductWithIgnoreModel>(p => db.Append($$"""
+            INSERT INTO {{p}} {{product}}
+            """)).Build();
+
+        // Assert SQL
+        testCase.AssertSql(result.Sql);
+
+        // Assert Parameters - Only Id and Name are captured (2 parameters)
+        Assert.Equal(2, result.Parameters.Count);
+        Assert.Equal(1, result.Parameters.ElementAt(0).Value);
+        Assert.Equal("Gadget", result.Parameters.ElementAt(1).Value);
+    }
+
+    public static TheoryData<SqlTestCase> InsertData =>
     [
         new SqlTestCase(
             SqlDialectKind.CustomDb,
@@ -216,7 +243,7 @@ public class InsertTests
         ),
     ];
 
-    public static TheoryData<SqlTestCase> InsertData =>
+    public static TheoryData<SqlTestCase> ManualInsertData =>
     [
         new SqlTestCase(
             SqlDialectKind.CustomDb,
@@ -280,7 +307,7 @@ public class InsertTests
         )
     ];
 
-    public static TheoryData<SqlTestCase> AllDialectsBulkInsertData =>
+    public static TheoryData<SqlTestCase> BulkInsertData =>
     [
         new SqlTestCase(
             SqlDialectKind.CustomDb,
@@ -338,7 +365,7 @@ public class InsertTests
         )
     ];
 
-    public static TheoryData<SqlTestCase> AllDialectsReturningSingleData =>
+    public static TheoryData<SqlTestCase> ReturningSingleData =>
     [
         new SqlTestCase(
             SqlDialectKind.CustomDb,
@@ -402,7 +429,7 @@ public class InsertTests
         )
     ];
 
-    public static TheoryData<SqlTestCase> AllDialectsReturningMultipleData =>
+    public static TheoryData<SqlTestCase> ReturningMultipleData =>
     [
         new SqlTestCase(
             SqlDialectKind.CustomDb,
@@ -459,6 +486,64 @@ public class InsertTests
                 INSERT INTO [dbo].[Products] ([PROD_NAME], [CategoryId], [Price])
                 OUTPUT inserted.[Id], inserted.[PROD_NAME]
                 VALUES (@p0, @p1, @p2)
+                """
+            ]
+        )
+    ];
+
+    public static TheoryData<SqlTestCase> InsertWithIgnoreData =>
+    [
+        new SqlTestCase(
+            SqlDialectKind.CustomDb,
+            [
+                """
+                INSERT INTO <<dbo>>.<<Products>> (<<Id>>, <<PROD_NAME>>)
+                VALUES (!!100, !!101)
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.MySql,
+            [
+                """
+                INSERT INTO `dbo`.`Products` (`Id`, `PROD_NAME`)
+                VALUES (@p0, @p1)
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Oracle,
+            [
+                """
+                INSERT INTO "dbo"."Products" ("Id", "PROD_NAME")
+                VALUES (:0, :1)
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.PostgreSql,
+            [
+                """
+                INSERT INTO "dbo"."Products" ("Id", "PROD_NAME")
+                VALUES ($1, $2)
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqLite,
+            [
+                """
+                INSERT INTO "dbo"."Products" ("Id", "PROD_NAME")
+                VALUES (?0, ?1)
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqlServer,
+            [
+                """
+                INSERT INTO [dbo].[Products] ([Id], [PROD_NAME])
+                VALUES (@p0, @p1)
                 """
             ]
         )

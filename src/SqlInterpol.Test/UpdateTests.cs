@@ -60,6 +60,38 @@ public class UpdateTests
     }
 
     [Theory]
+    [MemberData(nameof(UpdateWithIgnoreData))]
+    public void Update_WithIgnoredProperty(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        var order = new OrderWithIgnoreModel 
+        { 
+            Id = 42, 
+            Status = "Shipped", 
+            Total = 99.99m, 
+            InternalNotes = "Ignore me!" 
+        };
+
+        // Act - Passing the full object which triggers BuildAssignments
+        var result = db.Query<OrderWithIgnoreModel>(o => db.Append($$"""
+            UPDATE {{o}}
+            SET {{order}}
+            WHERE {{o[x => x.Id]}} = {{order.Id}}
+            """)).Build();
+
+        // Assert SQL
+        testCase.AssertSql(result.Sql);
+        
+        // Assert Parameters - 3 parameters from SET (Id, Status, Total) + 1 from WHERE (Id) = 4 total
+        Assert.Equal(4, result.Parameters.Count);
+        Assert.Equal(42, result.Parameters.ElementAt(0).Value);
+        Assert.Equal("Shipped", result.Parameters.ElementAt(1).Value);
+        Assert.Equal(99.99m, result.Parameters.ElementAt(2).Value);
+        Assert.Equal(42, result.Parameters.ElementAt(3).Value);
+    }
+
+    [Theory]
     [MemberData(nameof(UpdateErrorData))]
     public void Update_ValidationRules(SqlErrorTestCase testCase)
     {
@@ -207,6 +239,70 @@ public class UpdateTests
                 UPDATE [dbo].[Orders]
                 SET [dbo].[Orders].[order_status] = @p0, [dbo].[Orders].[Total] = @p1
                 WHERE [dbo].[Orders].[Id] = @p2
+                """
+            ]
+        )
+    ];
+
+    public static TheoryData<SqlTestCase> UpdateWithIgnoreData =>
+    [
+        new SqlTestCase(
+            SqlDialectKind.CustomDb,
+            [
+                """
+                UPDATE <<dbo>>.<<Orders>>
+                SET <<Id>> = !!100, <<order_status>> = !!101, <<Total>> = !!102
+                WHERE <<dbo>>.<<Orders>>.<<Id>> = !!103
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.MySql,
+            [
+                """
+                UPDATE `dbo`.`Orders`
+                SET `Id` = @p0, `order_status` = @p1, `Total` = @p2
+                WHERE `dbo`.`Orders`.`Id` = @p3
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Oracle,
+            [
+                """
+                UPDATE "dbo"."Orders"
+                SET "Id" = :0, "order_status" = :1, "Total" = :2
+                WHERE "dbo"."Orders"."Id" = :3
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.PostgreSql,
+            [
+                """
+                UPDATE "dbo"."Orders"
+                SET "Id" = $1, "order_status" = $2, "Total" = $3
+                WHERE "dbo"."Orders"."Id" = $4
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqLite,
+            [
+                """
+                UPDATE "dbo"."Orders"
+                SET "Id" = ?0, "order_status" = ?1, "Total" = ?2
+                WHERE "dbo"."Orders"."Id" = ?3
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqlServer,
+            [
+                """
+                UPDATE [dbo].[Orders]
+                SET [Id] = @p0, [order_status] = @p1, [Total] = @p2
+                WHERE [dbo].[Orders].[Id] = @p3
                 """
             ]
         )

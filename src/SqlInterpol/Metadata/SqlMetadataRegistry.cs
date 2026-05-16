@@ -49,7 +49,9 @@ public static class SqlMetadataRegistry
     public static PropertyInfo[] GetDtoProperties(Type type)
     {
         return _typePropertyCache.GetOrAdd(type, t => 
-            t.GetProperties(BindingFlags.Public | BindingFlags.Instance));
+            t.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(p => p.GetCustomAttribute<SqlIgnoreAttribute>() == null)
+            .ToArray());
     }
 
     public static string GetColumnName<T>(Expression<Func<T, object>> propertySelector)
