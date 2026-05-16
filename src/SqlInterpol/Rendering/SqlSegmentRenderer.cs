@@ -1,5 +1,9 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using SqlInterpol.Config;
 using SqlInterpol.Metadata;
+using SqlInterpol.Parsing;
 
 namespace SqlInterpol.Rendering;
 
@@ -20,17 +24,16 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
                     // Prioritize the segment's specific RenderMode if set by the parser
                     var mode = segment.RenderMode ?? ResolveRenderMode(index, segment, segments);
 
-                    // NEW: CTE Schema Override Check
+                    // CTE Schema Override Check
                     if (segment.Type == SqlSegmentType.Reference && 
                         segment.Value is ISqlEntityBase entity &&
-                        context is Parsing.ISqlParserContext parserContext &&
+                        context is ISqlParserContext parserContext &&
                         parserContext.ParserState.EntityRoles.TryGetValue(entity, out var role) &&
-                        role == Parsing.SqlEntityRole.Cte)
+                        role == SqlEntityRole.Cte)
                     {
                         // CTEs don't have schemas! We build it raw.
                         if (mode == SqlRenderMode.BaseName || mode == SqlRenderMode.Declaration)
                         {
-                            // FIX 1: Use entity.Declaration.Name instead of FallbackAlias
                             string baseName = context.Dialect.QuoteIdentifier(SqlMetadataRegistry.GetEntityName(entity));
 
                             if (mode == SqlRenderMode.Declaration && entity.Reference is ISqlReference entRef && !string.IsNullOrEmpty(entRef.Alias))
@@ -44,7 +47,6 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
                         }
                         else 
                         {
-                            // Fallback for modes like AliasOnly
                             rendered = fragment.ToSql(context, mode);
                         }
                     }
@@ -79,7 +81,6 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
                             {
                                 var textBeforeParen = beforeSubquery[..^1].TrimEnd();
                                 
-                                // FIX 2: If the block is prefixed by AS, it's a CTE definition and shouldn't be auto-aliased
                                 if (context.Dialect.IsExpressionContext(textBeforeParen) ||
                                     textBeforeParen.EndsWith("AS", StringComparison.OrdinalIgnoreCase))
                                 {
@@ -136,7 +137,6 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
         int lastNewline = prevLiteral.LastIndexOf('\n');
         if (lastNewline < 0) return rendered;
 
-        // Capture the exact whitespace following the last newline in the previous literal
         var indentChars = prevLiteral.Substring(lastNewline + 1)
             .TakeWhile(c => c == ' ' || c == '\t')
             .ToArray();
@@ -144,9 +144,6 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
         if (indentChars.Length > 0)
         {
             var indent = new string(indentChars);
-            
-            // Standardize newlines and inject the parent's indentation level
-            // We use \n + indent because the sub-builder uses \n for its internal lines
             return rendered.Replace("\n", "\n" + indent);
         }
 
@@ -155,12 +152,10 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
 
     private SqlRenderMode ResolveRenderMode(int index, SqlSegment segment, IReadOnlyList<SqlSegment> segments)
     {
-        // if (segment.RenderMode == SqlRenderMode.AliasOnly) return SqlRenderMode.AliasOnly;
-
-        if (segment.Value is not ISqlEntity entity) return SqlRenderMode.Default;
+        // Use ISqlEntityBase so both Queries and Tables can be checked for aliases!
+        if (segment.Value is not ISqlEntityBase entity) return SqlRenderMode.Default;
 
         // 1. WYSIWYG Look-Behind: Did the user manually open a parenthesis?
-        // E.g., WHERE IN ( {{subquery}} ) or FROM ( {{subquery}} ) AS stats
         if (index > 0 && segments[index - 1].Type == SqlSegmentType.Literal)
         {
             var prevText = segments[index - 1].Value?.ToString()?.TrimEnd();
@@ -179,11 +174,22 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
             {
                 var text = next.Value?.ToString()?.TrimStart();
                 
-                // If they manually type AS, drop the declaration but keep parentheses
-                if (text?.StartsWith($"{SqlKeyword.As} ", StringComparison.OrdinalIgnoreCase) == true
-                    || text?.StartsWith($"{SqlKeyword.As}\n", StringComparison.OrdinalIgnoreCase) == true)
+                // If they manually type AS, drop the declaration but keep parens if it's a query
+                if (text?.StartsWith($"{SqlKeyword.As.Value} ", StringComparison.OrdinalIgnoreCase) == true
+                    || text?.StartsWith($"{SqlKeyword.As.Value}\n", StringComparison.OrdinalIgnoreCase) == true)
                 {
                     return SqlRenderMode.BaseName;
+                }
+
+                // If they manually type the alias directly (e.g., " p1"), suppress the auto-generated alias
+                if (entity.Reference is ISqlReference entRef && !string.IsNullOrEmpty(entRef.Alias) && text != null &&
+                    text.StartsWith(entRef.Alias, StringComparison.OrdinalIgnoreCase))
+                {
+                    // Ensure it's a whole word match (so "p1" doesn't falsely match "p11")
+                    if (text.Length == entRef.Alias.Length || !char.IsLetterOrDigit(text[entRef.Alias.Length]))
+                    {
+                        return SqlRenderMode.BaseName;
+                    }
                 }
 
                 // WYSIWYG Look-Ahead: If the next string closes a parenthesis, they opened one.
@@ -199,8 +205,14 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
         }
 
         // 3. Auto-wrapping for un-wrapped physical tables / queries
-        return !string.IsNullOrEmpty(entity.Reference.Alias)
-            ? SqlRenderMode.Declaration
-            : SqlRenderMode.BaseName;
+        if (entity.Reference is ISqlReference reference && !string.IsNullOrEmpty(reference.Alias))
+        {
+            return SqlRenderMode.Declaration;
+        }
+
+        // PERFECT FIX: 
+        // Subqueries without an alias (like UNION) render natively so they don't get arbitrary parentheses!
+        // Physical tables without an alias render their BaseName (e.g., [Products]).
+        return entity is ISqlQuery ? SqlRenderMode.Default : SqlRenderMode.BaseName;
     }
 }

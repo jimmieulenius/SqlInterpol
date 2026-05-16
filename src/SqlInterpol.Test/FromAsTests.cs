@@ -92,6 +92,23 @@ public class FromAsTests
         testCase.AssertSql(result.Sql);
     }
 
+    [Theory]
+    [MemberData(nameof(FromAsEntityAsItsOwnAliasInceptionData))]
+    public void From_As_EntityAsItsOwnAlias_Inception(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+
+        // Act
+        var result = db.Query<Product>(p => db.Append($$"""
+            SELECT {{p}}
+            FROM {{p}} AS {{p}}
+            """)).Build();
+
+        // Assert SQL
+        testCase.AssertSql(result.Sql);
+    }
+
     public static TheoryData<SqlTestCase> From_EntityManualAliasData =>
     [
         new SqlTestCase(
@@ -406,6 +423,64 @@ public class FromAsTests
                 """
                 SELECT
                     [Product].[Id]
+                FROM [dbo].[Products] AS [Product]
+                """
+            ]
+        )
+    ];
+
+    public static TheoryData<SqlTestCase> FromAsEntityAsItsOwnAliasInceptionData =>
+    [
+        new SqlTestCase(
+            SqlDialectKind.CustomDb,
+            [
+                """
+                SELECT <<Product>>.<<Id>>, <<Product>>.<<PROD_NAME>>, <<Product>>.<<IsActive>>, <<Product>>.<<CategoryId>>, <<Product>>.<<Price>>
+                FROM <<dbo>>.<<Products>> AS <<Product>>
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.MySql,
+            [
+                """
+                SELECT `Product`.`Id`, `Product`.`PROD_NAME`, `Product`.`IsActive`, `Product`.`CategoryId`, `Product`.`Price`
+                FROM `dbo`.`Products` AS `Product`
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Oracle,
+            [
+                """
+                SELECT "Product"."Id", "Product"."PROD_NAME", "Product"."IsActive", "Product"."CategoryId", "Product"."Price"
+                FROM "dbo"."Products" AS "Product"
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.PostgreSql,
+            [
+                """
+                SELECT "Product"."Id", "Product"."PROD_NAME", "Product"."IsActive", "Product"."CategoryId", "Product"."Price"
+                FROM "dbo"."Products" AS "Product"
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqLite,
+            [
+                """
+                SELECT "Product"."Id", "Product"."PROD_NAME", "Product"."IsActive", "Product"."CategoryId", "Product"."Price"
+                FROM "dbo"."Products" AS "Product"
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqlServer,
+            [
+                """
+                SELECT [Product].[Id], [Product].[PROD_NAME], [Product].[IsActive], [Product].[CategoryId], [Product].[Price]
                 FROM [dbo].[Products] AS [Product]
                 """
             ]
