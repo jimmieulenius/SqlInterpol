@@ -22,7 +22,7 @@ public static class SqlMetadataRegistry
     {
         ArgumentNullException.ThrowIfNull(entity);
 
-        // 2. Safely extract and cache the 'T' from ISqlEntityBase<T> (e.g. Product)
+        // Safely extract and cache the 'T' from ISqlEntityBase<T> (e.g. Product)
         Type modelType = _entityModelTypeCache.GetOrAdd(entity.GetType(), type =>
         {
             var interfaceType = type.GetInterfaces().FirstOrDefault(i => 
@@ -37,7 +37,7 @@ public static class SqlMetadataRegistry
             throw new ArgumentException($"Entity type {type.Name} must implement ISqlEntityBase<T>.", nameof(entity));
         });
 
-        // 3. Forward the resolved model type to your existing attribute-parsing logic
+        // Forward the resolved model type to your existing attribute-parsing logic
         return GetMetadata(modelType).Name;
     }
 
@@ -79,7 +79,9 @@ public static class SqlMetadataRegistry
         string? schema = entityAttr?.Schema; 
         SqlEntityType entityType = entityAttr?.Type ?? SqlEntityType.Table;
 
+        // CRITICAL UPDATE: Filter out properties decorated with [SqlIgnore]
         var columns = type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(p => p.GetCustomAttribute<SqlIgnoreAttribute>() == null)
             .ToDictionary(
                 p => (MemberInfo)p,
                 p => p.GetCustomAttribute<SqlColumnAttribute>()?.Name ?? p.Name

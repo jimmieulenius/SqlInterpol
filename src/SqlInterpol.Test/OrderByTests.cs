@@ -114,6 +114,28 @@ public class OrderByTests
         testCase.AssertSql(result.Sql);
     }
 
+    [Theory]
+    [MemberData(nameof(OrderByErrorData))]
+    public void OrderBy_ValidationRules(SqlErrorTestCase testCase)
+    {
+        // Act
+        var exception = Record.Exception(() => 
+        {
+            var db = testCase.CreateBuilder();
+            if (testCase.ExpectedMessageSubstring.Contains("FakeColumn"))
+            {
+                db.AddEntity<Product>().OrderBy("FakeColumn", SqlOrderDirection.Asc);
+            }
+            else
+            {
+                db.AddEntity<OrderTestModel>().OrderBy(x => x.UnmappedProperty, SqlOrderDirection.Asc);
+            }
+        });
+
+        // Assert
+        testCase.AssertException(exception);
+    }
+
     public static TheoryData<SqlTestCase> OrderByExpressionData =>
     [
         new SqlTestCase(
@@ -367,6 +389,20 @@ public class OrderByTests
                 ORDER BY [dbo].[Orders].[created_at] ASC, (Total * 0.9) DESC
                 """
             ]
+        )
+    ];
+
+    public static TheoryData<SqlErrorTestCase> OrderByErrorData =>
+    [
+        new SqlErrorTestCase(
+            SqlDialectKind.CustomDb,
+            typeof(ArgumentException),
+            $"Property 'FakeColumn' not found on '{typeof(Product).Name}'."
+        ),
+        new SqlErrorTestCase(
+            SqlDialectKind.CustomDb,
+            typeof(ArgumentException),
+            "Property 'UnmappedProperty' not mapped."
         )
     ];
 }

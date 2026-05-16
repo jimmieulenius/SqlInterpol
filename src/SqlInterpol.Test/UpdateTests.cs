@@ -7,7 +7,7 @@ namespace SqlInterpol.Test;
 public class UpdateTests
 {
     [Theory]
-    [MemberData(nameof(AllDialectsUpdateData))]
+    [MemberData(nameof(UpdateData))]
     public void Update_WithContextualDto(SqlTestCase testCase)
     {
         // Arrange
@@ -59,7 +59,30 @@ public class UpdateTests
         Assert.Equal(orderId, result.Parameters.ElementAt(2).Value);
     }
 
-    public static TheoryData<SqlTestCase> AllDialectsUpdateData =>
+    [Theory]
+    [MemberData(nameof(UpdateErrorData))]
+    public void Update_ValidationRules(SqlErrorTestCase testCase)
+    {
+        // Act
+        var exception = Record.Exception(() => 
+        {
+            if (testCase.ExpectedMessageSubstring.Contains("implement"))
+            {
+                Sql.BuildAssignments(new InvalidDummyEntity(), new { Name = "Test" });
+            }
+            else
+            {
+                var db = testCase.CreateBuilder();
+                var entity = db.AddEntity<Product>();
+                Sql.BuildAssignments(entity, new { Id = 1, NonExistentProperty = "Should Fail" });
+            }
+        });
+
+        // Assert
+        testCase.AssertException(exception);
+    }
+
+    public static TheoryData<SqlTestCase> UpdateData =>
     [
         new SqlTestCase(
             SqlDialectKind.CustomDb,
@@ -186,6 +209,20 @@ public class UpdateTests
                 WHERE [dbo].[Orders].[Id] = @p2
                 """
             ]
+        )
+    ];
+
+    public static TheoryData<SqlErrorTestCase> UpdateErrorData =>
+    [
+        new SqlErrorTestCase(
+            SqlDialectKind.CustomDb,
+            typeof(ArgumentException),
+            "Entity must implement ISqlEntityBase<T>"
+        ),
+        new SqlErrorTestCase(
+            SqlDialectKind.CustomDb,
+            typeof(ArgumentException),
+            "Property 'NonExistentProperty' on DTO does not exist on Entity."
         )
     ];
 }

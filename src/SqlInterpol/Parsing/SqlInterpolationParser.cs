@@ -103,7 +103,7 @@ public class SqlInterpolationParser : ISqlInterpolationParser
             return new SqlSegment(SqlSegmentType.Literal, direction == SqlOrderDirection.Asc ? SqlKeyword.Asc : SqlKeyword.Desc);
         }
 
-        // 4. Magic DTO Promotion (This is what failed previously because CurrentKeyword wasn't Set!)
+        // 4. Magic DTO Promotion
         if (value != null && value.GetType().IsClass && value is not ISqlFragment && value is not ISqlReference && value is not ISqlEntityBase && value is not ISqlProjection && value is not string && value is not IEnumerable)
         {
             if (context.ParserState.CurrentKeyword?.Value.Equals(SqlKeyword.Set, StringComparison.OrdinalIgnoreCase) == true && context.ParserState.ActiveEntityTarget != null)
@@ -194,7 +194,7 @@ public class SqlInterpolationParser : ISqlInterpolationParser
 
     public virtual string? ProcessLiteral(ISqlParserContext context, ReadOnlySpan<char> span)
     {
-        // 1. --- ZERO-ALLOCATION, STRING-AWARE COMMENT SCRUBBING ---
+        // 1. --- ZERO-ALLOCATION, STATE-AWARE SCRUBBING ---
         int length = span.Length;
         char[]? rented = null;
         Span<char> cleanBuffer = length <= 1024 
@@ -207,20 +207,27 @@ public class SqlInterpolationParser : ISqlInterpolationParser
         {
             char c = span[i];
 
-            // Toggle String State (Ignore comments inside 'strings')
+            // 1. Toggle String State
             if (c == '\'' && !context.ParserState.InBlockComment && !context.ParserState.InLineComment)
             {
+                // Handle escaped quotes ('') inside strings
+                if (context.ParserState.IsInsideString && i + 1 < length && span[i + 1] == '\'')
+                {
+                    i++; // Skip the second quote entirely
+                    continue; // Stay inside string state
+                }
+
                 context.ParserState.IsInsideString = !context.ParserState.IsInsideString;
-                cleanBuffer[cleanIndex++] = c;
+                cleanBuffer[cleanIndex++] = ' '; // Pad with space to prevent word concatenation
                 continue;
             }
 
             if (context.ParserState.IsInsideString)
             {
-                cleanBuffer[cleanIndex++] = c;
-                continue;
+                continue; // Ignore string contents entirely
             }
 
+            // 2. Block Comments
             if (!context.ParserState.InLineComment && c == '/' && i + 1 < length && span[i + 1] == '*')
             {
                 context.ParserState.InBlockComment = true;
@@ -233,7 +240,13 @@ public class SqlInterpolationParser : ISqlInterpolationParser
                 cleanBuffer[cleanIndex++] = ' '; // Pad with space
                 i++; continue;
             }
+
+            if (context.ParserState.InBlockComment)
+            {
+                continue; // Ignore multi-line comment contents
+            }
             
+            // 3. Line Comments
             if (!context.ParserState.InBlockComment && c == '-' && i + 1 < length && span[i + 1] == '-')
             {
                 context.ParserState.InLineComment = true;
@@ -243,17 +256,22 @@ public class SqlInterpolationParser : ISqlInterpolationParser
             if (context.ParserState.InLineComment && (c == '\n' || c == '\r'))
             {
                 context.ParserState.InLineComment = false;
+                cleanBuffer[cleanIndex++] = c; // Keep newlines to separate lines safely
+                continue;
             }
 
-            if (!context.ParserState.InLineComment && !context.ParserState.InBlockComment)
+            if (context.ParserState.InLineComment)
             {
-                cleanBuffer[cleanIndex++] = c;
+                continue; // Ignore single-line comment contents
             }
+
+            // 4. Standard safe character (Not in a string or comment)
+            cleanBuffer[cleanIndex++] = c;
         }
 
         var activeSpan = cleanBuffer.Slice(0, cleanIndex);
 
-        // 3. --- EXISTING KEYWORD LOGIC ---
+        // 3. --- KEYWORD SCANNING ON SCRUBBED SPAN ---
         var trimmed = activeSpan.Trim();
         string? tag = null;
         SqlKeyword? forcedKeyword = null; 
@@ -262,6 +280,7 @@ public class SqlInterpolationParser : ISqlInterpolationParser
             tag = SqlSegmentTag.ForUpdateKeyword;
         else if (trimmed.Contains(SqlKeyword.ForShare, StringComparison.OrdinalIgnoreCase))
             tag = SqlSegmentTag.ForShareKeyword;
+        
         if (trimmed.Contains(SqlKeyword.Limit, StringComparison.OrdinalIgnoreCase))
             tag = SqlSegmentTag.Paging;
         else if (trimmed.EndsWith(SqlKeyword.DoUpdateSet, StringComparison.OrdinalIgnoreCase))
@@ -273,14 +292,14 @@ public class SqlInterpolationParser : ISqlInterpolationParser
             tag = SqlSegmentTag.OnConflictKeyword;
         else if (trimmed.EndsWith(SqlKeyword.Update, StringComparison.OrdinalIgnoreCase))
             forcedKeyword = SqlKeyword.Update;
-        else if (trimmed.EndsWith(SqlKeyword.Set, StringComparison.OrdinalIgnoreCase) || trimmed.EndsWith(SqlKeyword.Set, StringComparison.OrdinalIgnoreCase))
+        else if (trimmed.EndsWith(SqlKeyword.Set, StringComparison.OrdinalIgnoreCase))
         {
             forcedKeyword = SqlKeyword.Set;
             tag = SqlSegmentTag.UpdateSetKeyword;
         }
         else if (trimmed.EndsWith($"{SqlKeyword.Insert} {SqlKeyword.Into}", StringComparison.OrdinalIgnoreCase) || trimmed.EndsWith(SqlKeyword.Insert, StringComparison.OrdinalIgnoreCase))
             forcedKeyword = SqlKeyword.Insert;
-        else if (trimmed.EndsWith(SqlKeyword.Values, StringComparison.OrdinalIgnoreCase) || trimmed.EndsWith(SqlKeyword.Values, StringComparison.OrdinalIgnoreCase))
+        else if (trimmed.EndsWith(SqlKeyword.Values, StringComparison.OrdinalIgnoreCase))
         {
             forcedKeyword = SqlKeyword.Values;
             tag = SqlSegmentTag.InsertValuesKeyword;
@@ -317,6 +336,8 @@ public class SqlInterpolationParser : ISqlInterpolationParser
 
         context.ParserState.ExpectsAliasOnly = endsWithAs;
         
+        // Notice we pass `activeSpan` down to `UpdateScannerState` as well,
+        // so it won't trigger `SqlKeyword` states (like `FROM`) if they are inside strings!
         UpdateScannerState(context, activeSpan);
 
         if (forcedKeyword != null)
