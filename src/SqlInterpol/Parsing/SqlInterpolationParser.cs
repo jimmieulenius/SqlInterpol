@@ -87,11 +87,13 @@ public class SqlInterpolationParser : ISqlInterpolationParser
                 if (meta.Columns.Count > 0)
                 {
                     var columns = new List<ISqlFragment>(meta.Columns.Count);
+
                     foreach (var kvp in meta.Columns)
                     {
                         columns.Add(new SqlColumnReference(selectEntity.Reference, kvp.Value, kvp.Key.Name));
                     }
-                    return new SqlSegment(SqlSegmentType.Raw, new SqlCollectionFragment(columns));
+
+                    return new SqlSegment(SqlSegmentType.Raw, new SqlSelectFragment(columns));
                 }
             }
         }
@@ -342,8 +344,11 @@ public class SqlInterpolationParser : ISqlInterpolationParser
         else if (trimmed.EndsWith(SqlKeyword.Returning, StringComparison.OrdinalIgnoreCase))
             tag = SqlSegmentTag.ReturningKeyword;
         // THESE TWO LINES ARE CRITICAL to escape the SELECT state!
-        else if (trimmed.EndsWith("SELECT", StringComparison.OrdinalIgnoreCase)) 
+        else if (trimmed.EndsWith("SELECT", StringComparison.OrdinalIgnoreCase))
+        {
             forcedKeyword = SqlKeyword.Select;
+            tag = SqlSegmentTag.SelectKeyword;
+        }
         else if (trimmed.EndsWith("FROM", StringComparison.OrdinalIgnoreCase)) 
             forcedKeyword = SqlKeyword.From;
 

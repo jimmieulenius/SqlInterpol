@@ -213,6 +213,24 @@ public class FormattingTests
         testCase.AssertSql(result.Sql);
     }
 
+    [Theory]
+    [MemberData(nameof(SelectEntityExpansionVerticalLayoutData))]
+    public void Select_EntityExpansion_VerticalLayout(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        db.Context.Options.CollectionLayout = SqlCollectionLayout.Vertical;
+
+        // Act
+        var result = db.Query<ProductWithIgnoreModel>(p => db.Append($$"""
+            SELECT {{p}}
+            FROM {{p}} AS p1
+            """)).Build();
+
+        // Assert SQL
+        testCase.AssertSql(result.Sql);
+    }
+
     public static TheoryData<SqlTestCase> Select_WithNewLinesData =>
     [
         new SqlTestCase(
@@ -1022,6 +1040,76 @@ public class FormattingTests
                 ORDER BY 
                     [dbo].[Orders].[Total],
                     [dbo].[Orders].[Id] DESC
+                """
+            ]
+        )
+    ];
+
+    public static TheoryData<SqlTestCase> SelectEntityExpansionVerticalLayoutData =>
+    [
+        new SqlTestCase(
+            SqlDialectKind.CustomDb,
+            [
+                """
+                SELECT
+                    <<p1>>.<<Id>>,
+                    <<p1>>.<<PROD_NAME>>
+                FROM <<dbo>>.<<Products>> AS p1
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.MySql,
+            [
+                """
+                SELECT
+                    `p1`.`Id`,
+                    `p1`.`PROD_NAME`
+                FROM `dbo`.`Products` AS p1
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Oracle,
+            [
+                """
+                SELECT
+                    "p1"."Id",
+                    "p1"."PROD_NAME"
+                FROM "dbo"."Products" AS p1
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.PostgreSql,
+            [
+                """
+                SELECT
+                    "p1"."Id",
+                    "p1"."PROD_NAME"
+                FROM "dbo"."Products" AS p1
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqLite,
+            [
+                """
+                SELECT
+                    "p1"."Id",
+                    "p1"."PROD_NAME"
+                FROM "dbo"."Products" AS p1
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqlServer,
+            [
+                """
+                SELECT
+                    [p1].[Id],
+                    [p1].[PROD_NAME]
+                FROM [dbo].[Products] AS p1
                 """
             ]
         )

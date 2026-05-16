@@ -144,6 +144,7 @@ public abstract class SqlDialectBase : ISqlDialect
                     if (keywordIndex > -1)
                     {
                         rewritten.Add(new SqlSegment(SqlSegmentType.Literal, text[..keywordIndex]));
+
                         return true;
                     }
                 }
@@ -247,6 +248,9 @@ public abstract class SqlDialectBase : ISqlDialect
                     break;
                 case SqlSegmentTag.UpdateSetKeyword:
                     if (TryRewriteKeywordFragment<SqlSetFragment>(SqlKeyword.Set, segment, i)) continue;
+                    break;
+                case SqlSegmentTag.SelectKeyword:
+                    if (TryRewriteKeywordFragment<SqlSelectFragment>(SqlKeyword.Select, segment, i)) continue;
                     break;
             }
 

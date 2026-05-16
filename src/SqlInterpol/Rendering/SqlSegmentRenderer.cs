@@ -65,6 +65,7 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
                 if (index > 0 && segments[index - 1].Value is ISqlQuery prevSubquery)
                 {
                     var trimmed = text.TrimStart();
+
                     if (trimmed.StartsWith(")"))
                     {
                         var afterClose = trimmed[1..].TrimStart();
@@ -73,6 +74,7 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
                                         || afterClose.StartsWith($"{SqlKeyword.As.Value}\r", StringComparison.OrdinalIgnoreCase);
 
                         bool requiresAlias = true;
+
                         if (index >= 2 && segments[index - 2].Type == SqlSegmentType.Literal)
                         {
                             var beforeSubquery = segments[index - 2].Value?.ToString()?.TrimEnd();
