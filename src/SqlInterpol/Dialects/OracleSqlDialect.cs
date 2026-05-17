@@ -18,7 +18,15 @@ public class OracleSqlDialect : SqlDialectBase
         }
         
         // Just in case a lock fragment bypasses the rewriter, return empty
-        if (fragment is SqlLockFragment) return string.Empty;
+        if (fragment is SqlLockFragment)
+        {
+            return string.Empty;
+        }
+
+        if (fragment is SqlSetOperationFragment setOp && setOp.Operator == SqlSetOperator.Except)
+        {
+            return $"{setOp.Left.ToSql(context)}{Environment.NewLine}MINUS{Environment.NewLine}{setOp.Right.ToSql(context)}";
+        }
 
         return base.RenderFragment(fragment, context);
     }
@@ -43,18 +51,18 @@ public class OracleSqlDialect : SqlDialectBase
             }
 
             // 3. Apply Oracle specific paging logic to the cleaned AST
-            if (segment.Tag == SqlSegmentTag.Paging && segment.Value is string text)
+            if (segment.Tag == SqlSegmentTag.Paging && segment.Value is string pagingValue)
             {
                 if (i + 3 < baseRewritten.Count &&
                     baseRewritten[i + 1].Type == SqlSegmentType.Parameter &&
                     baseRewritten[i + 3].Type == SqlSegmentType.Parameter)
                 {
-                    int index = text.LastIndexOf(SqlKeyword.Limit, StringComparison.OrdinalIgnoreCase);
+                    int index = pagingValue.LastIndexOf(SqlKeyword.Limit, StringComparison.OrdinalIgnoreCase);
                     
                     if (index > -1)
                     {
                         // Preserve formatting before the word LIMIT
-                        rewritten.Add(new SqlSegment(SqlSegmentType.Literal, text[..index]));
+                        rewritten.Add(new SqlSegment(SqlSegmentType.Literal, pagingValue[..index]));
                     }
 
                     // Swapping LIMIT/OFFSET to Oracle 12c+ syntax
@@ -69,6 +77,17 @@ public class OracleSqlDialect : SqlDialectBase
                     i += 3; // Skip consumed segments
 
                     continue;
+                }
+            }
+
+            if (segment.Type == SqlSegmentType.Literal && segment.Value is string literalValue)
+            {
+                if (literalValue.Contains("EXCEPT", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    // Use the centralized parser to safely navigate SQL syntax rules
+                    var newValue = SqlInterpolationParser.Instance.ReplaceKeyword(literalValue, SqlKeyword.Except, "MINUS");
+                    
+                    segment = new SqlSegment(SqlSegmentType.Literal, newValue);
                 }
             }
 

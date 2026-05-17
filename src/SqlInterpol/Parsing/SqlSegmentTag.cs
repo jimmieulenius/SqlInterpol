@@ -14,4 +14,8 @@ public static class SqlSegmentTag
     public const string ForShareKeyword = "ForShareKeyword";
     public const string SelectKeyword = "SelectKeyword";
     public const string SelectDistinctKeyword = "SelectDistinctKeyword";
+    public const string IntersectKeyword = "IntersectKeyword";
+    public const string ExceptKeyword = "ExceptKeyword";
+    public const string UnionKeyword = "UnionKeyword";
+    public const string UnionAllKeyword = "UnionAllKeyword";
 }

@@ -355,6 +355,14 @@ public class SqlInterpolationParser : ISqlInterpolationParser
         }
         else if (trimmed.EndsWith(SqlKeyword.From, StringComparison.OrdinalIgnoreCase)) 
             forcedKeyword = SqlKeyword.From;
+        else if (trimmed.Equals(SqlKeyword.Except, StringComparison.OrdinalIgnoreCase))
+            tag = SqlSegmentTag.ExceptKeyword;
+        else if (trimmed.Equals(SqlKeyword.Intersect, StringComparison.OrdinalIgnoreCase))
+            tag = SqlSegmentTag.IntersectKeyword;
+        else if (trimmed.Equals(SqlKeyword.UnionAll, StringComparison.OrdinalIgnoreCase)) // MUST BE BEFORE UNION
+            tag = SqlSegmentTag.UnionAllKeyword;
+        else if (trimmed.Equals(SqlKeyword.Union, StringComparison.OrdinalIgnoreCase))
+            tag = SqlSegmentTag.UnionKeyword;
 
         if (trimmed.IsEmpty)
         {
@@ -393,6 +401,99 @@ public class SqlInterpolationParser : ISqlInterpolationParser
         if (rented != null) ArrayPool<char>.Shared.Return(rented);
 
         return tag;
+    }
+
+    public virtual string ReplaceKeyword(string sql, string keyword, string replacement)
+    {
+        if (string.IsNullOrEmpty(sql) || sql.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) == -1)
+            return sql;
+
+        var result = new System.Text.StringBuilder(sql.Length + 10);
+        bool inString = false, inLineComment = false, inBlockComment = false;
+        int keywordLen = keyword.Length;
+
+        for (int i = 0; i < sql.Length; i++)
+        {
+            char c = sql[i];
+
+            // 1. String State
+            if (c == '\'' && !inBlockComment && !inLineComment)
+            {
+                if (inString && i + 1 < sql.Length && sql[i + 1] == '\'')
+                {
+                    result.Append("''");
+                    i++;
+                    continue;
+                }
+                inString = !inString;
+                result.Append(c);
+                continue;
+            }
+
+            if (inString)
+            {
+                result.Append(c);
+                continue;
+            }
+
+            // 2. Block Comment State
+            if (!inLineComment && c == '/' && i + 1 < sql.Length && sql[i + 1] == '*')
+            {
+                inBlockComment = true;
+                result.Append("/*");
+                i++; continue;
+            }
+            if (inBlockComment && c == '*' && i + 1 < sql.Length && sql[i + 1] == '/')
+            {
+                inBlockComment = false;
+                result.Append("*/");
+                i++; continue;
+            }
+            if (inBlockComment)
+            {
+                result.Append(c);
+                continue;
+            }
+
+            // 3. Line Comment State
+            if (!inBlockComment && c == '-' && i + 1 < sql.Length && sql[i + 1] == '-')
+            {
+                inLineComment = true;
+                result.Append("--");
+                i++; continue;
+            }
+            if (inLineComment && (c == '\n' || c == '\r'))
+            {
+                inLineComment = false;
+                result.Append(c);
+                continue;
+            }
+            if (inLineComment)
+            {
+                result.Append(c);
+                continue;
+            }
+
+            // 4. Safe Keyword Replacement (Only triggers if outside strings/comments!)
+            if (i + keywordLen <= sql.Length && 
+                string.Compare(sql, i, keyword, 0, keywordLen, StringComparison.OrdinalIgnoreCase) == 0)
+            {
+                // Ensure word boundaries so we don't replace "Exceptional"
+                bool leftSafe = i == 0 || (!char.IsLetterOrDigit(sql[i - 1]) && sql[i - 1] != '_');
+                bool rightSafe = i + keywordLen == sql.Length || (!char.IsLetterOrDigit(sql[i + keywordLen]) && sql[i + keywordLen] != '_');
+
+                if (leftSafe && rightSafe)
+                {
+                    result.Append(replacement);
+                    i += keywordLen - 1; // Skip the original keyword
+                    continue;
+                }
+            }
+
+            result.Append(c);
+        }
+
+        return result.ToString();
     }
 
     protected virtual SqlSegment CreateParameter(ISqlParserContext context, object? value)

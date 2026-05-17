@@ -123,6 +123,7 @@ public abstract class SqlDialectBase : ISqlDialect
         return fragment switch
         {
             SqlPagingFragment p => $"{SqlKeyword.Limit} {p.Limit} {SqlKeyword.Offset} {p.Offset}",
+            SqlSetOperationFragment setOp => RenderSetOperation(setOp, context),
 
             _ => throw new NotSupportedException($"The fragment type '{fragment.GetType().Name}' is not supported by {this.GetType().Name}.")
         };
@@ -233,6 +234,29 @@ public abstract class SqlDialectBase : ISqlDialect
                     continue;
                 }
             }
+            else if (segment.Tag == SqlSegmentTag.ExceptKeyword || 
+                segment.Tag == SqlSegmentTag.IntersectKeyword ||
+                segment.Tag == SqlSegmentTag.UnionKeyword ||
+                segment.Tag == SqlSegmentTag.UnionAllKeyword)
+            {
+                var op = segment.Tag switch
+                {
+                    SqlSegmentTag.ExceptKeyword => SqlSetOperator.Except,
+                    SqlSegmentTag.IntersectKeyword => SqlSetOperator.Intersect,
+                    SqlSegmentTag.UnionAllKeyword => SqlSetOperator.UnionAll,
+                    _ => SqlSetOperator.Union
+                };
+
+                if (rewritten.Count > 0 && rewritten[^1].Value is ISqlFragment left && 
+                    i + 1 < segments.Count && segments[i + 1].Value is ISqlFragment right)
+                {
+                    var fragment = new SqlSetOperationFragment(left, right, op);
+                    
+                    rewritten[^1] = new SqlSegment(SqlSegmentType.Raw, fragment);
+                    i++; // Skip the Right query
+                    continue; // Skip the Keyword segment
+                }
+            }
 
             if (forceBaseNamePhase && segment.Type == SqlSegmentType.Projection && segment.Value is ISqlProjection proj)
             {
@@ -264,4 +288,18 @@ public abstract class SqlDialectBase : ISqlDialect
     }
 
     public virtual SqlInterpolOptions GetDefaultOptions() => new();
+
+    protected virtual string RenderSetOperation(SqlSetOperationFragment fragment, ISqlContext context)
+    {
+        string opKeyword = fragment.Operator switch
+        {
+            SqlSetOperator.Except => SqlKeyword.Except,
+            SqlSetOperator.Intersect => SqlKeyword.Intersect,
+            SqlSetOperator.Union => SqlKeyword.Union,
+            SqlSetOperator.UnionAll => SqlKeyword.UnionAll,
+            _ => throw new NotImplementedException($"Set operator {fragment.Operator} is not supported.")
+        };
+        
+        return $"{fragment.Left.ToSql(context)}{Environment.NewLine}{opKeyword}{Environment.NewLine}{fragment.Right.ToSql(context)}";
+    }
 }
