@@ -13,4 +13,5 @@ public static class SqlSegmentTag
     public const string ForUpdateKeyword = "ForUpdateKeyword";
     public const string ForShareKeyword = "ForShareKeyword";
     public const string SelectKeyword = "SelectKeyword";
+    public const string SelectDistinctKeyword = "SelectDistinctKeyword";
 }

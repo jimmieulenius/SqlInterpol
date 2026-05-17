@@ -1,8 +1,5 @@
-using System;
 using System.Buffers;
 using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
 using SqlInterpol.Metadata;
 using SqlInterpol.References;
 
@@ -55,12 +52,15 @@ public class SqlInterpolationParser : ISqlInterpolationParser
             }
         }
 
-        // 2. MAGIC SELECT PROMOTION
+        // 2. SELECT PROMOTION
         // Explicitly guard against ISqlProjection AND ISqlQuery so subqueries retain WYSIWYG indentation!
+        bool isSelect = context.ParserState.CurrentKeyword == SqlKeyword.Select;
+        bool isSelectDistinct = context.ParserState.CurrentKeyword == SqlKeyword.SelectDistinct;
+
         if (value is ISqlEntityBase selectEntity && 
             value is not ISqlProjection && 
             value is not ISqlQuery &&
-            string.Equals(context.ParserState.CurrentKeyword?.Value, SqlKeyword.Select, StringComparison.OrdinalIgnoreCase))
+            (isSelect || isSelectDistinct)) // <-- FIX: Match both conditions safely
         {
             Type? modelType = null;
             Type type = selectEntity.GetType();
@@ -93,7 +93,7 @@ public class SqlInterpolationParser : ISqlInterpolationParser
                         columns.Add(new SqlColumnReference(selectEntity.Reference, kvp.Value, kvp.Key.Name));
                     }
 
-                    return new SqlSegment(SqlSegmentType.Raw, new SqlSelectFragment(columns));
+                    return new SqlSegment(SqlSegmentType.Raw, new SqlSelectFragment(columns, isDistinct: isSelectDistinct));
                 }
             }
         }
@@ -343,13 +343,17 @@ public class SqlInterpolationParser : ISqlInterpolationParser
         }
         else if (trimmed.EndsWith(SqlKeyword.Returning, StringComparison.OrdinalIgnoreCase))
             tag = SqlSegmentTag.ReturningKeyword;
-        // THESE TWO LINES ARE CRITICAL to escape the SELECT state!
-        else if (trimmed.EndsWith("SELECT", StringComparison.OrdinalIgnoreCase))
+        else if (trimmed.EndsWith($"{SqlKeyword.Select} {SqlKeyword.Distinct}", StringComparison.OrdinalIgnoreCase))
+        {
+            forcedKeyword = SqlKeyword.SelectDistinct;
+            tag = SqlSegmentTag.SelectDistinctKeyword;
+        }
+        else if (trimmed.EndsWith(SqlKeyword.Select, StringComparison.OrdinalIgnoreCase))
         {
             forcedKeyword = SqlKeyword.Select;
             tag = SqlSegmentTag.SelectKeyword;
         }
-        else if (trimmed.EndsWith("FROM", StringComparison.OrdinalIgnoreCase)) 
+        else if (trimmed.EndsWith(SqlKeyword.From, StringComparison.OrdinalIgnoreCase)) 
             forcedKeyword = SqlKeyword.From;
 
         if (trimmed.IsEmpty)
@@ -479,6 +483,17 @@ public class SqlInterpolationParser : ISqlInterpolationParser
 
     private void UpdateScannerState(ISqlParserContext context, ReadOnlySpan<char> span)
     {
+        // Guard Check: If the literal ends with a targeted vertical override block,
+        // do not let the forward sliding window loop overwrite our forced keyword context!
+        var trimmedSpan = span.Trim();
+
+        if (trimmedSpan.EndsWith($"{SqlKeyword.Select} {SqlKeyword.Distinct}", StringComparison.OrdinalIgnoreCase))
+        {
+            context.ParserState.CurrentKeyword = SqlKeyword.SelectDistinct;
+
+            return;
+        }
+
         for (int i = 0; i < span.Length; i++)
         {
             var slice = span[i..];

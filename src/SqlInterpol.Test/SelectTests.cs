@@ -129,6 +129,24 @@ public class SelectTests
         testCase.AssertSql(result.Sql);
     }
 
+    [Theory]
+    [MemberData(nameof(SelectDistinctVerticalLayoutData))]
+    public void Select_Distinct_EntityExpansion_VerticalLayout(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        db.Context.Options.CollectionLayout = SqlCollectionLayout.Vertical;
+
+        // Act
+        var result = db.Query<ProductWithIgnoreModel>(p => db.Append($$"""
+            SELECT DISTINCT {{p}}
+            FROM {{p}} AS p1
+            """)).Build();
+
+        // Assert
+        testCase.AssertSql(result.Sql);
+    }
+
     public static TheoryData<SqlTestCase> SelectExpansionData =>
     [
         new SqlTestCase(
@@ -509,6 +527,76 @@ public class SelectTests
                 SELECT
                     [dbo].[Products].[PROD_NAME]
                 FROM [dbo].[Products]
+                """
+            ]
+        )
+    ];
+
+    public static TheoryData<SqlTestCase> SelectDistinctVerticalLayoutData =>
+    [
+        new SqlTestCase(
+            SqlDialectKind.CustomDb,
+            [
+                """
+                SELECT DISTINCT
+                    <<p1>>.<<Id>>,
+                    <<p1>>.<<PROD_NAME>>
+                FROM <<dbo>>.<<Products>> AS p1
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.MySql,
+            [
+                """
+                SELECT DISTINCT
+                    `p1`.`Id`,
+                    `p1`.`PROD_NAME`
+                FROM `dbo`.`Products` AS p1
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Oracle,
+            [
+                """
+                SELECT DISTINCT
+                    "p1"."Id",
+                    "p1"."PROD_NAME"
+                FROM "dbo"."Products" AS p1
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.PostgreSql,
+            [
+                """
+                SELECT DISTINCT
+                    "p1"."Id",
+                    "p1"."PROD_NAME"
+                FROM "dbo"."Products" AS p1
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqLite,
+            [
+                """
+                SELECT DISTINCT
+                    "p1"."Id",
+                    "p1"."PROD_NAME"
+                FROM "dbo"."Products" AS p1
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqlServer,
+            [
+                """
+                SELECT DISTINCT
+                    [p1].[Id],
+                    [p1].[PROD_NAME]
+                FROM [dbo].[Products] AS p1
                 """
             ]
         )

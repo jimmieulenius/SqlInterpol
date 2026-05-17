@@ -252,6 +252,9 @@ public abstract class SqlDialectBase : ISqlDialect
                 case SqlSegmentTag.SelectKeyword:
                     if (TryRewriteKeywordFragment<SqlSelectFragment>(SqlKeyword.Select, segment, i)) continue;
                     break;
+                case SqlSegmentTag.SelectDistinctKeyword:
+                    if (TryRewriteKeywordFragment<SqlSelectFragment>($"{SqlKeyword.Select} {SqlKeyword.Distinct}", segment, i)) continue;
+                    break;
             }
 
             rewritten.Add(segment);

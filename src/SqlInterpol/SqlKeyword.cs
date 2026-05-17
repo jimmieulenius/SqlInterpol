@@ -15,6 +15,7 @@ public sealed class SqlKeyword
 
     // --- CRUD & Main Clauses ---
     public static readonly SqlKeyword Select = new("SELECT", true, false);
+    public static readonly SqlKeyword SelectDistinct = new("SELECT DISTINCT", true, false);
     public static readonly SqlKeyword From = new("FROM", true, true);
     public static readonly SqlKeyword Insert = new("INSERT", true, true);
     public static readonly SqlKeyword Update = new("UPDATE", true, true);
@@ -80,6 +81,7 @@ public sealed class SqlKeyword
     public static readonly SqlKeyword[] AllKeywords = 
     [ 
         Select,
+        SelectDistinct,
         From,
         Insert,
         Update,
