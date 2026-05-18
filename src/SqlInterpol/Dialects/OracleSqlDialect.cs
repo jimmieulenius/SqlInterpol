@@ -42,6 +42,19 @@ public class OracleSqlDialect : SqlDialectBase
             return $"MERGE INTO {target}{Environment.NewLine}USING {fromClause}{Environment.NewLine}ON ({whereClause}){Environment.NewLine}WHEN MATCHED THEN UPDATE SET {setClause}";
         }
 
+        if (fragment is SqlMultiTableDeleteFragment delete)
+        {
+            var targetDecl = delete.Target.ToSql(context).Trim();
+            var fromClause = delete.FromClause.ToSql(context).Trim();
+            var whereClause = delete.WhereClause?.ToSql(context).Trim() ?? "1=1";
+
+            // Strip the explicit alias mapping as it's unsupported in the subquery
+            fromClause = SqlInterpolationParser.Instance.ReplaceKeyword(fromClause, "AS", "").Replace("  ", " ");
+            var indent = new string(' ', context.Options.IndentSize);
+
+            return $"DELETE FROM {targetDecl}{Environment.NewLine}WHERE EXISTS ({Environment.NewLine}{indent}SELECT 1{Environment.NewLine}{indent}FROM {fromClause}{Environment.NewLine}{indent}WHERE {whereClause}{Environment.NewLine})";
+        }
+
         return base.RenderFragment(fragment, context);
     }
 

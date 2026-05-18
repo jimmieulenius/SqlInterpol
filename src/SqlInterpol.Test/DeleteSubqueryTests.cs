@@ -17,10 +17,10 @@ public class DeleteSubqueryTests
         // Act
         var result = db.Query<OrderLine, OrderModel>((l, o) =>
             db.Append($$"""
-            DELETE FROM {{l}} 
+            DELETE FROM {{l}}
             WHERE {{l[x => x.OrderId]}} IN (
-                SELECT {{o[x => x.Id]}} 
-                FROM {{o}} 
+                SELECT {{o[x => x.Id]}}
+                FROM {{o}}
                 WHERE {{o[x => x.Status]}} = {{status}}
             )
             """))
@@ -37,10 +37,10 @@ public class DeleteSubqueryTests
             SqlDialectKind.CustomDb,
             [
                 """
-                DELETE FROM <<OrderLine>> 
+                DELETE FROM <<OrderLine>>
                 WHERE <<OrderLine>>.<<OrderId>> IN (
-                    SELECT <<dbo>>.<<Orders>>.<<Id>> 
-                    FROM <<dbo>>.<<Orders>> 
+                    SELECT <<dbo>>.<<Orders>>.<<Id>>
+                    FROM <<dbo>>.<<Orders>>
                     WHERE <<dbo>>.<<Orders>>.<<order_status>> = !!100
                 )
                 """
@@ -50,10 +50,10 @@ public class DeleteSubqueryTests
             SqlDialectKind.MySql,
             [
                 """
-                DELETE FROM `OrderLine` 
+                DELETE FROM `OrderLine`
                 WHERE `OrderLine`.`OrderId` IN (
-                    SELECT `dbo`.`Orders`.`Id` 
-                    FROM `dbo`.`Orders` 
+                    SELECT `dbo`.`Orders`.`Id`
+                    FROM `dbo`.`Orders`
                     WHERE `dbo`.`Orders`.`order_status` = @p0
                 )
                 """
@@ -63,10 +63,10 @@ public class DeleteSubqueryTests
             SqlDialectKind.Oracle,
             [
                 """
-                DELETE FROM "OrderLine" 
+                DELETE FROM "OrderLine"
                 WHERE "OrderLine"."OrderId" IN (
-                    SELECT "dbo"."Orders"."Id" 
-                    FROM "dbo"."Orders" 
+                    SELECT "dbo"."Orders"."Id"
+                    FROM "dbo"."Orders"
                     WHERE "dbo"."Orders"."order_status" = :0
                 )
                 """
@@ -76,10 +76,10 @@ public class DeleteSubqueryTests
             SqlDialectKind.PostgreSql,
             [
                 """
-                DELETE FROM "OrderLine" 
+                DELETE FROM "OrderLine"
                 WHERE "OrderLine"."OrderId" IN (
-                    SELECT "dbo"."Orders"."Id" 
-                    FROM "dbo"."Orders" 
+                    SELECT "dbo"."Orders"."Id"
+                    FROM "dbo"."Orders"
                     WHERE "dbo"."Orders"."order_status" = $1
                 )
                 """
@@ -89,10 +89,10 @@ public class DeleteSubqueryTests
             SqlDialectKind.SqLite,
             [
                 """
-                DELETE FROM "OrderLine" 
+                DELETE FROM "OrderLine"
                 WHERE "OrderLine"."OrderId" IN (
-                    SELECT "dbo"."Orders"."Id" 
-                    FROM "dbo"."Orders" 
+                    SELECT "dbo"."Orders"."Id"
+                    FROM "dbo"."Orders"
                     WHERE "dbo"."Orders"."order_status" = ?0
                 )
                 """
@@ -102,10 +102,10 @@ public class DeleteSubqueryTests
             SqlDialectKind.SqlServer,
             [
                 """
-                DELETE FROM [OrderLine] 
+                DELETE FROM [OrderLine]
                 WHERE [OrderLine].[OrderId] IN (
-                    SELECT [dbo].[Orders].[Id] 
-                    FROM [dbo].[Orders] 
+                    SELECT [dbo].[Orders].[Id]
+                    FROM [dbo].[Orders]
                     WHERE [dbo].[Orders].[order_status] = @p0
                 )
                 """

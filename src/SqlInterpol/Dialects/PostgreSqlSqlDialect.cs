@@ -66,6 +66,12 @@ public class PostgreSqlSqlDialect : SqlDialectBase
         // Postgres doesn't render locks inline, but if it accidentally hits one, return empty
         if (fragment is SqlLockFragment) return string.Empty;
 
+        if (fragment is SqlMultiTableDeleteFragment delete)
+        {
+            return $"DELETE FROM {delete.Target.ToSql(context).Trim()}{Environment.NewLine}USING {delete.FromClause.ToSql(context).Trim()}" +
+                (delete.WhereClause != null ? $"{Environment.NewLine}WHERE {delete.WhereClause.ToSql(context).Trim()}" : "");
+        }
+
         return base.RenderFragment(fragment, context);
     }
 }

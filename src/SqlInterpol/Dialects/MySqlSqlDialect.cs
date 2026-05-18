@@ -95,6 +95,20 @@ public class MySqlSqlDialect : SqlDialectBase
             return sql;
         }
 
+        if (fragment is SqlMultiTableDeleteFragment delete)
+        {
+            var targetDecl = delete.Target.ToSql(context).Trim();
+            var fromClause = delete.FromClause.ToSql(context).Trim();
+            var whereClause = delete.WhereClause?.ToSql(context).Trim() ?? "1=1";
+
+            // If the target has an alias (e.g. `Products` AS `p`), MySQL requires `DELETE p FROM Products AS p...`
+            // You can extract the alias easily using Regex, or default to the base target.
+            var targetAliasMatch = System.Text.RegularExpressions.Regex.Match(targetDecl, @"AS\s+(`?[a-zA-Z0-9_]+`?)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            var deleteTarget = targetAliasMatch.Success ? targetAliasMatch.Groups[1].Value : targetDecl;
+
+            return $"DELETE {deleteTarget}{Environment.NewLine}FROM {targetDecl}, {fromClause}{Environment.NewLine}WHERE {whereClause}";
+        }
+
         // Just in case a lock fragment bypasses the rewriter, return empty
         if (fragment is SqlLockFragment) return string.Empty;
         
