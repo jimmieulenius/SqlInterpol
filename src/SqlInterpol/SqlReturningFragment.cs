@@ -2,9 +2,11 @@ using SqlInterpol.Config;
 
 namespace SqlInterpol;
 
-public class SqlReturningFragment(params ISqlProjection[] columns) : ISqlFragment
+public class SqlReturningFragment(params ISqlProjection[] columns) : ISqlFragment, ISqlFeatureRequirement
 {
     public IReadOnlyList<ISqlProjection> Columns { get; } = columns;
+    public SqlFeature RequiredFeature => SqlFeature.Returning;
+    public string FeatureName => "RETURNING";
 
     public string ToSql(ISqlContext context, SqlRenderMode renderMode = SqlRenderMode.Default)
     {

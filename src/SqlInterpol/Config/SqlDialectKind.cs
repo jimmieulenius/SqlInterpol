@@ -2,6 +2,7 @@ namespace SqlInterpol.Config;
 
 public readonly record struct SqlDialectKind(string Value)
 {
+    public static SqlDialectKind MariaDb { get; } = new("MariaDb");
     public static SqlDialectKind MySql { get; } = new("MySql");
     public static SqlDialectKind Oracle { get; } = new("Oracle");
     public static SqlDialectKind PostgreSql { get; } = new("PostgreSql");

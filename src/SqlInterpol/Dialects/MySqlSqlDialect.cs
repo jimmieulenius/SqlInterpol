@@ -9,6 +9,12 @@ public class MySqlSqlDialect : SqlDialectBase
     public override string OpenQuote => "`";
     public override string CloseQuote => "`";
     public override string ParameterPrefix => "@p";
+    public override IReadOnlySet<SqlFeature> SupportedFeatures { get; } = new HashSet<SqlFeature>
+    {
+        SqlFeature.ForUpdate,
+        SqlFeature.ForShare,
+        SqlFeature.OnConflict // Emulated via ON DUPLICATE KEY UPDATE
+    };
 
     public override IEnumerable<SqlSegment> RewriteSegments(IReadOnlyList<SqlSegment> segments)
     {

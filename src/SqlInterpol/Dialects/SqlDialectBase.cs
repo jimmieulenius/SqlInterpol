@@ -23,6 +23,8 @@ public abstract class SqlDialectBase : ISqlDialect
         SqlKeyword.Some
     ];
 
+    public virtual IReadOnlySet<SqlFeature> SupportedFeatures { get; } = new HashSet<SqlFeature>();
+
     // Common logic for all dialects
     public virtual string QuoteIdentifier(string name)
     {

@@ -9,6 +9,13 @@ public class SqlServerSqlDialect : SqlDialectBase
     public override string OpenQuote => "[";
     public override string CloseQuote => "]";
     public override string ParameterPrefix => "@p";
+    public override IReadOnlySet<SqlFeature> SupportedFeatures { get; } = new HashSet<SqlFeature>
+    {
+        SqlFeature.ForUpdate, // Emulated via WITH (UPDLOCK)
+        SqlFeature.ForShare,
+        SqlFeature.Returning, // Emulated via OUTPUT inserted.*
+        SqlFeature.OnConflict // Emulated via MERGE
+    };
 
     public override string RenderFragment(ISqlFragment fragment, ISqlContext context)
     {

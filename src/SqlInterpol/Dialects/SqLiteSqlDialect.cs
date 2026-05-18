@@ -8,6 +8,11 @@ public class SqLiteSqlDialect : SqlDialectBase
     public override string OpenQuote => "\"";
     public override string CloseQuote => "\"";
     public override string ParameterPrefix => "?";
+    public override IReadOnlySet<SqlFeature> SupportedFeatures { get; } = new HashSet<SqlFeature>
+    {
+        SqlFeature.Returning,
+        SqlFeature.OnConflict
+    };
 
     public override IEnumerable<SqlSegment> RewriteSegments(IReadOnlyList<SqlSegment> segments)
     {

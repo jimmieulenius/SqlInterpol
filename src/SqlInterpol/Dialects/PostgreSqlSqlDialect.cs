@@ -9,6 +9,13 @@ public class PostgreSqlSqlDialect : SqlDialectBase
     public override string CloseQuote => "\"";
     public override string ParameterPrefix => "$";
     private static readonly string[] PostgresSymbols = ["->>", "->", "@>", "<@"];
+    public override IReadOnlySet<SqlFeature> SupportedFeatures { get; } = new HashSet<SqlFeature>
+    {
+        SqlFeature.ForUpdate,
+        SqlFeature.ForShare,
+        SqlFeature.Returning,
+        SqlFeature.OnConflict
+    };
 
     public override bool IsExpressionContext(string textBeforeParen)
     {

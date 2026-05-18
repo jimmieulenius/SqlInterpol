@@ -1,6 +1,9 @@
+using System;
+using System.Linq;
 using SqlInterpol.Config;
 using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
+using Xunit;
 
 namespace SqlInterpol.Test;
 
@@ -14,7 +17,7 @@ public class LockTests
         var db = testCase.CreateBuilder();
         int id = 5;
 
-        // Act - The developer always writes standard FOR UPDATE
+        // Act
         var result = db.Query<Product>(p => db.Append($$"""
             SELECT {{p[x => x.Id]}}, {{p[x => x.Name]}}
             FROM {{p}} FOR UPDATE
@@ -48,7 +51,7 @@ public class LockTests
     }
 
     [Theory]
-    [MemberData(nameof(UnsupportedLockData))]
+    [MemberData(nameof(UnsupportedForUpdateData))]
     public void Select_WithForUpdate_ThrowsException_ForUnsupportedDialect(SqlErrorTestCase testCase)
     {
         // Arrange
@@ -70,7 +73,7 @@ public class LockTests
     }
 
     [Theory]
-    [MemberData(nameof(UnsupportedLockData))]
+    [MemberData(nameof(UnsupportedForShareData))]
     public void Select_WithForShare_ThrowsException_ForUnsupportedDialect(SqlErrorTestCase testCase)
     {
         // Arrange
@@ -91,9 +94,10 @@ public class LockTests
         testCase.AssertException(exception);
     }
 
+    // --- TEST DATA ---
+
     public static TheoryData<SqlTestCase> SelectWithForUpdateData =>
     [
-        // MySQL moves it to the end (using backticks)
         new SqlTestCase(
             SqlDialectKind.MySql,
             [
@@ -105,7 +109,6 @@ public class LockTests
                 """
             ]
         ),
-        // Oracle moves it to the end (using quotes & colon params)
         new SqlTestCase(
             SqlDialectKind.Oracle,
             [
@@ -117,7 +120,6 @@ public class LockTests
                 """
             ]
         ),
-        // PostgreSQL moves it to the end
         new SqlTestCase(
             SqlDialectKind.PostgreSql,
             [
@@ -129,18 +131,6 @@ public class LockTests
                 """
             ]
         ),
-        // SQLite doesn't support row-level locks! It completely (and safely) strips it out.
-        new SqlTestCase(
-            SqlDialectKind.SqLite,
-            [
-                """
-                SELECT "dbo"."Products"."Id", "dbo"."Products"."PROD_NAME"
-                FROM "dbo"."Products"
-                WHERE "dbo"."Products"."Id" = ?0
-                """
-            ]
-        ),
-        // SQL Server translates it inline automatically, perfectly formatted!
         new SqlTestCase(
             SqlDialectKind.SqlServer,
             [
@@ -155,7 +145,6 @@ public class LockTests
 
     public static TheoryData<SqlTestCase> SelectWithForShareData =>
     [
-        // MySQL supports FOR SHARE syntax at the end
         new SqlTestCase(
             SqlDialectKind.MySql,
             [
@@ -167,19 +156,6 @@ public class LockTests
                 """
             ]
         ),
-        // Oracle does not natively support SELECT FOR SHARE. ORMs traditionally fallback to FOR UPDATE.
-        new SqlTestCase(
-            SqlDialectKind.Oracle,
-            [
-                """
-                SELECT "dbo"."Products"."Id", "dbo"."Products"."PROD_NAME"
-                FROM "dbo"."Products"
-                WHERE "dbo"."Products"."Id" = :0
-                FOR UPDATE
-                """
-            ]
-        ),
-        // PostgreSQL moves to end
         new SqlTestCase(
             SqlDialectKind.PostgreSql,
             [
@@ -191,18 +167,6 @@ public class LockTests
                 """
             ]
         ),
-        // SQLite ignores it safely
-        new SqlTestCase(
-            SqlDialectKind.SqLite,
-            [
-                """
-                SELECT "dbo"."Products"."Id", "dbo"."Products"."PROD_NAME"
-                FROM "dbo"."Products"
-                WHERE "dbo"."Products"."Id" = ?0
-                """
-            ]
-        ),
-        // SQL Server translates to ROWLOCK, HOLDLOCK
         new SqlTestCase(
             SqlDialectKind.SqlServer,
             [
@@ -215,12 +179,36 @@ public class LockTests
         )
     ];
 
-    public static TheoryData<SqlErrorTestCase> UnsupportedLockData =>
+    public static TheoryData<SqlErrorTestCase> UnsupportedForUpdateData =>
     [
-        // Test that CustomDb throws if a user tries to use FOR UPDATE
         new SqlErrorTestCase(
-            SqlDialectKind.CustomDb, 
-            expectedExceptionType: typeof(NotSupportedException), 
-            expectedMessageSubstring: "SqlLockFragment")
+            SqlDialectKind.CustomDb,
+            typeof(SqlDialectException),
+            "'FOR UPDATE' is not supported"
+        ),
+        new SqlErrorTestCase(
+            SqlDialectKind.SqLite,
+            typeof(SqlDialectException),
+            "'FOR UPDATE' is not supported"
+        )
+    ];
+
+    public static TheoryData<SqlErrorTestCase> UnsupportedForShareData =>
+    [
+        new SqlErrorTestCase(
+            SqlDialectKind.CustomDb,
+            typeof(SqlDialectException),
+            "'FOR SHARE' is not supported"
+        ),
+        new SqlErrorTestCase(
+            SqlDialectKind.SqLite,
+            typeof(SqlDialectException),
+            "'FOR SHARE' is not supported"
+        ),
+        new SqlErrorTestCase(
+            SqlDialectKind.Oracle,
+            typeof(SqlDialectException),
+            "'FOR SHARE' is not supported"
+        )
     ];
 }

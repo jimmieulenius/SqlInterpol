@@ -73,7 +73,56 @@ public partial class SqlBuilder : ISqlEntityRegistry
 
     private SqlQueryResult BuildSegments(IReadOnlyList<SqlSegment> segmentsToBuild)
     {
+        // === EARLY BUILD-TIME VALIDATION (on original segments, before dialect rewriting erases evidence) ===
+        var errors = new List<string>();
+        foreach (var segment in segmentsToBuild)
+        {
+            SqlFeature? requiredFeature = null;
+            string? featureName = null;
+
+            // 1. Check Explicit AST Fragments
+            if (segment.Value is ISqlFeatureRequirement req)
+            {
+                requiredFeature = req.RequiredFeature;
+                featureName = req.FeatureName;
+            }
+            // 2. Check Raw WYSIWYG Strings tagged by the lexer
+            else if (segment.Tag == SqlSegmentTag.ForUpdateKeyword)
+            {
+                requiredFeature = SqlFeature.ForUpdate;
+                featureName = "FOR UPDATE";
+            }
+            else if (segment.Tag == SqlSegmentTag.ForShareKeyword)
+            {
+                requiredFeature = SqlFeature.ForShare;
+                featureName = "FOR SHARE";
+            }
+            else if (segment.Tag == SqlSegmentTag.ReturningKeyword)
+            {
+                requiredFeature = SqlFeature.Returning;
+                featureName = "RETURNING";
+            }
+            else if (segment.Tag == SqlSegmentTag.OnConflictKeyword)
+            {
+                requiredFeature = SqlFeature.OnConflict;
+                featureName = "ON CONFLICT";
+            }
+
+            if (requiredFeature.HasValue && !Context.Dialect.SupportedFeatures.Contains(requiredFeature.Value))
+            {
+                // Add to aggregate list to show all errors at once!
+                errors.Add($"'{featureName}' is not supported by {Context.Dialect.Kind}.");
+            }
+        }
+
+        if (errors.Count > 0)
+        {
+            throw new SqlDialectException($"Dialect capabilities validation failed:{Environment.NewLine}- " + string.Join($"{Environment.NewLine}- ", errors));
+        }
+
         var finalSegments = Context.Dialect.RewriteSegments(segmentsToBuild).ToList();
+
+        // === RENDER PHASE ===
         var vsb = new ValueStringBuilder(stackalloc char[2048]);
 
         try
@@ -102,7 +151,7 @@ public partial class SqlBuilder : ISqlEntityRegistry
     {
         var entity = CreateEntity<T>(name, schema, alias);
         _entities.Add(entity);
-        
+
         return entity;
     }
 
