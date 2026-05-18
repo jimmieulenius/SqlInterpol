@@ -117,7 +117,6 @@ public abstract class SqlDialectBase : ISqlDialect
             return source;
         }
 
-        // return $"{QuoteIdentifier(source)} {SqlKeyword.As.Value} {QuoteIdentifier(alias)}";
         return $"{QuoteIdentifier(source)} {SqlKeyword.As.Value} {alias}";
     }
 
@@ -132,9 +131,6 @@ public abstract class SqlDialectBase : ISqlDialect
             SqlMultiTableUpdateFragment update => RenderMultiTableUpdate(update, context),
 
             SqlMultiTableDeleteFragment delete => RenderMultiTableDelete(delete, context),
-            // SqlMultiTableDeleteFragment delete => 
-            //     $"DELETE FROM {delete.Target.ToSql(context).Trim()}{Environment.NewLine}FROM {delete.FromClause.ToSql(context).Trim()}" +
-            //     (delete.WhereClause != null ? $"{Environment.NewLine}WHERE {delete.WhereClause.ToSql(context).Trim()}" : ""),
 
             _ => throw new NotSupportedException($"The fragment type '{fragment.GetType().Name}' is not supported by {this.GetType().Name}.")
         };
@@ -178,8 +174,16 @@ public abstract class SqlDialectBase : ISqlDialect
                 forceBaseNamePhase = true;
                 if (segment.Value is string text)
                 {
-                    string clean = text.EndsWith(" ") ? text[..^1] : text;
-                    if (!clean.EndsWith('(')) clean += " (";
+                    string clean = text;
+
+                    // FIX: Only auto-inject the opening parenthesis if the segment literally ENDS with "ON CONFLICT" 
+                    // (Meaning the AST nodes for columns are expected immediately after this)
+                    if (segment.Tag == SqlSegmentTag.OnConflictKeyword)
+                    {
+                        clean = text.EndsWith(" ") ? text[..^1] : text;
+                        if (!clean.EndsWith('(')) clean += " (";
+                    }
+
                     rewritten.Add(new SqlSegment(SqlSegmentType.Literal, clean));
                     continue;
                 }
@@ -191,7 +195,12 @@ public abstract class SqlDialectBase : ISqlDialect
                 if (segment.Value is string text)
                 {
                     string clean = text;
-                    if (!clean.TrimStart().StartsWith(')')) clean = ")\n" + clean.TrimStart();
+
+                    // FIX: Only auto-inject the closing parenthesis if the user used the targeted AST ON CONFLICT keyword
+                    if (segment.Tag == SqlSegmentTag.DoUpdateSetKeyword)
+                    {
+                        if (!clean.TrimStart().StartsWith(')')) clean = ")\n" + clean.TrimStart();
+                    }
                     
                     int keywordIndex = clean.LastIndexOf(SqlKeyword.Set, StringComparison.OrdinalIgnoreCase);
                     if (keywordIndex > -1 && i + 1 < segments.Count && segments[i + 1].Value is SqlSetFragment)
