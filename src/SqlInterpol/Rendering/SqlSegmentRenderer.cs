@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using SqlInterpol.Config;
 using SqlInterpol.Metadata;
 using SqlInterpol.Parsing;
@@ -11,7 +8,7 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
 {
     public static readonly SqlSegmentRenderer Instance = new();
 
-    public string? Render(SqlContext context, SqlSegment segment, int index, IReadOnlyList<SqlSegment> segments)
+    public string? Render(ISqlContext context, SqlSegment segment, int index, IReadOnlyList<SqlSegment> segments)
     {
         string? rendered = null;
 
@@ -139,14 +136,15 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
         int lastNewline = prevLiteral.LastIndexOf('\n');
         if (lastNewline < 0) return rendered;
 
-        var indentChars = prevLiteral.Substring(lastNewline + 1)
+        var indentChars = prevLiteral[(lastNewline + 1)..]
             .TakeWhile(c => c == ' ' || c == '\t')
             .ToArray();
 
         if (indentChars.Length > 0)
         {
             var indent = new string(indentChars);
-            return rendered.Replace("\n", "\n" + indent);
+
+            return rendered.Replace("\n", $"\n{indent}");
         }
 
         return rendered;

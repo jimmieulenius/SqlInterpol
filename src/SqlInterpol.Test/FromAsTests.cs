@@ -1,7 +1,6 @@
 using SqlInterpol.Config;
 using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
-using Xunit;
 
 namespace SqlInterpol.Test;
 
@@ -116,7 +115,7 @@ public class FromAsTests
             [
                 """
                 SELECT
-                    <<p>>.<<Id>>
+                    p.<<Id>>
                 FROM <<dbo>>.<<Products>> AS p
                 """
             ]
@@ -126,7 +125,7 @@ public class FromAsTests
             [
                 """
                 SELECT
-                    `p`.`Id`
+                    p.`Id`
                 FROM `dbo`.`Products` AS p
                 """
             ]
@@ -136,7 +135,7 @@ public class FromAsTests
             [
                 """
                 SELECT
-                    "p"."Id"
+                    p."Id"
                 FROM "dbo"."Products" AS p
                 """
             ]
@@ -146,7 +145,7 @@ public class FromAsTests
             [
                 """
                 SELECT
-                    "p"."Id"
+                    p."Id"
                 FROM "dbo"."Products" AS p
                 """
             ]
@@ -156,7 +155,7 @@ public class FromAsTests
             [
                 """
                 SELECT
-                    "p"."Id"
+                    p."Id"
                 FROM "dbo"."Products" AS p
                 """
             ]
@@ -166,7 +165,7 @@ public class FromAsTests
             [
                 """
                 SELECT
-                    [p].[Id]
+                    p.[Id]
                 FROM [dbo].[Products] AS p
                 """
             ]
@@ -180,7 +179,7 @@ public class FromAsTests
             [
                 """
                 SELECT
-                    <<prod>>.<<Id>>
+                    prod.<<Id>>
                 FROM <<dbo>>.<<Products>> AS prod
                 """
             ]
@@ -190,7 +189,7 @@ public class FromAsTests
             [
                 """
                 SELECT
-                    `prod`.`Id`
+                    prod.`Id`
                 FROM `dbo`.`Products` AS prod
                 """
             ]
@@ -200,7 +199,7 @@ public class FromAsTests
             [
                 """
                 SELECT
-                    "prod"."Id"
+                    prod."Id"
                 FROM "dbo"."Products" AS prod
                 """
             ]
@@ -210,7 +209,7 @@ public class FromAsTests
             [
                 """
                 SELECT
-                    "prod"."Id"
+                    prod."Id"
                 FROM "dbo"."Products" AS prod
                 """
             ]
@@ -220,7 +219,7 @@ public class FromAsTests
             [
                 """
                 SELECT
-                    "prod"."Id"
+                    prod."Id"
                 FROM "dbo"."Products" AS prod
                 """
             ]
@@ -230,7 +229,7 @@ public class FromAsTests
             [
                 """
                 SELECT
-                    [prod].[Id]
+                    prod.[Id]
                 FROM [dbo].[Products] AS prod
                 """
             ]

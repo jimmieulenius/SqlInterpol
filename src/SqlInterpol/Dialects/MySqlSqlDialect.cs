@@ -82,6 +82,19 @@ public class MySqlSqlDialect : SqlDialectBase
 
     public override string RenderFragment(ISqlFragment fragment, ISqlContext context)
     {
+        if (fragment is SqlMultiTableUpdateFragment update)
+        {
+            // MySQL Block Swapping!
+            var sql = $"{SqlKeyword.Update} {update.Target.ToSql(context)}";
+            if (update.FromClause != null) sql += $", {update.FromClause.ToSql(context)}"; // Swap FROM for a comma
+            
+            sql += $"{Environment.NewLine}{SqlKeyword.Set} {update.SetClause.ToSql(context)}"; // SET moves to the middle
+            
+            if (update.WhereClause != null) sql += $"{Environment.NewLine}{SqlKeyword.Where} {update.WhereClause.ToSql(context)}";
+            
+            return sql;
+        }
+
         // Just in case a lock fragment bypasses the rewriter, return empty
         if (fragment is SqlLockFragment) return string.Empty;
         

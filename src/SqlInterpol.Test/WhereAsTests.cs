@@ -35,9 +35,9 @@ public class WhereAsTests
             [
                 """
                 SELECT
-                    <<p>>.<<Id>>
+                    p.<<Id>>
                 FROM <<dbo>>.<<Products>> AS p
-                WHERE <<p>>.<<CategoryId>> = !!100
+                WHERE p.<<CategoryId>> = !!100
                 """
             ]
         ),
@@ -46,9 +46,9 @@ public class WhereAsTests
             [
                 """
                 SELECT
-                    `p`.`Id`
+                    p.`Id`
                 FROM `dbo`.`Products` AS p
-                WHERE `p`.`CategoryId` = @p0
+                WHERE p.`CategoryId` = @p0
                 """
             ]
         ),
@@ -57,9 +57,9 @@ public class WhereAsTests
             [
                 """
                 SELECT
-                    "p"."Id"
+                    p."Id"
                 FROM "dbo"."Products" AS p
-                WHERE "p"."CategoryId" = :0
+                WHERE p."CategoryId" = :0
                 """
             ]
         ),
@@ -68,9 +68,9 @@ public class WhereAsTests
             [
                 """
                 SELECT
-                    "p"."Id"
+                    p."Id"
                 FROM "dbo"."Products" AS p
-                WHERE "p"."CategoryId" = $1
+                WHERE p."CategoryId" = $1
                 """
             ]
         ),
@@ -79,9 +79,9 @@ public class WhereAsTests
             [
                 """
                 SELECT
-                    "p"."Id"
+                    p."Id"
                 FROM "dbo"."Products" AS p
-                WHERE "p"."CategoryId" = ?0
+                WHERE p."CategoryId" = ?0
                 """
             ]
         ),
@@ -90,9 +90,9 @@ public class WhereAsTests
             [
                 """
                 SELECT
-                    [p].[Id]
+                    p.[Id]
                 FROM [dbo].[Products] AS p
-                WHERE [p].[CategoryId] = @p0
+                WHERE p.[CategoryId] = @p0
                 """
             ]
         )

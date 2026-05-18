@@ -107,11 +107,11 @@ public class JoinAsTests
             [
                 """
                 SELECT
-                    <<p>>.<<Id>>,
-                    <<ol>>.<<OrderId>>
+                    p.<<Id>>,
+                    ol.<<OrderId>>
                 FROM <<dbo>>.<<Products>> AS p
                 JOIN <<OrderLine>> AS ol
-                    ON <<p>>.<<Id>> = <<ol>>.<<ProductItemNumber>>
+                    ON p.<<Id>> = ol.<<ProductItemNumber>>
                 """
             ]
         ),
@@ -120,11 +120,11 @@ public class JoinAsTests
             [
                 """
                 SELECT
-                    `p`.`Id`,
-                    `ol`.`OrderId`
+                    p.`Id`,
+                    ol.`OrderId`
                 FROM `dbo`.`Products` AS p
                 JOIN `OrderLine` AS ol
-                    ON `p`.`Id` = `ol`.`ProductItemNumber`
+                    ON p.`Id` = ol.`ProductItemNumber`
                 """
             ]
         ),
@@ -133,11 +133,11 @@ public class JoinAsTests
             [
                 """
                 SELECT
-                    "p"."Id",
-                    "ol"."OrderId"
+                    p."Id",
+                    ol."OrderId"
                 FROM "dbo"."Products" AS p
                 JOIN "OrderLine" AS ol
-                    ON "p"."Id" = "ol"."ProductItemNumber"
+                    ON p."Id" = ol."ProductItemNumber"
                 """
             ]
         ),
@@ -146,11 +146,11 @@ public class JoinAsTests
             [
                 """
                 SELECT
-                    "p"."Id",
-                    "ol"."OrderId"
+                    p."Id",
+                    ol."OrderId"
                 FROM "dbo"."Products" AS p
                 JOIN "OrderLine" AS ol
-                    ON "p"."Id" = "ol"."ProductItemNumber"
+                    ON p."Id" = ol."ProductItemNumber"
                 """
             ]
         ),
@@ -159,11 +159,11 @@ public class JoinAsTests
             [
                 """
                 SELECT
-                    "p"."Id",
-                    "ol"."OrderId"
+                    p."Id",
+                    ol."OrderId"
                 FROM "dbo"."Products" AS p
                 JOIN "OrderLine" AS ol
-                    ON "p"."Id" = "ol"."ProductItemNumber"
+                    ON p."Id" = ol."ProductItemNumber"
                 """
             ]
         ),
@@ -172,11 +172,11 @@ public class JoinAsTests
             [
                 """
                 SELECT
-                    [p].[Id],
-                    [ol].[OrderId]
+                    p.[Id],
+                    ol.[OrderId]
                 FROM [dbo].[Products] AS p
                 JOIN [OrderLine] AS ol
-                    ON [p].[Id] = [ol].[ProductItemNumber]
+                    ON p.[Id] = ol.[ProductItemNumber]
                 """
             ]
         )
@@ -271,11 +271,11 @@ public class JoinAsTests
             [
                 """
                 SELECT
-                    <<original>>.<<Id>>,
-                    <<related>>.<<Id>>
+                    original.<<Id>>,
+                    related.<<Id>>
                 FROM <<dbo>>.<<Products>> AS original
                 JOIN <<dbo>>.<<Products>> AS related
-                    ON <<original>>.<<CategoryId>> = <<related>>.<<CategoryId>>
+                    ON original.<<CategoryId>> = related.<<CategoryId>>
                 """
             ]
         ),
@@ -284,11 +284,11 @@ public class JoinAsTests
             [
                 """
                 SELECT
-                    `original`.`Id`,
-                    `related`.`Id`
+                    original.`Id`,
+                    related.`Id`
                 FROM `dbo`.`Products` AS original
                 JOIN `dbo`.`Products` AS related
-                    ON `original`.`CategoryId` = `related`.`CategoryId`
+                    ON original.`CategoryId` = related.`CategoryId`
                 """
             ]
         ),
@@ -297,11 +297,11 @@ public class JoinAsTests
             [
                 """
                 SELECT
-                    "original"."Id",
-                    "related"."Id"
+                    original."Id",
+                    related."Id"
                 FROM "dbo"."Products" AS original
                 JOIN "dbo"."Products" AS related
-                    ON "original"."CategoryId" = "related"."CategoryId"
+                    ON original."CategoryId" = related."CategoryId"
                 """
             ]
         ),
@@ -310,11 +310,11 @@ public class JoinAsTests
             [
                 """
                 SELECT
-                    "original"."Id",
-                    "related"."Id"
+                    original."Id",
+                    related."Id"
                 FROM "dbo"."Products" AS original
                 JOIN "dbo"."Products" AS related
-                    ON "original"."CategoryId" = "related"."CategoryId"
+                    ON original."CategoryId" = related."CategoryId"
                 """
             ]
         ),
@@ -323,11 +323,11 @@ public class JoinAsTests
             [
                 """
                 SELECT
-                    "original"."Id",
-                    "related"."Id"
+                    original."Id",
+                    related."Id"
                 FROM "dbo"."Products" AS original
                 JOIN "dbo"."Products" AS related
-                    ON "original"."CategoryId" = "related"."CategoryId"
+                    ON original."CategoryId" = related."CategoryId"
                 """
             ]
         ),
@@ -336,11 +336,11 @@ public class JoinAsTests
             [
                 """
                 SELECT
-                    [original].[Id],
-                    [related].[Id]
+                    original.[Id],
+                    related.[Id]
                 FROM [dbo].[Products] AS original
                 JOIN [dbo].[Products] AS related
-                    ON [original].[CategoryId] = [related].[CategoryId]
+                    ON original.[CategoryId] = related.[CategoryId]
                 """
             ]
         )

@@ -1052,8 +1052,8 @@ public class FormattingTests
             [
                 """
                 SELECT
-                    <<p1>>.<<Id>>,
-                    <<p1>>.<<PROD_NAME>>
+                    p1.<<Id>>,
+                    p1.<<PROD_NAME>>
                 FROM <<dbo>>.<<Products>> AS p1
                 """
             ]
@@ -1063,8 +1063,8 @@ public class FormattingTests
             [
                 """
                 SELECT
-                    `p1`.`Id`,
-                    `p1`.`PROD_NAME`
+                    p1.`Id`,
+                    p1.`PROD_NAME`
                 FROM `dbo`.`Products` AS p1
                 """
             ]
@@ -1074,8 +1074,8 @@ public class FormattingTests
             [
                 """
                 SELECT
-                    "p1"."Id",
-                    "p1"."PROD_NAME"
+                    p1."Id",
+                    p1."PROD_NAME"
                 FROM "dbo"."Products" AS p1
                 """
             ]
@@ -1085,8 +1085,8 @@ public class FormattingTests
             [
                 """
                 SELECT
-                    "p1"."Id",
-                    "p1"."PROD_NAME"
+                    p1."Id",
+                    p1."PROD_NAME"
                 FROM "dbo"."Products" AS p1
                 """
             ]
@@ -1096,8 +1096,8 @@ public class FormattingTests
             [
                 """
                 SELECT
-                    "p1"."Id",
-                    "p1"."PROD_NAME"
+                    p1."Id",
+                    p1."PROD_NAME"
                 FROM "dbo"."Products" AS p1
                 """
             ]
@@ -1107,8 +1107,8 @@ public class FormattingTests
             [
                 """
                 SELECT
-                    [p1].[Id],
-                    [p1].[PROD_NAME]
+                    p1.[Id],
+                    p1.[PROD_NAME]
                 FROM [dbo].[Products] AS p1
                 """
             ]

@@ -11,6 +11,7 @@ public static class SqlEntityExtensions
         public ISqlEntityBase<T> As(string alias)
         {
             entity.Reference?.Alias = alias;
+            entity.Reference?.IsAliasQuoted = true;
             
             return entity;
         }

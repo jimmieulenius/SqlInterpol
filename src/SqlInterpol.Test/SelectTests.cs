@@ -153,7 +153,7 @@ public class SelectTests
             SqlDialectKind.CustomDb,
             [
                 """
-                SELECT <<p1>>.<<Id>>, <<p1>>.<<PROD_NAME>>
+                SELECT p1.<<Id>>, p1.<<PROD_NAME>>
                 FROM <<dbo>>.<<Products>> AS p1
                 """
             ]
@@ -162,7 +162,7 @@ public class SelectTests
             SqlDialectKind.MySql,
             [
                 """
-                SELECT `p1`.`Id`, `p1`.`PROD_NAME`
+                SELECT p1.`Id`, p1.`PROD_NAME`
                 FROM `dbo`.`Products` AS p1
                 """
             ]
@@ -171,7 +171,7 @@ public class SelectTests
             SqlDialectKind.Oracle,
             [
                 """
-                SELECT "p1"."Id", "p1"."PROD_NAME"
+                SELECT p1."Id", p1."PROD_NAME"
                 FROM "dbo"."Products" AS p1
                 """
             ]
@@ -180,7 +180,7 @@ public class SelectTests
             SqlDialectKind.PostgreSql,
             [
                 """
-                SELECT "p1"."Id", "p1"."PROD_NAME"
+                SELECT p1."Id", p1."PROD_NAME"
                 FROM "dbo"."Products" AS p1
                 """
             ]
@@ -189,7 +189,7 @@ public class SelectTests
             SqlDialectKind.SqLite,
             [
                 """
-                SELECT "p1"."Id", "p1"."PROD_NAME"
+                SELECT p1."Id", p1."PROD_NAME"
                 FROM "dbo"."Products" AS p1
                 """
             ]
@@ -198,7 +198,7 @@ public class SelectTests
             SqlDialectKind.SqlServer,
             [
                 """
-                SELECT [p1].[Id], [p1].[PROD_NAME]
+                SELECT p1.[Id], p1.[PROD_NAME]
                 FROM [dbo].[Products] AS p1
                 """
             ]
@@ -539,8 +539,8 @@ public class SelectTests
             [
                 """
                 SELECT DISTINCT
-                    <<p1>>.<<Id>>,
-                    <<p1>>.<<PROD_NAME>>
+                    p1.<<Id>>,
+                    p1.<<PROD_NAME>>
                 FROM <<dbo>>.<<Products>> AS p1
                 """
             ]
@@ -550,8 +550,8 @@ public class SelectTests
             [
                 """
                 SELECT DISTINCT
-                    `p1`.`Id`,
-                    `p1`.`PROD_NAME`
+                    p1.`Id`,
+                    p1.`PROD_NAME`
                 FROM `dbo`.`Products` AS p1
                 """
             ]
@@ -561,8 +561,8 @@ public class SelectTests
             [
                 """
                 SELECT DISTINCT
-                    "p1"."Id",
-                    "p1"."PROD_NAME"
+                    p1."Id",
+                    p1."PROD_NAME"
                 FROM "dbo"."Products" AS p1
                 """
             ]
@@ -572,8 +572,8 @@ public class SelectTests
             [
                 """
                 SELECT DISTINCT
-                    "p1"."Id",
-                    "p1"."PROD_NAME"
+                    p1."Id",
+                    p1."PROD_NAME"
                 FROM "dbo"."Products" AS p1
                 """
             ]
@@ -583,8 +583,8 @@ public class SelectTests
             [
                 """
                 SELECT DISTINCT
-                    "p1"."Id",
-                    "p1"."PROD_NAME"
+                    p1."Id",
+                    p1."PROD_NAME"
                 FROM "dbo"."Products" AS p1
                 """
             ]
@@ -594,8 +594,8 @@ public class SelectTests
             [
                 """
                 SELECT DISTINCT
-                    [p1].[Id],
-                    [p1].[PROD_NAME]
+                    p1.[Id],
+                    p1.[PROD_NAME]
                 FROM [dbo].[Products] AS p1
                 """
             ]

@@ -114,6 +114,29 @@ public class UpdateTests
         testCase.AssertException(exception);
     }
 
+    [Theory]
+    [MemberData(nameof(MultiTableUpdateData))]
+    public void Update_MultiTable_TranslatesAcrossDialects(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+
+        // Act - Implicit Join WYSIWYG!
+        var result = db
+            .Entity<Product>()
+            .Entity<Category>()
+            .Query((p, c) =>
+        db.Append($$"""
+            UPDATE {{p}}
+            SET {{p[x => x.Price]}} = {{10}}
+            FROM {{c}} AS c1
+            WHERE {{p[x => x.CategoryId]}} = c1.Id
+            """)).Build();
+
+        // Assert
+        testCase.AssertSql(result.Sql);
+    }
+
     public static TheoryData<SqlTestCase> UpdateData =>
     [
         new SqlTestCase(
@@ -320,5 +343,63 @@ public class UpdateTests
             typeof(ArgumentException),
             "Property 'NonExistentProperty' on DTO does not exist on Entity."
         )
+    ];
+
+    public static TheoryData<SqlTestCase> MultiTableUpdateData =>
+    [
+        // CRITICAL CHECK: MySQL dynamically rearranges the AST into "UPDATE A, B SET A.Price = X WHERE..."
+        new SqlTestCase(
+            SqlDialectKind.MySql,
+            [
+                """
+                UPDATE `dbo`.`Products`, `Category` AS c1
+                SET `Price` = @p0
+                WHERE `dbo`.`Products`.`CategoryId` = c1.Id
+                """
+            ]
+        ),
+        // new SqlTestCase(
+        //     SqlDialectKind.Oracle,
+        //     [
+        //         """
+        //         UPDATE "dbo"."Products" p1
+        //         SET "Price" = :0
+        //         WHERE "dbo"."Products"."CategoryId" = (SELECT c1.Id FROM "dbo"."Category" c1 WHERE c1.Id = p1.CategoryId)
+        //         """
+        //     ]
+        // ),
+        new SqlTestCase(
+            SqlDialectKind.PostgreSql,
+            [
+                """
+                UPDATE "dbo"."Products"
+                SET "Price" = $1
+                FROM "Category" AS c1
+                WHERE "dbo"."Products"."CategoryId" = c1.Id
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqLite,
+            [
+                """
+                UPDATE "dbo"."Products"
+                SET "Price" = ?0
+                FROM "Category" AS c1
+                WHERE "dbo"."Products"."CategoryId" = c1.Id
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqlServer,
+            [
+                """
+                UPDATE [dbo].[Products]
+                SET [Price] = @p0
+                FROM [Category] AS c1
+                WHERE [dbo].[Products].[CategoryId] = c1.Id
+                """
+            ]
+        ),
     ];
 }

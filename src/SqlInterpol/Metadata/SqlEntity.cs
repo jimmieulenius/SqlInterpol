@@ -17,7 +17,8 @@ public abstract class SqlEntity<T> : SqlEntityBase<T>, ISqlEntity<T>
         Reference = new SqlEntityReference(this) 
         { 
             Alias = alias,
-            FallbackAlias = typeof(T).Name 
+            FallbackAlias = typeof(T).Name,
+            IsAliasQuoted = !string.IsNullOrWhiteSpace(alias)
         };
         
         // Declaration points to this entity to render the 'Table AS Alias' string
@@ -34,7 +35,12 @@ public abstract class SqlEntity<T> : SqlEntityBase<T>, ISqlEntity<T>
             
             SqlRenderMode.AliasOnly => string.IsNullOrWhiteSpace(Reference.Alias) 
                 ? string.Empty 
-                : context.Dialect.QuoteIdentifier(Reference.Alias),
+                : Reference.IsAliasQuoted
+                    ? context.Dialect.QuoteIdentifier(Reference.Alias)
+                    : Reference.Alias,
+            // SqlRenderMode.AliasOnly => string.IsNullOrWhiteSpace(Reference.Alias) 
+            //     ? string.Empty 
+            //     : context.Dialect.QuoteIdentifier(Reference.Alias),
             
             _ => RenderReference(context)
         };
@@ -44,20 +50,28 @@ public abstract class SqlEntity<T> : SqlEntityBase<T>, ISqlEntity<T>
     {
         var baseName = context.Dialect.QuoteEntityName(Name, Schema);
         
-        // If no alias is defined, just return the physical name (e.g., [dbo].[Products])
         if (string.IsNullOrWhiteSpace(Reference.Alias))
         {
             return baseName;
         }
 
-        // Return the full declaration (e.g., [dbo].[Products] AS [p])
-        return context.Dialect.ApplyAlias(baseName, Reference.Alias);
+        // Apply safely quoted (or explicitly unquoted) alias based on user intent
+        string finalAlias = Reference.IsAliasQuoted
+            ? context.Dialect.QuoteIdentifier(Reference.Alias)
+            :Reference.Alias;
+        
+        return context.Dialect.ApplyAlias(baseName, finalAlias);
     }
 
     private string RenderReference(ISqlContext context)
     {
-        return !string.IsNullOrWhiteSpace(Reference.Alias)
-            ? context.Dialect.QuoteIdentifier(Reference.Alias)
-            : context.Dialect.QuoteEntityName(Name, Schema);
+        if (!string.IsNullOrWhiteSpace(Reference.Alias))
+        {
+            return Reference.IsAliasQuoted
+                ? context.Dialect.QuoteIdentifier(Reference.Alias)
+                : Reference.Alias;
+        }
+
+        return context.Dialect.QuoteEntityName(Name, Schema);
     }
 }

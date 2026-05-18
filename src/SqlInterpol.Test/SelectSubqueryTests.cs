@@ -106,27 +106,27 @@ public class SelectSubqueryTests
             [
                 """
                 SELECT 
-                    <<prod>>.<<Id>>,
+                    prod.<<Id>>,
                     (
                         SELECT
                             <<Category>>.<<Name>>
                         FROM <<Category>>
-                        WHERE <<Category>>.<<Id>> = <<prod>>.<<CategoryId>> AND <<Category>>.<<IsActive>> = !!100
+                        WHERE <<Category>>.<<Id>> = prod.<<CategoryId>> AND <<Category>>.<<IsActive>> = !!100
                     ) AS CategoryName
                 FROM <<dbo>>.<<Products>> AS prod
-                WHERE <<prod>>.<<Price>> > !!101
+                WHERE prod.<<Price>> > !!101
                 """,
                 """
                 SELECT 
-                    <<second_prod>>.<<Id>>,
+                    second_prod.<<Id>>,
                     (
                         SELECT
                             <<Category>>.<<Name>>
                         FROM <<Category>>
-                        WHERE <<Category>>.<<Id>> = <<second_prod>>.<<CategoryId>> AND <<Category>>.<<IsActive>> = !!100
+                        WHERE <<Category>>.<<Id>> = second_prod.<<CategoryId>> AND <<Category>>.<<IsActive>> = !!100
                     ) AS CategoryName
                 FROM <<dbo>>.<<Products>> AS second_prod
-                WHERE <<second_prod>>.<<Price>> > !!101
+                WHERE second_prod.<<Price>> > !!101
                 """
             ]
         ),
@@ -135,27 +135,27 @@ public class SelectSubqueryTests
             [
                 """
                 SELECT 
-                    `prod`.`Id`,
+                    prod.`Id`,
                     (
                         SELECT
                             `Category`.`Name`
                         FROM `Category`
-                        WHERE `Category`.`Id` = `prod`.`CategoryId` AND `Category`.`IsActive` = @p0
+                        WHERE `Category`.`Id` = prod.`CategoryId` AND `Category`.`IsActive` = @p0
                     ) AS CategoryName
                 FROM `dbo`.`Products` AS prod
-                WHERE `prod`.`Price` > @p1
+                WHERE prod.`Price` > @p1
                 """,
                 """
                 SELECT 
-                    `second_prod`.`Id`,
+                    second_prod.`Id`,
                     (
                         SELECT
                             `Category`.`Name`
                         FROM `Category`
-                        WHERE `Category`.`Id` = `second_prod`.`CategoryId` AND `Category`.`IsActive` = @p0
+                        WHERE `Category`.`Id` = second_prod.`CategoryId` AND `Category`.`IsActive` = @p0
                     ) AS CategoryName
                 FROM `dbo`.`Products` AS second_prod
-                WHERE `second_prod`.`Price` > @p1
+                WHERE second_prod.`Price` > @p1
                 """
             ]
         ),
@@ -164,27 +164,27 @@ public class SelectSubqueryTests
             [
                 """
                 SELECT 
-                    "prod"."Id",
+                    prod."Id",
                     (
                         SELECT
                             "Category"."Name"
                         FROM "Category"
-                        WHERE "Category"."Id" = "prod"."CategoryId" AND "Category"."IsActive" = :0
+                        WHERE "Category"."Id" = prod."CategoryId" AND "Category"."IsActive" = :0
                     ) AS CategoryName
                 FROM "dbo"."Products" AS prod
-                WHERE "prod"."Price" > :1
+                WHERE prod."Price" > :1
                 """,
                 """
                 SELECT 
-                    "second_prod"."Id",
+                    second_prod."Id",
                     (
                         SELECT
                             "Category"."Name"
                         FROM "Category"
-                        WHERE "Category"."Id" = "second_prod"."CategoryId" AND "Category"."IsActive" = :0
+                        WHERE "Category"."Id" = second_prod."CategoryId" AND "Category"."IsActive" = :0
                     ) AS CategoryName
                 FROM "dbo"."Products" AS second_prod
-                WHERE "second_prod"."Price" > :1
+                WHERE second_prod."Price" > :1
                 """
             ]
         ),
@@ -193,27 +193,27 @@ public class SelectSubqueryTests
             [
                 """
                 SELECT 
-                    "prod"."Id",
+                    prod."Id",
                     (
                         SELECT
                             "Category"."Name"
                         FROM "Category"
-                        WHERE "Category"."Id" = "prod"."CategoryId" AND "Category"."IsActive" = $1
+                        WHERE "Category"."Id" = prod."CategoryId" AND "Category"."IsActive" = $1
                     ) AS CategoryName
                 FROM "dbo"."Products" AS prod
-                WHERE "prod"."Price" > $2
+                WHERE prod."Price" > $2
                 """,
                 """
                 SELECT 
-                    "second_prod"."Id",
+                    second_prod."Id",
                     (
                         SELECT
                             "Category"."Name"
                         FROM "Category"
-                        WHERE "Category"."Id" = "second_prod"."CategoryId" AND "Category"."IsActive" = $1
+                        WHERE "Category"."Id" = second_prod."CategoryId" AND "Category"."IsActive" = $1
                     ) AS CategoryName
                 FROM "dbo"."Products" AS second_prod
-                WHERE "second_prod"."Price" > $2
+                WHERE second_prod."Price" > $2
                 """
             ]
         ),
@@ -222,27 +222,27 @@ public class SelectSubqueryTests
             [
                 """
                 SELECT 
-                    "prod"."Id",
+                    prod."Id",
                     (
                         SELECT
                             "Category"."Name"
                         FROM "Category"
-                        WHERE "Category"."Id" = "prod"."CategoryId" AND "Category"."IsActive" = ?0
+                        WHERE "Category"."Id" = prod."CategoryId" AND "Category"."IsActive" = ?0
                     ) AS CategoryName
                 FROM "dbo"."Products" AS prod
-                WHERE "prod"."Price" > ?1
+                WHERE prod."Price" > ?1
                 """,
                 """
                 SELECT 
-                    "second_prod"."Id",
+                    second_prod."Id",
                     (
                         SELECT
                             "Category"."Name"
                         FROM "Category"
-                        WHERE "Category"."Id" = "second_prod"."CategoryId" AND "Category"."IsActive" = ?0
+                        WHERE "Category"."Id" = second_prod."CategoryId" AND "Category"."IsActive" = ?0
                     ) AS CategoryName
                 FROM "dbo"."Products" AS second_prod
-                WHERE "second_prod"."Price" > ?1
+                WHERE second_prod."Price" > ?1
                 """
             ]
         ),
@@ -251,27 +251,27 @@ public class SelectSubqueryTests
             [
                 """
                 SELECT 
-                    [prod].[Id],
+                    prod.[Id],
                     (
                         SELECT
                             [Category].[Name]
                         FROM [Category]
-                        WHERE [Category].[Id] = [prod].[CategoryId] AND [Category].[IsActive] = @p0
+                        WHERE [Category].[Id] = prod.[CategoryId] AND [Category].[IsActive] = @p0
                     ) AS CategoryName
                 FROM [dbo].[Products] AS prod
-                WHERE [prod].[Price] > @p1
+                WHERE prod.[Price] > @p1
                 """,
                 """
                 SELECT 
-                    [second_prod].[Id],
+                    second_prod.[Id],
                     (
                         SELECT
                             [Category].[Name]
                         FROM [Category]
-                        WHERE [Category].[Id] = [second_prod].[CategoryId] AND [Category].[IsActive] = @p0
+                        WHERE [Category].[Id] = second_prod.[CategoryId] AND [Category].[IsActive] = @p0
                     ) AS CategoryName
                 FROM [dbo].[Products] AS second_prod
-                WHERE [second_prod].[Price] > @p1
+                WHERE second_prod.[Price] > @p1
                 """
             ]
         )

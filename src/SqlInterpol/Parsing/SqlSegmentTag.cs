@@ -6,7 +6,6 @@ public static class SqlSegmentTag
     public const string InsertTarget = "InsertTarget";
     public const string UpdateTarget = "UpdateTarget";
     public const string InsertValuesKeyword = "InsertValuesKeyword";
-    public const string UpdateSetKeyword = "UpdateSetKeyword";
     public const string ReturningKeyword = "ReturningKeyword";
     public const string OnConflictKeyword = "OnConflictKeyword";
     public const string DoUpdateSetKeyword = "DoUpdateSetKeyword";
@@ -18,4 +17,8 @@ public static class SqlSegmentTag
     public const string ExceptKeyword = "ExceptKeyword";
     public const string UnionKeyword = "UnionKeyword";
     public const string UnionAllKeyword = "UnionAllKeyword";
+    public const string UpdateKeyword = "UpdateKeyword";
+    public const string SetKeyword = "SetKeyword";
+    public const string FromKeyword = "FromKeyword";
+    public const string WhereKeyword = "WhereKeyword";
 }

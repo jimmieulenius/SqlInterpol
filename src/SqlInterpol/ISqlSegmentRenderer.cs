@@ -4,5 +4,5 @@ namespace SqlInterpol;
 
 public interface ISqlSegmentRenderer
 {
-    string? Render(SqlContext context, SqlSegment segment, int index, IReadOnlyList<SqlSegment> segments);
+    string? Render(ISqlContext context, SqlSegment segment, int index, IReadOnlyList<SqlSegment> segments);
 }

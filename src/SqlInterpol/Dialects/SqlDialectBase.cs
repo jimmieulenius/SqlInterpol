@@ -115,7 +115,8 @@ public abstract class SqlDialectBase : ISqlDialect
             return source;
         }
 
-        return $"{QuoteIdentifier(source)} {SqlKeyword.As.Value} {QuoteIdentifier(alias)}";
+        // return $"{QuoteIdentifier(source)} {SqlKeyword.As.Value} {QuoteIdentifier(alias)}";
+        return $"{QuoteIdentifier(source)} {SqlKeyword.As.Value} {alias}";
     }
 
     public virtual string RenderFragment(ISqlFragment fragment, ISqlContext context)
@@ -124,6 +125,9 @@ public abstract class SqlDialectBase : ISqlDialect
         {
             SqlPagingFragment p => $"{SqlKeyword.Limit} {p.Limit} {SqlKeyword.Offset} {p.Offset}",
             SqlSetOperationFragment setOp => RenderSetOperation(setOp, context),
+            
+            // === NEW: Render Multi-Table Updates ===
+            SqlMultiTableUpdateFragment update => RenderMultiTableUpdate(update, context),
 
             _ => throw new NotSupportedException($"The fragment type '{fragment.GetType().Name}' is not supported by {this.GetType().Name}.")
         };
@@ -145,16 +149,13 @@ public abstract class SqlDialectBase : ISqlDialect
                     if (keywordIndex > -1)
                     {
                         rewritten.Add(new SqlSegment(SqlSegmentType.Literal, text[..keywordIndex]));
-
                         return true;
                     }
                 }
 
                 rewritten.Add(new SqlSegment(SqlSegmentType.Literal, " "));
-
                 return true; 
             }
-
             return false;
         }
 
@@ -162,75 +163,59 @@ public abstract class SqlDialectBase : ISqlDialect
         {
             var segment = segments[i];
 
-            if (segment.Tag == SqlSegmentTag.ReturningKeyword)
-            {
-                forceBaseNamePhase = true;
-            }
-            // 1. Safe detection and auto-injection for ON CONFLICT
+            if (segment.Tag == SqlSegmentTag.ReturningKeyword) forceBaseNamePhase = true;
+            
             else if (segment.Tag == SqlSegmentTag.OnConflictKeyword || 
                     (segment.Type == SqlSegmentType.Literal && segment.Value is string s1 && s1.Contains("ON CONFLICT", StringComparison.OrdinalIgnoreCase)))
             {
                 forceBaseNamePhase = true;
-                
                 if (segment.Value is string text)
                 {
                     string clean = text.EndsWith(" ") ? text[..^1] : text;
-
                     if (!clean.EndsWith('(')) clean += " (";
-                    
                     rewritten.Add(new SqlSegment(SqlSegmentType.Literal, clean));
-
                     continue;
                 }
             }
-            // 2. Safe detection and auto-injection for DO UPDATE SET
             else if (segment.Tag == SqlSegmentTag.DoUpdateSetKeyword || 
                     (segment.Type == SqlSegmentType.Literal && segment.Value is string s2 && s2.Contains("DO UPDATE SET", StringComparison.OrdinalIgnoreCase)))
             {
                 forceBaseNamePhase = false; 
-                
                 if (segment.Value is string text)
                 {
                     string clean = text;
                     if (!clean.TrimStart().StartsWith(')')) clean = ")\n" + clean.TrimStart();
                     
                     int keywordIndex = clean.LastIndexOf(SqlKeyword.Set, StringComparison.OrdinalIgnoreCase);
-
                     if (keywordIndex > -1 && i + 1 < segments.Count && segments[i + 1].Value is SqlSetFragment)
                     {
                         rewritten.Add(new SqlSegment(SqlSegmentType.Literal, clean[..keywordIndex]));
-
                         continue;
                     }
                     
                     rewritten.Add(new SqlSegment(SqlSegmentType.Literal, clean));
-
                     continue;
                 }
             }
             else if (segment.Tag == SqlSegmentTag.ForUpdateKeyword && segment.Value is string updateText)
             {
                 int idx = updateText.IndexOf("FOR UPDATE", StringComparison.OrdinalIgnoreCase);
-
                 if (idx > -1)
                 {
                     rewritten.Add(new SqlSegment(SqlSegmentType.Literal, updateText[..idx].TrimEnd(' ', '\t')));
                     rewritten.Add(new SqlSegment(SqlSegmentType.Raw, new SqlLockFragment(SqlLockMode.Update)));
                     rewritten.Add(new SqlSegment(SqlSegmentType.Literal, updateText[(idx + 10)..]));
-
                     continue;
                 }
             }
             else if (segment.Tag == SqlSegmentTag.ForShareKeyword && segment.Value is string shareText)
             {
                 int idx = shareText.IndexOf("FOR SHARE", StringComparison.OrdinalIgnoreCase);
-
                 if (idx > -1)
                 {
                     rewritten.Add(new SqlSegment(SqlSegmentType.Literal, shareText[..idx].TrimEnd(' ', '\t')));
                     rewritten.Add(new SqlSegment(SqlSegmentType.Raw, new SqlLockFragment(SqlLockMode.Share)));
                     rewritten.Add(new SqlSegment(SqlSegmentType.Literal, shareText[(idx + 9)..]));
-                    
                     continue;
                 }
             }
@@ -251,17 +236,15 @@ public abstract class SqlDialectBase : ISqlDialect
                     i + 1 < segments.Count && segments[i + 1].Value is ISqlFragment right)
                 {
                     var fragment = new SqlSetOperationFragment(left, right, op);
-                    
                     rewritten[^1] = new SqlSegment(SqlSegmentType.Raw, fragment);
-                    i++; // Skip the Right query
-                    continue; // Skip the Keyword segment
+                    i++; 
+                    continue; 
                 }
             }
 
             if (forceBaseNamePhase && segment.Type == SqlSegmentType.Projection && segment.Value is ISqlProjection proj)
             {
                 rewritten.Add(new SqlSegment(SqlSegmentType.Projection, proj, SqlRenderMode.BaseName));
-
                 continue;
             }
 
@@ -270,7 +253,7 @@ public abstract class SqlDialectBase : ISqlDialect
                 case SqlSegmentTag.InsertValuesKeyword:
                     if (TryRewriteKeywordFragment<SqlInsertValuesFragment>(SqlKeyword.Values, segment, i)) continue;
                     break;
-                case SqlSegmentTag.UpdateSetKeyword:
+                case SqlSegmentTag.SetKeyword:
                     if (TryRewriteKeywordFragment<SqlSetFragment>(SqlKeyword.Set, segment, i)) continue;
                     break;
                 case SqlSegmentTag.SelectKeyword:
@@ -282,6 +265,51 @@ public abstract class SqlDialectBase : ISqlDialect
             }
 
             rewritten.Add(segment);
+        }
+
+        // === NEW: Multi-Table Update Post-Pass ===
+        // Runs on the processed 'rewritten' list so we don't break earlier framework rules!
+        int updateIdx = -1, setIdx = -1, fromIdx = -1, whereIdx = -1;
+
+        for (int i = 0; i < rewritten.Count; i++)
+        {
+            if (rewritten[i].Tag == SqlSegmentTag.UpdateKeyword) updateIdx = i;
+            else if (rewritten[i].Tag == SqlSegmentTag.SetKeyword) setIdx = i;
+            else if (rewritten[i].Tag == SqlSegmentTag.FromKeyword) fromIdx = i;
+            else if (rewritten[i].Tag == SqlSegmentTag.WhereKeyword) whereIdx = i;
+        }
+
+        if (updateIdx >= 0 && setIdx > updateIdx)
+        {
+            var target = new SqlSegmentCollectionFragment([.. rewritten.Skip(updateIdx + 1).Take(setIdx - updateIdx - 1)]);
+            var endOfSet = fromIdx > 0 ? fromIdx : (whereIdx > 0 ? whereIdx : rewritten.Count);
+            
+            // Force SqlRenderMode.BaseName on all columns sitting inside the SET clause chunk
+            var setClauseSegments = rewritten.Skip(setIdx + 1).Take(endOfSet - setIdx - 1).Select(s => 
+                s.Type == SqlSegmentType.Projection && s.Value is ISqlProjection p
+                    ? new SqlSegment(SqlSegmentType.Projection, p, SqlRenderMode.BaseName)
+                    : s
+            ).ToList();
+            
+            var setClause = new SqlSegmentCollectionFragment(setClauseSegments);
+
+            SqlSegmentCollectionFragment? fromClause = null;
+            if (fromIdx > 0)
+            {
+                int endOfFrom = whereIdx > 0 ? whereIdx : rewritten.Count;
+                fromClause = new SqlSegmentCollectionFragment([.. rewritten.Skip(fromIdx + 1).Take(endOfFrom - fromIdx - 1)]);
+            }
+
+            SqlSegmentCollectionFragment? whereClause = null;
+            if (whereIdx > 0)
+            {
+                whereClause = new SqlSegmentCollectionFragment([.. rewritten.Skip(whereIdx + 1)]);
+            }
+
+            if (fromClause != null)
+            {
+                return [new SqlSegment(SqlSegmentType.Raw, new SqlMultiTableUpdateFragment(target, setClause, fromClause, whereClause))];
+            }
         }
 
         return rewritten;
@@ -301,5 +329,20 @@ public abstract class SqlDialectBase : ISqlDialect
         };
         
         return $"{fragment.Left.ToSql(context)}{Environment.NewLine}{opKeyword}{Environment.NewLine}{fragment.Right.ToSql(context)}";
+    }
+
+    // === NEW: Base Rendering for UPDATE statements ===
+    protected virtual string RenderMultiTableUpdate(SqlMultiTableUpdateFragment update, ISqlContext context)
+    {
+        // Standard Layout (SQL Server, Postgres, SQLite, Oracle)
+        var sql = $"UPDATE {update.Target.ToSql(context)}{Environment.NewLine}SET {update.SetClause.ToSql(context)}";
+        
+        if (update.FromClause != null) 
+            sql += $"{Environment.NewLine}FROM {update.FromClause.ToSql(context)}";
+            
+        if (update.WhereClause != null) 
+            sql += $"{Environment.NewLine}WHERE {update.WhereClause.ToSql(context)}";
+            
+        return sql;
     }
 }

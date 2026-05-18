@@ -1,5 +1,3 @@
-using System;
-
 namespace SqlInterpol;
 
 public static partial class SqlBuilderExtensions
