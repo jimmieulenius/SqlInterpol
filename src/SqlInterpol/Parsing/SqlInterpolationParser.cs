@@ -290,6 +290,60 @@ public class SqlInterpolationParser : ISqlInterpolationParser
         return CreateParameter(context, value);
     }
 
+    // --- Keyword Detection Infrastructure ---
+
+    private enum KeywordMatchMode { EndsWithWord, ContainsWord, EqualsWord }
+
+    private readonly record struct KeywordRule(string Text, KeywordMatchMode Mode, string? Tag, SqlKeyword? ForcedKeyword);
+
+    // Ordering IS priority — multi-word patterns must come before their single-word suffixes.
+    private static readonly KeywordRule[] _keywordRules =
+    [
+        new(SqlKeyword.ForUpdate.Value,                                KeywordMatchMode.ContainsWord, SqlSegmentTag.ForUpdateKeyword,      null),
+        new(SqlKeyword.ForShare.Value,                                 KeywordMatchMode.ContainsWord, SqlSegmentTag.ForShareKeyword,       null),
+        new(SqlKeyword.Limit.Value,                                    KeywordMatchMode.ContainsWord, SqlSegmentTag.Paging,                null),
+        new(SqlKeyword.DoUpdateSet.Value,                              KeywordMatchMode.EndsWithWord, SqlSegmentTag.DoUpdateSetKeyword,    SqlKeyword.Set),   // before Set
+        new(SqlKeyword.OnConflict.Value,                               KeywordMatchMode.EndsWithWord, SqlSegmentTag.OnConflictKeyword,     null),
+        new(SqlKeyword.Update.Value,                                   KeywordMatchMode.EndsWithWord, SqlSegmentTag.UpdateKeyword,         SqlKeyword.Update),
+        new(SqlKeyword.Set.Value,                                      KeywordMatchMode.EndsWithWord, SqlSegmentTag.SetKeyword,            SqlKeyword.Set),
+        new($"{SqlKeyword.Insert.Value} {SqlKeyword.Into.Value}",     KeywordMatchMode.EndsWithWord, null,                                SqlKeyword.Insert), // before Insert
+        new(SqlKeyword.Insert.Value,                                   KeywordMatchMode.EndsWithWord, null,                                SqlKeyword.Insert),
+        new(SqlKeyword.Values.Value,                                   KeywordMatchMode.EndsWithWord, SqlSegmentTag.InsertValuesKeyword,   SqlKeyword.Values),
+        new(SqlKeyword.Returning.Value,                                KeywordMatchMode.EndsWithWord, SqlSegmentTag.ReturningKeyword,      null),
+        new(SqlKeyword.SelectDistinct.Value,                           KeywordMatchMode.EndsWithWord, SqlSegmentTag.SelectDistinctKeyword, SqlKeyword.SelectDistinct), // before Select
+        new(SqlKeyword.Select.Value,                                   KeywordMatchMode.EndsWithWord, SqlSegmentTag.SelectKeyword,         SqlKeyword.Select),
+        new(SqlKeyword.From.Value,                                     KeywordMatchMode.EndsWithWord, SqlSegmentTag.FromKeyword,           SqlKeyword.From),
+        new(SqlKeyword.Except.Value,                                   KeywordMatchMode.EqualsWord,   SqlSegmentTag.ExceptKeyword,         null),
+        new(SqlKeyword.Intersect.Value,                                KeywordMatchMode.EqualsWord,   SqlSegmentTag.IntersectKeyword,      null),
+        new(SqlKeyword.UnionAll.Value,                                 KeywordMatchMode.EqualsWord,   SqlSegmentTag.UnionAllKeyword,       null), // before Union
+        new(SqlKeyword.Union.Value,                                    KeywordMatchMode.EqualsWord,   SqlSegmentTag.UnionKeyword,          null),
+        new(SqlKeyword.Where.Value,                                    KeywordMatchMode.ContainsWord, SqlSegmentTag.WhereKeyword,          SqlKeyword.Where),
+    ];
+
+    private static bool EndsWithWholeWord(ReadOnlySpan<char> text, string keyword)
+    {
+        if (!text.EndsWith(keyword, StringComparison.OrdinalIgnoreCase)) return false;
+        int pos = text.Length - keyword.Length;
+        return pos == 0 || !char.IsLetterOrDigit(text[pos - 1]);
+    }
+
+    private static bool ContainsWholeWord(ReadOnlySpan<char> text, string keyword)
+    {
+        var kw = keyword.AsSpan();
+        int start = 0;
+        while (start <= text.Length - kw.Length)
+        {
+            int idx = text[start..].IndexOf(kw, StringComparison.OrdinalIgnoreCase);
+            if (idx < 0) return false;
+            idx += start;
+            bool leftOk  = idx == 0 || !char.IsLetterOrDigit(text[idx - 1]);
+            bool rightOk = idx + kw.Length >= text.Length || !char.IsLetterOrDigit(text[idx + kw.Length]);
+            if (leftOk && rightOk) return true;
+            start = idx + 1;
+        }
+        return false;
+    }
+
     public virtual string? ProcessLiteral(ISqlParserContext context, ReadOnlySpan<char> span)
     {
         // 1. --- ZERO-ALLOCATION, STATE-AWARE SCRUBBING ---
@@ -358,67 +412,20 @@ public class SqlInterpolationParser : ISqlInterpolationParser
         // 3. --- KEYWORD SCANNING ON SCRUBBED SPAN ---
         var trimmed = activeSpan.Trim();
         string? tag = null;
-        SqlKeyword? forcedKeyword = null; 
+        SqlKeyword? forcedKeyword = null;
 
-        if (trimmed.Contains(SqlKeyword.ForUpdate, StringComparison.OrdinalIgnoreCase))
-            tag = SqlSegmentTag.ForUpdateKeyword;
-        else if (trimmed.Contains(SqlKeyword.ForShare, StringComparison.OrdinalIgnoreCase))
-            tag = SqlSegmentTag.ForShareKeyword;
-        else if (trimmed.Contains(SqlKeyword.Limit, StringComparison.OrdinalIgnoreCase))
-            tag = SqlSegmentTag.Paging;
-        else if (trimmed.EndsWith(SqlKeyword.DoUpdateSet, StringComparison.OrdinalIgnoreCase))
+        foreach (var rule in _keywordRules)
         {
-            forcedKeyword = SqlKeyword.Set;
-            tag = SqlSegmentTag.DoUpdateSetKeyword;
-        }
-        else if (trimmed.EndsWith(SqlKeyword.OnConflict, StringComparison.OrdinalIgnoreCase))
-            tag = SqlSegmentTag.OnConflictKeyword;
-        else if (trimmed.EndsWith(SqlKeyword.Update, StringComparison.OrdinalIgnoreCase))
-        {
-            forcedKeyword = SqlKeyword.Update;
-            tag = SqlSegmentTag.UpdateKeyword;
-        }
-        else if (trimmed.EndsWith(SqlKeyword.Set, StringComparison.OrdinalIgnoreCase))
-        {
-            forcedKeyword = SqlKeyword.Set;
-            tag = SqlSegmentTag.SetKeyword;
-        }
-        else if (trimmed.EndsWith($"{SqlKeyword.Insert} {SqlKeyword.Into}", StringComparison.OrdinalIgnoreCase) || trimmed.EndsWith(SqlKeyword.Insert, StringComparison.OrdinalIgnoreCase))
-            forcedKeyword = SqlKeyword.Insert;
-        else if (trimmed.EndsWith(SqlKeyword.Values, StringComparison.OrdinalIgnoreCase))
-        {
-            forcedKeyword = SqlKeyword.Values;
-            tag = SqlSegmentTag.InsertValuesKeyword;
-        }
-        else if (trimmed.EndsWith(SqlKeyword.Returning, StringComparison.OrdinalIgnoreCase))
-            tag = SqlSegmentTag.ReturningKeyword;
-        else if (trimmed.EndsWith($"{SqlKeyword.Select} {SqlKeyword.Distinct}", StringComparison.OrdinalIgnoreCase))
-        {
-            forcedKeyword = SqlKeyword.SelectDistinct;
-            tag = SqlSegmentTag.SelectDistinctKeyword;
-        }
-        else if (trimmed.EndsWith(SqlKeyword.Select, StringComparison.OrdinalIgnoreCase))
-        {
-            forcedKeyword = SqlKeyword.Select;
-            tag = SqlSegmentTag.SelectKeyword;
-        }
-        else if (trimmed.EndsWith(SqlKeyword.From, StringComparison.OrdinalIgnoreCase))
-        {
-            forcedKeyword = SqlKeyword.From;
-            tag = SqlSegmentTag.FromKeyword;
-        }
-        else if (trimmed.Equals(SqlKeyword.Except, StringComparison.OrdinalIgnoreCase))
-            tag = SqlSegmentTag.ExceptKeyword;
-        else if (trimmed.Equals(SqlKeyword.Intersect, StringComparison.OrdinalIgnoreCase))
-            tag = SqlSegmentTag.IntersectKeyword;
-        else if (trimmed.Equals(SqlKeyword.UnionAll, StringComparison.OrdinalIgnoreCase)) // MUST BE BEFORE UNION
-            tag = SqlSegmentTag.UnionAllKeyword;
-        else if (trimmed.Equals(SqlKeyword.Union, StringComparison.OrdinalIgnoreCase))
-            tag = SqlSegmentTag.UnionKeyword;
-        else if (trimmed.Contains(SqlKeyword.Where, StringComparison.OrdinalIgnoreCase))
-        {
-            forcedKeyword = SqlKeyword.Where;
-            tag = SqlSegmentTag.WhereKeyword;
+            bool matched = rule.Mode switch
+            {
+                KeywordMatchMode.EndsWithWord => EndsWithWholeWord(trimmed, rule.Text),
+                KeywordMatchMode.ContainsWord => ContainsWholeWord(trimmed, rule.Text),
+                _                             => trimmed.Equals(rule.Text, StringComparison.OrdinalIgnoreCase),
+            };
+            if (!matched) continue;
+            tag = rule.Tag;
+            forcedKeyword = rule.ForcedKeyword;
+            break;
         }
 
         if (trimmed.IsEmpty)

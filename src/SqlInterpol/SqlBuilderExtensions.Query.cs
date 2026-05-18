@@ -2,29 +2,26 @@ namespace SqlInterpol;
 
 public static partial class SqlBuilderExtensions
 {
-    extension (SqlBuilder builder)
-    {
-        public ISqlEntity<T> AddEntity<T>(string? name = null, string? schema = null, string? alias = null)
-            => ((ISqlEntityRegistry)builder).RegisterEntity<T>(name, schema, alias);
+    public static ISqlEntity<T> AddEntity<T>(this SqlBuilder builder, string? name = null, string? schema = null, string? alias = null)
+        => ((ISqlEntityRegistry)builder).RegisterEntity<T>(name, schema, alias);
 
-        public SqlQueryBuilder<T1> Entity<T1>(string? name = null, string? schema = null, string? alias = null)
-            => new(builder, name, schema, alias);
+    public static SqlQueryBuilder<T1> Entity<T1>(this SqlBuilder builder, string? name = null, string? schema = null, string? alias = null)
+        => new(builder, name, schema, alias);
 
-        public ISqlQuery<T1> Query<T1>(Action<ISqlEntity<T1>> body)
-            => Entity<T1>(builder).Query(body);
+    public static ISqlQuery<T1> Query<T1>(this SqlBuilder builder, Action<ISqlEntity<T1>> body)
+        => builder.Entity<T1>().Query(body);
 
-        public ISqlQuery<T1> Query<T1, T2>(Action<ISqlEntity<T1>, ISqlEntity<T2>> body)
-            => Entity<T1>(builder).Entity<T2>().Query(body);
+    public static ISqlQuery<T1> Query<T1, T2>(this SqlBuilder builder, Action<ISqlEntity<T1>, ISqlEntity<T2>> body)
+        => builder.Entity<T1>().Entity<T2>().Query(body);
 
-        public ISqlQuery<T1> Query<T1, T2, T3>(Action<ISqlEntity<T1>, ISqlEntity<T2>, ISqlEntity<T3>> body)
-            => Entity<T1>(builder).Entity<T2>().Entity<T3>().Query(body);
+    public static ISqlQuery<T1> Query<T1, T2, T3>(this SqlBuilder builder, Action<ISqlEntity<T1>, ISqlEntity<T2>, ISqlEntity<T3>> body)
+        => builder.Entity<T1>().Entity<T2>().Entity<T3>().Query(body);
 
-        public ISqlQuery<T1> Query<T1, T2, T3, T4>(Action<ISqlEntity<T1>, ISqlEntity<T2>, ISqlEntity<T3>, ISqlEntity<T4>> body)
-            => Entity<T1>(builder).Entity<T2>().Entity<T3>().Entity<T4>().Query(body);
+    public static ISqlQuery<T1> Query<T1, T2, T3, T4>(this SqlBuilder builder, Action<ISqlEntity<T1>, ISqlEntity<T2>, ISqlEntity<T3>, ISqlEntity<T4>> body)
+        => builder.Entity<T1>().Entity<T2>().Entity<T3>().Entity<T4>().Query(body);
 
-        public ISqlQuery<T1> Query<T1, T2, T3, T4, T5>(Action<ISqlEntity<T1>, ISqlEntity<T2>, ISqlEntity<T3>, ISqlEntity<T4>, ISqlEntity<T5>> body)
-            => Entity<T1>(builder).Entity<T2>().Entity<T3>().Entity<T4>().Entity<T5>().Query(body);
-    }
+    public static ISqlQuery<T1> Query<T1, T2, T3, T4, T5>(this SqlBuilder builder, Action<ISqlEntity<T1>, ISqlEntity<T2>, ISqlEntity<T3>, ISqlEntity<T4>, ISqlEntity<T5>> body)
+        => builder.Entity<T1>().Entity<T2>().Entity<T3>().Entity<T4>().Entity<T5>().Query(body);
 }
 
 public readonly struct SqlQueryBuilder<T1>(SqlBuilder builder, string? name, string? schema, string? alias)
