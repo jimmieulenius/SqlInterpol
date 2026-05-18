@@ -106,7 +106,9 @@ public class UpdateTests
             {
                 var db = testCase.CreateBuilder();
                 var entity = db.AddEntity<Product>();
+                #pragma warning disable SQLI002
                 Sql.BuildAssignments(entity, new { Id = 1, NonExistentProperty = "Should Fail" });
+                #pragma warning restore SQLI002
             }
         });
 

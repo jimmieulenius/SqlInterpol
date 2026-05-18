@@ -95,7 +95,35 @@ public static class SqlInterpolDapperExtensions
             commandTimeout,
             commandType);
     }
+    public static SqlMapper.GridReader QueryMultiple(
+        this IDbConnection connection,
+        SqlQueryResult result,
+        IDbTransaction? transaction = null,
+        int? commandTimeout = null,
+        CommandType? commandType = null)
+    {
+        return connection.QueryMultiple(
+            result.Sql,
+            ToDynamicParameters(result.Parameters),
+            transaction,
+            commandTimeout,
+            commandType);
+    }
 
+    public static Task<SqlMapper.GridReader> QueryMultipleAsync(
+        this IDbConnection connection,
+        SqlQueryResult result,
+        IDbTransaction? transaction = null,
+        int? commandTimeout = null,
+        CommandType? commandType = null)
+    {
+        return connection.QueryMultipleAsync(
+            result.Sql,
+            ToDynamicParameters(result.Parameters),
+            transaction,
+            commandTimeout,
+            commandType);
+    }
     public static IEnumerable<T> Query<T>(
         this IDbConnection connection,
         SqlQueryResult result,

@@ -19,6 +19,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\SqlInterpol.Analyzers\SqlInterpol.Analyzers.csproj" 
+      ReferenceOutputAssembly="false" 
+      OutputItemType="Analyzer" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
 

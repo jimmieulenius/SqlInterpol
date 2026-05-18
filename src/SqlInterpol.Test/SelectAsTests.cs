@@ -34,6 +34,7 @@ public class SelectAsTests
         var db = testCase.CreateBuilder();
         
         // Act
+        #pragma warning disable SQLI003
         var result = db.Query<Product>(p =>
             db.Append($$"""
             SELECT
@@ -41,6 +42,7 @@ public class SelectAsTests
             FROM {{p}}
             """))
             .Build();
+        #pragma warning restore SQLI003
 
         // Assert
         testCase.AssertSql(result.Sql);

@@ -23,7 +23,7 @@ public partial class SqlBuilder : ISqlEntityRegistry
         Context = new SqlContext(this, dialect, parser, renderer, finalOptions);
     }
 
-    public SqlBuilder Append(string? value)
+    private SqlBuilder Append(string? value)
     {
         if (string.IsNullOrEmpty(value)) return this;
         _segments.Add(ProcessLiteral(value));
@@ -39,8 +39,6 @@ public partial class SqlBuilder : ISqlEntityRegistry
     }
 
     public SqlBuilder AppendLine() => Append(Environment.NewLine);
-
-    public SqlBuilder AppendLine(string? value) => Append(value).AppendLine();
 
     public SqlBuilder AppendLine([InterpolatedStringHandlerArgument("")] ref SqlQueryInterpolatedStringHandler handler)
     {
