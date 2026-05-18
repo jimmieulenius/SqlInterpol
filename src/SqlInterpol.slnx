@@ -1,4 +1,6 @@
 <Solution>
   <Project Path="SqlInterpol/SqlInterpol.csproj" />
+  <Project Path="SqlInterpol.Dapper/SqlInterpol.Dapper.csproj" />
+  <Project Path="SqlInterpol.EntityFrameworkCore/SqlInterpol.EntityFrameworkCore.csproj" />
   <Project Path="SqlInterpol.Test/SqlInterpol.Test.csproj" />
 </Solution>
