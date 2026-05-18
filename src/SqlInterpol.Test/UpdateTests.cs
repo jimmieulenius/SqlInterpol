@@ -358,16 +358,18 @@ public class UpdateTests
                 """
             ]
         ),
-        // new SqlTestCase(
-        //     SqlDialectKind.Oracle,
-        //     [
-        //         """
-        //         UPDATE "dbo"."Products" p1
-        //         SET "Price" = :0
-        //         WHERE "dbo"."Products"."CategoryId" = (SELECT c1.Id FROM "dbo"."Category" c1 WHERE c1.Id = p1.CategoryId)
-        //         """
-        //     ]
-        // ),
+        // CRITICAL CHECK: Oracle uses MERGE for multi-table updates, so the syntax is very different!
+        new SqlTestCase(
+            SqlDialectKind.Oracle,
+            [
+                """
+                MERGE INTO "dbo"."Products"
+                USING "Category" c1
+                ON ("dbo"."Products"."CategoryId" = c1.Id)
+                WHEN MATCHED THEN UPDATE SET "Price" = :0
+                """
+            ]
+        ),
         new SqlTestCase(
             SqlDialectKind.PostgreSql,
             [

@@ -28,6 +28,20 @@ public class OracleSqlDialect : SqlDialectBase
             return $"{setOp.Left.ToSql(context)}{Environment.NewLine}MINUS{Environment.NewLine}{setOp.Right.ToSql(context)}";
         }
 
+        if (fragment is SqlMultiTableUpdateFragment update && update.FromClause != null)
+        {
+            var target = update.Target.ToSql(context).Trim();
+            var setClause = update.SetClause.ToSql(context).Trim();
+            var fromClause = update.FromClause.ToSql(context).Trim();
+            var whereClause = update.WhereClause?.ToSql(context).Trim() ?? "1=1";
+
+            // WYSIWYG FIX: Safely strip the 'AS' keyword using the Parser's state-aware engine!
+            // This guarantees we never accidentally mutate 'AS' inside a string literal or comment.
+            fromClause = SqlInterpolationParser.Instance.ReplaceKeyword(fromClause, "AS", "").Replace("  ", " ");
+
+            return $"MERGE INTO {target}{Environment.NewLine}USING {fromClause}{Environment.NewLine}ON ({whereClause}){Environment.NewLine}WHEN MATCHED THEN UPDATE SET {setClause}";
+        }
+
         return base.RenderFragment(fragment, context);
     }
 
