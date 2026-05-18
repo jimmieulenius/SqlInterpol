@@ -19,6 +19,14 @@ public class SqlKeywordTypoAnalyzer : DiagnosticAnalyzer
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true);
 
+    private static readonly DiagnosticDescriptor ConstraintRule = new(
+        id: "SQLI004",
+        title: "Invalid keyword after SQL keyword",
+        messageFormat: "'{0}' is not a recognized SQL keyword after {1}",
+        category: "Correctness",
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true);
+
     // Common ANSI SQL + dialect-specific keywords and data types
     private static readonly string[] KnownKeywords =
     [
@@ -50,7 +58,19 @@ public class SqlKeywordTypoAnalyzer : DiagnosticAnalyzer
 
     private static readonly HashSet<string> KeywordSet = new(KnownKeywords, StringComparer.Ordinal);
 
-    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ImmutableArray.Create(Rule);
+    // After these keywords, if the next word-token is not a known keyword and not in the
+    // listed valid set, it is flagged. UPDATE/SHARE/etc. are already in KeywordSet so they
+    // never reach the constrained check; only non-keyword valid successors are listed here.
+    private static readonly IReadOnlyDictionary<string, HashSet<string>> ConstrainedSuccessors =
+        new Dictionary<string, HashSet<string>>(StringComparer.Ordinal)
+        {
+            // FOR UPDATE / FOR SHARE / FOR KEY SHARE / FOR NO KEY UPDATE
+            // UPDATE and SHARE are KeywordSet members; KEY and NO are not.
+            ["FOR"] = new HashSet<string>(StringComparer.Ordinal) { "KEY", "NO" },
+        };
+
+    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
+        ImmutableArray.Create(Rule, ConstraintRule);
 
     public override void Initialize(AnalysisContext context)
     {
@@ -75,6 +95,11 @@ public class SqlKeywordTypoAnalyzer : DiagnosticAnalyzer
         var firstArg = invocation.ArgumentList.Arguments[0].Expression;
         if (firstArg is not InterpolatedStringExpressionSyntax interpolatedString) return;
 
+        // lastKeyword persists across interpolation holes: the constrained check only fires
+        // for non-keywords, so valid successors (UPDATE, SHARE, etc.) are always in KeywordSet
+        // and will update lastKeyword cleanly regardless of what holes produce.
+        // e.g. FOR {{"dfd"}} AAA still flags AAA; FOR {{expr}} UPDATE is fine.
+        string? lastKeyword = null;
         foreach (var content in interpolatedString.Contents)
         {
             if (content is not InterpolatedStringTextSyntax textSyntax) continue;
@@ -82,7 +107,24 @@ public class SqlKeywordTypoAnalyzer : DiagnosticAnalyzer
             var text = textSyntax.TextToken.ValueText;
             foreach (var (original, normalized, offset) in ExtractWordTokens(text))
             {
-                if (KeywordSet.Contains(normalized)) continue;
+                if (KeywordSet.Contains(normalized))
+                {
+                    lastKeyword = normalized;
+                    continue;
+                }
+
+                // Constrained-successor check: e.g. after FOR, only UPDATE/SHARE/KEY/NO are valid.
+                if (lastKeyword != null &&
+                    ConstrainedSuccessors.TryGetValue(lastKeyword, out var validSuccessors))
+                {
+                    if (!validSuccessors.Contains(normalized))
+                        context.ReportDiagnostic(Diagnostic.Create(
+                            ConstraintRule, textSyntax.GetLocation(), original, lastKeyword));
+                    lastKeyword = null;
+                    continue;
+                }
+
+                lastKeyword = null;
 
                 var suggestion = FindClosestKeyword(normalized);
                 if (suggestion == null) continue;
