@@ -22,6 +22,9 @@ public partial class SqlBuilder
     public static SqlBuilder SqLite(SqlInterpolOptions? opt = null) 
         => new(SqlDialectCache<SqLiteSqlDialect>.Instance, opt);
 
+    public static SqlBuilder Firebird(SqlInterpolOptions? opt = null)
+        => new(SqlDialectCache<FirebirdSqlDialect>.Instance, opt);
+
     public static SqlBuilder SqlServer(SqlInterpolOptions? opt = null) 
         => new(SqlDialectCache<SqlServerSqlDialect>.Instance, opt);
 

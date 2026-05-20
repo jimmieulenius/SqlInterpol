@@ -30,7 +30,7 @@ Stop writing clumsy `SelectBuilder` chains. Write real SQL, and let C# do the he
 * **Zero SQL Injection:** Every interpolated value is automatically converted to a native `DbParameter`. Raw identifiers require an explicit `Sql.Raw()` call, making injection points visible and auditable.
 * **Type-Safe Schema:** Strongly-typed table and column references via C# expressions (e.g., `{{p[x => x.Price]}}`). Renamed a property? The compiler catches every broken reference instantly.
 * **Full DML Support:** INSERT, UPDATE, DELETE, and UPSERT (`ON CONFLICT` / `ON DUPLICATE KEY UPDATE` / SQL Server `MERGE`) all work through the same interpolation model.
-* **Dialect Agnostic:** Write once, run on SQL Server, PostgreSQL, MySQL, SQLite, or Oracle. Dialect-specific syntax differences are rewritten at render time.
+* **Dialect Agnostic:** Write once, run on SQL Server, PostgreSQL, MySQL, SQLite, Oracle, or Firebird. Dialect-specific syntax differences are rewritten at render time.
 * **Composable Subqueries:** A built `SqlQuery` can be interpolated directly into another query as a subquery — compose complex nested SQL from typed, reusable query variables.
 * **Compile-Time Safety:** Bundled Roslyn Analyzers catch injection attempts, unsupported dialect features, and invalid selectors *while you type*.
 * **Native Integrations:** Drop-in support for **Dapper** and **Entity Framework Core**.

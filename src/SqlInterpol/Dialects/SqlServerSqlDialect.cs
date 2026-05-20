@@ -47,6 +47,14 @@ public class SqlServerSqlDialect : SqlDialectBase
             bool isOnConflict = segment.Tag == SqlSegmentTag.OnConflictKeyword || 
                 (segment.Type == SqlSegmentType.Literal && segment.Value is string s1 && s1.Contains("ON CONFLICT", StringComparison.OrdinalIgnoreCase));
 
+            // 0. Strip RECURSIVE keyword (SQL Server CTEs are implicitly recursive)
+            if (segment.Type == SqlSegmentType.Literal && segment.Value is string literalValue &&
+                literalValue.Contains("WITH RECURSIVE", StringComparison.OrdinalIgnoreCase))
+            {
+                segment = new SqlSegment(SqlSegmentType.Literal,
+                    SqlInterpolationParser.Instance.ReplaceKeyword(literalValue, "WITH RECURSIVE", "WITH"));
+            }
+
             // 1. Transpile UPSERT -> ANSI MERGE
             if (isOnConflict)
             {

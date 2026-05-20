@@ -138,4 +138,121 @@ public class CteTests
             ]
         )
     ];
+
+    [Theory]
+    [MemberData(nameof(Select_WithRecursiveCteData))]
+    public void Select_WithRecursiveCte(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+
+        // Act
+        db.Append($"""
+            WITH RECURSIVE Numbers AS (
+                SELECT 1 AS n
+                UNION ALL
+                SELECT n + 1 FROM Numbers WHERE n < 10
+            )
+            SELECT n FROM Numbers
+            """);
+        var result = db.Build();
+
+        // Assert
+        testCase.AssertSql(result.Sql);
+    }
+
+    public static TheoryData<SqlTestCase> Select_WithRecursiveCteData =>
+    [
+        new SqlTestCase(
+            SqlDialectKind.CustomDb,
+            [
+                """
+                WITH RECURSIVE Numbers AS (
+                    SELECT 1 AS n
+                    UNION ALL
+                    SELECT n + 1 FROM Numbers WHERE n < 10
+                )
+                SELECT n FROM Numbers
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                WITH RECURSIVE Numbers AS (
+                    SELECT 1 AS n
+                    UNION ALL
+                    SELECT n + 1 FROM Numbers WHERE n < 10
+                )
+                SELECT n FROM Numbers
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.MySql,
+            [
+                """
+                WITH RECURSIVE Numbers AS (
+                    SELECT 1 AS n
+                    UNION ALL
+                    SELECT n + 1 FROM Numbers WHERE n < 10
+                )
+                SELECT n FROM Numbers
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Oracle,
+            [
+                """
+                WITH Numbers AS (
+                    SELECT 1 AS n
+                    UNION ALL
+                    SELECT n + 1 FROM Numbers WHERE n < 10
+                )
+                SELECT n FROM Numbers
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.PostgreSql,
+            [
+                """
+                WITH RECURSIVE Numbers AS (
+                    SELECT 1 AS n
+                    UNION ALL
+                    SELECT n + 1 FROM Numbers WHERE n < 10
+                )
+                SELECT n FROM Numbers
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqLite,
+            [
+                """
+                WITH RECURSIVE Numbers AS (
+                    SELECT 1 AS n
+                    UNION ALL
+                    SELECT n + 1 FROM Numbers WHERE n < 10
+                )
+                SELECT n FROM Numbers
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqlServer,
+            [
+                """
+                WITH Numbers AS (
+                    SELECT 1 AS n
+                    UNION ALL
+                    SELECT n + 1 FROM Numbers WHERE n < 10
+                )
+                SELECT n FROM Numbers
+                """
+            ]
+        )
+    ];
 }

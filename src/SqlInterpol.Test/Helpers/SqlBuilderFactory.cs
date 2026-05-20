@@ -9,6 +9,8 @@ public static class SqlBuilderFactory
     {
         if (dialect == SqlDialectKind.CustomDb)
             return SqlBuilder.CustomDb(options);
+        else if (dialect == SqlDialectKind.Firebird)
+            return SqlBuilder.Firebird(options);
         else if (dialect == SqlDialectKind.MySql)
             return SqlBuilder.MySql(options);
         else if (dialect == SqlDialectKind.Oracle)

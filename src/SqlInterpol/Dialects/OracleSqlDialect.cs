@@ -114,13 +114,16 @@ public class OracleSqlDialect : SqlDialectBase
 
             if (segment.Type == SqlSegmentType.Literal && segment.Value is string literalValue)
             {
-                if (literalValue.Contains("EXCEPT", System.StringComparison.OrdinalIgnoreCase))
-                {
-                    // Use the centralized parser to safely navigate SQL syntax rules
-                    var newValue = SqlInterpolationParser.Instance.ReplaceKeyword(literalValue, SqlKeyword.Except, "MINUS");
-                    
+                var newValue = literalValue;
+
+                if (newValue.Contains("WITH RECURSIVE", System.StringComparison.OrdinalIgnoreCase))
+                    newValue = SqlInterpolationParser.Instance.ReplaceKeyword(newValue, "WITH RECURSIVE", "WITH");
+
+                if (newValue.Contains("EXCEPT", System.StringComparison.OrdinalIgnoreCase))
+                    newValue = SqlInterpolationParser.Instance.ReplaceKeyword(newValue, SqlKeyword.Except, "MINUS");
+
+                if (!ReferenceEquals(newValue, literalValue))
                     segment = new SqlSegment(SqlSegmentType.Literal, newValue);
-                }
             }
 
             rewritten.Add(segment);
