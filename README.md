@@ -12,7 +12,7 @@ It leverages C# 12 Interpolated String Handlers to let you write WYSIWYG (What Y
 
 Stop writing clumsy `SelectBuilder` chains. Write real SQL, and let C# do the heavy lifting.
 
-> **Prerequisites:** .NET 8+ and C# 12+ (Visual Studio 2022 17.8+, JetBrains Rider 2023.3+, or `dotnet` CLI 8.0+).
+> **Prerequisites:** .NET 8+ and C# 12+ (Visual Studio 2022 17.8+, JetBrains Rider 2023.3+, VS Code with C# Dev Kit, or `dotnet` CLI 8.0+).
 
 ## Table of Contents
 - [SqlInterpol](#sqlinterpol)
