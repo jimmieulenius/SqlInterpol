@@ -27,10 +27,10 @@ public class SqlKeywordTypoAnalyzer : DiagnosticAnalyzer
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true);
 
-    // Common ANSI SQL + dialect-specific keywords and data types
+    // Expanded ANSI SQL + Major Dialects (Postgres, T-SQL, MySQL, Oracle, Snowflake, etc.)
     private static readonly string[] KnownKeywords =
     [
-        // DML / query structure
+        // DML / Query Structure
         "SELECT", "FROM", "WHERE", "AND", "OR", "NOT", "IN", "EXISTS", "BETWEEN",
         "LIKE", "ILIKE", "IS", "NULL", "ORDER", "GROUP", "HAVING", "UNION", "ALL",
         "DISTINCT", "INSERT", "INTO", "VALUES", "UPDATE", "SET", "DELETE",
@@ -39,34 +39,40 @@ public class SqlKeywordTypoAnalyzer : DiagnosticAnalyzer
         "CAST", "COALESCE", "NULLIF", "OVER", "PARTITION", "BY",
         "COUNT", "SUM", "AVG", "MIN", "MAX",
         "LIMIT", "OFFSET", "FETCH", "ROWS", "ONLY", "FIRST", "NEXT",
-        "RETURNING", "CONFLICT", "EXCLUDED",
-        "FOR", "SHARE", "LOCK",
+        "RETURNING", "CONFLICT", "EXCLUDED", "OUTPUT", "TOP", // Postgres/T-SQL
+        "FOR", "SHARE", "LOCK", "UPDATE", "NOCHECK", "CHECK",
         "ROW_NUMBER", "RANK", "DENSE_RANK", "LEAD", "LAG", "NTILE",
-        "ASC", "DESC", "NULLS", "LAST",
+        "ASC", "DESC", "NULLS", "LAST", "FIRST",
         "ROLLUP", "CUBE", "GROUPING", "SETS",
         "TRUNCATE", "MERGE", "USING", "MATCHED",
-        // Data types
+        
+        // Extended Dialect Keywords
+        "APPLY", "PIVOT", "UNPIVOT", "TRY_CAST", "TRY_CONVERT", // T-SQL
+        "REPLACE", "IGNORE", "STRAIGHT_JOIN", "DUPLICATE", "KEY", // MySQL
+        "MINUS", "ROWNUM", "SYSDATE", "CONNECT", "PRIOR", "START", // Oracle
+        "WINDOW", "FILTER", "WITHIN", "TABLESAMPLE", "MATERIALIZED", // Postgres/ANSI
+        "FLATTEN", "UNNEST", "STRUCT", "ARRAY", "QUALIFY", "EXCLUDE", // Snowflake/BigQuery
+        
+        // Common Data types
         "INT", "INTEGER", "BIGINT", "SMALLINT", "TINYINT",
-        "DECIMAL", "NUMERIC", "FLOAT", "REAL", "DOUBLE",
-        "CHAR", "VARCHAR", "NCHAR", "NVARCHAR", "TEXT",
-        "DATE", "TIME", "DATETIME", "TIMESTAMP", "INTERVAL",
+        "DECIMAL", "NUMERIC", "FLOAT", "REAL", "DOUBLE", "MONEY",
+        "CHAR", "VARCHAR", "NCHAR", "NVARCHAR", "TEXT", "STRING",
+        "DATE", "TIME", "DATETIME", "DATETIME2", "TIMESTAMP", "INTERVAL",
         "BOOLEAN", "BOOL", "BIT",
         "BLOB", "BINARY", "VARBINARY", "BYTEA",
-        "JSON", "JSONB", "XML", "UUID",
-        "SERIAL", "IDENTITY",
+        "JSON", "JSONB", "XML", "UUID", "UNIQUEIDENTIFIER",
+        "SERIAL", "IDENTITY", "AUTO_INCREMENT"
     ];
 
     private static readonly HashSet<string> KeywordSet = new(KnownKeywords, StringComparer.Ordinal);
 
-    // After these keywords, if the next word-token is not a known keyword and not in the
-    // listed valid set, it is flagged. UPDATE/SHARE/etc. are already in KeywordSet so they
-    // never reach the constrained check; only non-keyword valid successors are listed here.
     private static readonly IReadOnlyDictionary<string, HashSet<string>> ConstrainedSuccessors =
         new Dictionary<string, HashSet<string>>(StringComparer.Ordinal)
         {
-            // FOR UPDATE / FOR SHARE / FOR KEY SHARE / FOR NO KEY UPDATE
-            // UPDATE and SHARE are KeywordSet members; KEY and NO are not.
-            ["FOR"] = new HashSet<string>(StringComparer.Ordinal) { "KEY", "NO" },
+            // Upgraded FOR valid successors to support Postgres and T-SQL
+            // Postgres: FOR UPDATE, FOR SHARE, FOR KEY SHARE, FOR NO KEY UPDATE
+            // T-SQL: FOR XML, FOR JSON, FOR SYSTEM_TIME
+            ["FOR"] = new HashSet<string>(StringComparer.Ordinal) { "KEY", "NO", "XML", "JSON", "SYSTEM_TIME", "PATH", "AUTO" },
         };
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
@@ -95,10 +101,6 @@ public class SqlKeywordTypoAnalyzer : DiagnosticAnalyzer
         var firstArg = invocation.ArgumentList.Arguments[0].Expression;
         if (firstArg is not InterpolatedStringExpressionSyntax interpolatedString) return;
 
-        // lastKeyword persists across interpolation holes: the constrained check only fires
-        // for non-keywords, so valid successors (UPDATE, SHARE, etc.) are always in KeywordSet
-        // and will update lastKeyword cleanly regardless of what holes produce.
-        // e.g. FOR {{"dfd"}} AAA still flags AAA; FOR {{expr}} UPDATE is fine.
         string? lastKeyword = null;
         foreach (var content in interpolatedString.Contents)
         {
@@ -113,7 +115,6 @@ public class SqlKeywordTypoAnalyzer : DiagnosticAnalyzer
                     continue;
                 }
 
-                // Constrained-successor check: e.g. after FOR, only UPDATE/SHARE/KEY/NO are valid.
                 if (lastKeyword != null &&
                     ConstrainedSuccessors.TryGetValue(lastKeyword, out var validSuccessors))
                 {
@@ -134,17 +135,14 @@ public class SqlKeywordTypoAnalyzer : DiagnosticAnalyzer
         }
     }
 
-    // Yields (original, normalized, startIndex) for purely-alphabetic tokens (any case),
-    // skipping SQL strings, comments, dot-qualified names, and tokens immediately after AS.
     private static IEnumerable<(string Original, string Normalized, int Offset)> ExtractWordTokens(string text)
     {
         int i = 0;
-        bool skipNext = false; // true when next token is an alias (preceded by AS)
-        bool afterDot = false; // true when previous non-whitespace char was '.'
+        bool skipNext = false; 
+        bool afterDot = false; 
 
         while (i < text.Length)
         {
-            // Skip SQL string literals: '...' (with '' escape)
             if (text[i] == '\'')
             {
                 afterDot = false;
@@ -158,7 +156,6 @@ public class SqlKeywordTypoAnalyzer : DiagnosticAnalyzer
                 continue;
             }
 
-            // Skip line comments: --
             if (i + 1 < text.Length && text[i] == '-' && text[i + 1] == '-')
             {
                 afterDot = false;
@@ -166,7 +163,6 @@ public class SqlKeywordTypoAnalyzer : DiagnosticAnalyzer
                 continue;
             }
 
-            // Skip block comments: /* ... */
             if (i + 1 < text.Length && text[i] == '/' && text[i + 1] == '*')
             {
                 afterDot = false;
@@ -176,7 +172,6 @@ public class SqlKeywordTypoAnalyzer : DiagnosticAnalyzer
                 continue;
             }
 
-            // Track dot for qualified names (table.column)
             if (text[i] == '.')
             {
                 afterDot = true;
@@ -184,20 +179,17 @@ public class SqlKeywordTypoAnalyzer : DiagnosticAnalyzer
                 continue;
             }
 
-            // Whitespace does not reset afterDot — `table . column` is still qualified
             if (char.IsWhiteSpace(text[i]))
             {
                 i++;
                 continue;
             }
 
-            // Read a purely-alphabetic token (any case)
             if (char.IsLetter(text[i]))
             {
                 int start = i;
                 while (i < text.Length && char.IsLetter(text[i])) i++;
 
-                // Compound identifier (underscore or digit follows) — skip entirely
                 if (i < text.Length && (text[i] == '_' || char.IsDigit(text[i])))
                 {
                     while (i < text.Length && (char.IsLetterOrDigit(text[i]) || text[i] == '_')) i++;
@@ -219,7 +211,6 @@ public class SqlKeywordTypoAnalyzer : DiagnosticAnalyzer
                 continue;
             }
 
-            // Any other character resets dot context
             afterDot = false;
             i++;
         }
@@ -227,10 +218,10 @@ public class SqlKeywordTypoAnalyzer : DiagnosticAnalyzer
 
     private static string? FindClosestKeyword(string word)
     {
-        if (word.Length < 4) return null; // too short for reliable fuzzy matching
+        if (word.Length < 4) return null; 
 
         string? best = null;
-        int bestDist = 2; // only report if distance is strictly less than 2 (i.e., == 1)
+        int bestDist = 2; 
 
         foreach (var keyword in KnownKeywords)
         {
@@ -246,7 +237,6 @@ public class SqlKeywordTypoAnalyzer : DiagnosticAnalyzer
         return best;
     }
 
-    // Damerau-Levenshtein distance (accounts for transpositions, e.g. FORM ↔ FROM)
     private static int DamerauLevenshtein(string s, string t)
     {
         int m = s.Length, n = t.Length;
@@ -264,7 +254,6 @@ public class SqlKeywordTypoAnalyzer : DiagnosticAnalyzer
                     Math.Min(d[i - 1, j] + 1, d[i, j - 1] + 1),
                     d[i - 1, j - 1] + cost);
 
-                // Transposition
                 if (i > 1 && j > 1 && s[i - 1] == t[j - 2] && s[i - 2] == t[j - 1])
                     d[i, j] = Math.Min(d[i, j], d[i - 2, j - 2] + cost);
             }

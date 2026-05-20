@@ -10,11 +10,6 @@ using Microsoft.CodeAnalysis.Diagnostics;
 
 namespace SqlInterpol.Analyzers;
 
-/// <summary>
-/// SQLI005 — Reports an error when a SQL feature is passed as an interpolated-string hole to
-/// <c>SqlBuilder.Append</c>/<c>AppendLine</c> but the dialect chosen at construction time does
-/// not support that feature (which would throw <c>SqlDialectException</c> at runtime).
-/// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public class UnsupportedDialectFeatureAnalyzer : DiagnosticAnalyzer
 {
