@@ -108,6 +108,87 @@ JOIN "Category" AS cat
 
 The alias is declared once on `FROM {{p}} AS prod` — all subsequent `{{p[x => ...]}}` references resolve to `prod."ColumnName"` automatically. Rename the alias in one place and it propagates everywhere.
 
+## Composable Subqueries
+
+An `ISqlQuery<T>` returned by `.Query(...)` can be interpolated directly into any outer query — as a `FROM` subquery, a `WHERE ... IN (...)` filter, or a correlated `SELECT` expression. The outer query treats it like any other typed entity, so you can reference its projected columns with the same expression syntax.
+
+**WHERE IN subquery:**
+
+```csharp
+var db = SqlBuilder.PostgreSql();
+
+// Step 1: build the inner query as a variable
+var activeCategoryIds = db.Entity<Product>(alias: "p")
+    .Query(p => db.Append($$"""
+        SELECT {{p[x => x.CategoryId]}}
+        FROM {{p}}
+        WHERE {{p[x => x.Price]}} > {{0m}}
+        """));
+
+// Step 2: interpolate it directly into the outer query
+var result = db.Entity<Category>(alias: "c")
+    .Query(c => db.Append($$"""
+        SELECT {{c[x => x.Name]}}
+        FROM {{c}}
+        WHERE {{c[x => x.Id]}} IN
+        (
+            {{activeCategoryIds}}
+        )
+        """))
+    .Build();
+```
+
+**Generated SQL (PostgreSQL):**
+```sql
+SELECT c."Name"
+FROM "Category" AS c
+WHERE c."Id" IN
+(
+    SELECT p."CategoryId"
+    FROM "Product" AS p
+    WHERE p."Price" > $1
+)
+```
+
+**FROM subquery with typed column access:**
+
+```csharp
+var stats = db.Entity<CategoryStats>()
+    .Entity<Product>(alias: "p")
+    .Query((s, p) => db.Append($$"""
+        SELECT
+            {{p[x => x.CategoryId]}} AS {{s[x => x.CategoryId]}},
+            SUM({{p[x => x.Price]}}) AS {{s[x => x.TotalPrice]}}
+        FROM {{p}}
+        GROUP BY {{p[x => x.CategoryId]}}
+        """));
+
+var result = db.Entity<Category>(alias: "c")
+    .Query(c => db.Append($$"""
+        SELECT {{c[x => x.Name]}}, {{stats[x => x.TotalPrice]}}
+        FROM
+        (
+            {{stats}}
+        ) AS {{"stats"}}
+        JOIN {{c}} ON {{stats[x => x.CategoryId]}} = {{c[x => x.Id]}}
+        """))
+    .Build();
+```
+
+**Generated SQL (PostgreSQL):**
+```sql
+SELECT c."Name", stats."TotalPrice"
+FROM
+(
+    SELECT p."CategoryId" AS "CategoryId", SUM(p."Price") AS "TotalPrice"
+    FROM "Product" AS p
+    GROUP BY p."CategoryId"
+) AS stats
+JOIN "Category" AS c ON stats."CategoryId" = c."Id"
+```
+
+The subquery variable carries its typed projection — `{{stats[x => x.TotalPrice]}}` in the outer query resolves to `stats."TotalPrice"` automatically, with full compile-time safety.
+
 ## Dependency Injection Setup
 
 For ASP.NET Core or any `IServiceCollection`-based host, register SqlInterpol once at startup:

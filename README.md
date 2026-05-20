@@ -15,14 +15,15 @@ Stop writing clumsy `SelectBuilder` chains. Write real SQL, and let C# do the he
 > **Prerequisites:** .NET 8+ and C# 12+ (Visual Studio 2022 17.8+, JetBrains Rider 2023.3+, or `dotnet` CLI 8.0+).
 
 ## Table of Contents
-- [Features](#features)
-- [Installation](#installation)
-- [Quick Start (with Dapper)](#quick-start-with-dapper)
-- [Supported Dialects](#supported-dialects)
-- [Why Not EF Core LINQ or Dapper.SqlBuilder?](#why-not-ef-core-linq-or-dappersqlbuilder)
-- [Documentation](#documentation)
-- [Contributing](#contributing)
-- [License](#license)
+- [SqlInterpol](#sqlinterpol)
+  - [Table of Contents](#table-of-contents)
+  - [Features](#features)
+  - [Installation](#installation)
+  - [Quick Start (with Dapper)](#quick-start-with-dapper)
+    - [What actually happens under the hood?](#what-actually-happens-under-the-hood)
+  - [Documentation](#documentation)
+  - [Contributing](#contributing)
+  - [License](#license)
 
 ## Features
 * **WYSIWYG SQL:** The exact SQL structure you write is what executes — no mental translation between C# method chains and database queries.
@@ -30,6 +31,7 @@ Stop writing clumsy `SelectBuilder` chains. Write real SQL, and let C# do the he
 * **Type-Safe Schema:** Strongly-typed table and column references via C# expressions (e.g., `{{p[x => x.Price]}}`). Renamed a property? The compiler catches every broken reference instantly.
 * **Full DML Support:** INSERT, UPDATE, DELETE, and UPSERT (`ON CONFLICT` / `ON DUPLICATE KEY UPDATE` / SQL Server `MERGE`) all work through the same interpolation model.
 * **Dialect Agnostic:** Write once, run on SQL Server, PostgreSQL, MySQL, SQLite, or Oracle. Dialect-specific syntax differences are rewritten at render time.
+* **Composable Subqueries:** A built `SqlQuery` can be interpolated directly into another query as a subquery — compose complex nested SQL from typed, reusable query variables.
 * **Compile-Time Safety:** Bundled Roslyn Analyzers catch injection attempts, unsupported dialect features, and invalid selectors *while you type*.
 * **Native Integrations:** Drop-in support for **Dapper** and **Entity Framework Core**.
 
