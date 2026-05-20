@@ -21,4 +21,6 @@ public static class SqlSegmentTag
     public const string SetKeyword = "SetKeyword";
     public const string FromKeyword = "FromKeyword";
     public const string WhereKeyword = "WhereKeyword";
+    public const string SelectIntoKeyword = "SelectIntoKeyword";
+    public const string IntoKeyword = "IntoKeyword";
 }

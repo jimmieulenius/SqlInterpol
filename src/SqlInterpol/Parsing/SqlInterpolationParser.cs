@@ -309,6 +309,7 @@ public class SqlInterpolationParser : ISqlInterpolationParser
         new($"{SqlKeyword.Insert.Value} {SqlKeyword.Into.Value}",     KeywordMatchMode.EndsWithWord, null,                                SqlKeyword.Insert), // before Insert
         new(SqlKeyword.Insert.Value,                                   KeywordMatchMode.EndsWithWord, null,                                SqlKeyword.Insert),
         new(SqlKeyword.Values.Value,                                   KeywordMatchMode.EndsWithWord, SqlSegmentTag.InsertValuesKeyword,   SqlKeyword.Values),
+        new(SqlKeyword.Into.Value,                                     KeywordMatchMode.ContainsWord, SqlSegmentTag.IntoKeyword,           SqlKeyword.Into),
         new(SqlKeyword.Returning.Value,                                KeywordMatchMode.EndsWithWord, SqlSegmentTag.ReturningKeyword,      null),
         new(SqlKeyword.SelectDistinct.Value,                           KeywordMatchMode.EndsWithWord, SqlSegmentTag.SelectDistinctKeyword, SqlKeyword.SelectDistinct), // before Select
         new(SqlKeyword.Select.Value,                                   KeywordMatchMode.EndsWithWord, SqlSegmentTag.SelectKeyword,         SqlKeyword.Select),
@@ -422,9 +423,17 @@ public class SqlInterpolationParser : ISqlInterpolationParser
                 KeywordMatchMode.ContainsWord => ContainsWholeWord(trimmed, rule.Text),
                 _                             => trimmed.Equals(rule.Text, StringComparison.OrdinalIgnoreCase),
             };
+
             if (!matched) continue;
+
             tag = rule.Tag;
             forcedKeyword = rule.ForcedKeyword;
+
+            if (forcedKeyword == SqlKeyword.Into && context.ParserState.CurrentKeyword == SqlKeyword.Select)
+            {
+                tag = SqlSegmentTag.SelectIntoKeyword;
+            }
+
             break;
         }
 

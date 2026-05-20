@@ -14,7 +14,8 @@ public class SqlServerSqlDialect : SqlDialectBase
         SqlFeature.ForUpdate, // Emulated via WITH (UPDLOCK)
         SqlFeature.ForShare,
         SqlFeature.Returning, // Emulated via OUTPUT inserted.*
-        SqlFeature.OnConflict // Emulated via MERGE
+        SqlFeature.OnConflict, // Emulated via MERGE
+        SqlFeature.SelectInto // Supported natively
     };
 
     public override string RenderFragment(ISqlFragment fragment, ISqlContext context)

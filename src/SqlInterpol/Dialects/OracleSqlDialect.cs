@@ -1,5 +1,6 @@
 using SqlInterpol.Config;
 using SqlInterpol.Parsing;
+using SqlInterpol.Rendering;
 
 namespace SqlInterpol.Dialects;
 
@@ -12,7 +13,8 @@ public class OracleSqlDialect : SqlDialectBase
     public override IReadOnlySet<SqlFeature> SupportedFeatures { get; } = new HashSet<SqlFeature>
     {
         SqlFeature.ForUpdate,
-        SqlFeature.Returning
+        SqlFeature.Returning,
+        SqlFeature.SelectInto
     };
 
     public override string RenderFragment(ISqlFragment fragment, ISqlContext context)
@@ -136,5 +138,27 @@ public class OracleSqlDialect : SqlDialectBase
         }
 
         return rewritten;
+    }
+
+    protected override string RenderSelectInto(SqlSelectIntoFragment fragment, ISqlContext context)
+    {
+        string target = fragment.TargetTable switch
+        {
+            string s => QuoteIdentifier(s),
+            SqlSegment paramSeg => SqlSegmentRenderer.Instance.Render(context, paramSeg, 0, [paramSeg]) ?? "",
+            ISqlFragment frag => frag.ToSql(context),
+            _ => fragment.TargetTable.ToString()!
+        };
+
+        var vsb = new System.Text.StringBuilder();
+        vsb.AppendLine($"CREATE TABLE {target} AS");
+
+        for (int i = 0; i < fragment.SourceSegments.Count; i++)
+        {
+            var seg = fragment.SourceSegments[i];
+            vsb.Append(SqlSegmentRenderer.Instance.Render(context, seg, i, fragment.SourceSegments));
+        }
+
+        return vsb.ToString();
     }
 }

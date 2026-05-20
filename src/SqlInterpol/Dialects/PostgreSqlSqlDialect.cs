@@ -14,7 +14,8 @@ public class PostgreSqlSqlDialect : SqlDialectBase
         SqlFeature.ForUpdate,
         SqlFeature.ForShare,
         SqlFeature.Returning,
-        SqlFeature.OnConflict
+        SqlFeature.OnConflict,
+        SqlFeature.SelectInto
     };
 
     public override bool IsExpressionContext(string textBeforeParen)

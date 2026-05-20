@@ -1,5 +1,6 @@
 using SqlInterpol.Config;
 using SqlInterpol.Parsing;
+using SqlInterpol.Rendering;
 
 namespace SqlInterpol.Dialects;
 
@@ -125,13 +126,10 @@ public abstract class SqlDialectBase : ISqlDialect
         return fragment switch
         {
             SqlPagingFragment p => $"{SqlKeyword.Limit} {p.Limit} {SqlKeyword.Offset} {p.Offset}",
-
             SqlSetOperationFragment setOp => RenderSetOperation(setOp, context),
-            
             SqlMultiTableUpdateFragment update => RenderMultiTableUpdate(update, context),
-
             SqlMultiTableDeleteFragment delete => RenderMultiTableDelete(delete, context),
-
+            SqlSelectIntoFragment selectInto => RenderSelectInto(selectInto, context),
             _ => throw new NotSupportedException($"The fragment type '{fragment.GetType().Name}' is not supported by {this.GetType().Name}.")
         };
     }
@@ -162,6 +160,7 @@ public abstract class SqlDialectBase : ISqlDialect
             return false;
         }
 
+        // --- PASS 1: RESOLVE INLINE FRAGMENTS & SET OPERATORS ---
         for (int i = 0; i < segments.Count; i++)
         {
             var segment = segments[i];
@@ -176,8 +175,6 @@ public abstract class SqlDialectBase : ISqlDialect
                 {
                     string clean = text;
 
-                    // FIX: Only auto-inject the opening parenthesis if the segment literally ENDS with "ON CONFLICT" 
-                    // (Meaning the AST nodes for columns are expected immediately after this)
                     if (segment.Tag == SqlSegmentTag.OnConflictKeyword)
                     {
                         clean = text.EndsWith(" ") ? text[..^1] : text;
@@ -196,7 +193,6 @@ public abstract class SqlDialectBase : ISqlDialect
                 {
                     string clean = text;
 
-                    // FIX: Only auto-inject the closing parenthesis if the user used the targeted AST ON CONFLICT keyword
                     if (segment.Tag == SqlSegmentTag.DoUpdateSetKeyword)
                     {
                         if (!clean.TrimStart().StartsWith(')')) clean = ")\n" + clean.TrimStart();
@@ -283,6 +279,92 @@ public abstract class SqlDialectBase : ISqlDialect
             rewritten.Add(segment);
         }
 
+        // --- PASS 2: EVALUATE SELECT INTO ---
+        int intoIdx = -1;
+        for (int i = 0; i < rewritten.Count; i++)
+        {
+            if (rewritten[i].Tag == SqlSegmentTag.SelectIntoKeyword)
+            {
+                intoIdx = i;
+                break;
+            }
+        }
+
+        if (intoIdx >= 0)
+        {
+            int selectIdx = -1;
+            for (int i = intoIdx - 1; i >= 0; i--)
+            {
+                if (rewritten[i].Tag == SqlSegmentTag.SelectKeyword || rewritten[i].Tag == SqlSegmentTag.SelectDistinctKeyword)
+                {
+                    selectIdx = i;
+                    break;
+                }
+            }
+
+            if (selectIdx >= 0)
+            {
+                if (!SupportedFeatures.Contains(SqlFeature.SelectInto))
+                {
+                    throw new SqlDialectException("'SELECT INTO' is not supported by this dialect. Use an explicit CREATE TABLE and INSERT statement.");
+                }
+
+                var intoSegment = rewritten[intoIdx];
+                var text = intoSegment.Value as string ?? "";
+                
+                int keywordPos = text.IndexOf("INTO", StringComparison.OrdinalIgnoreCase);
+                string leftOfInto = keywordPos >= 0 ? text[..keywordPos] : "";
+                string rightOfInto = keywordPos >= 0 ? text[(keywordPos + 4)..] : text;
+                
+                object? targetTable = null;
+                SqlSegment? targetParamSegment = null;
+
+                var rightTrimmed = rightOfInto.TrimStart();
+                if (rightTrimmed.Length > 0 && rightTrimmed[0] != '\n' && rightTrimmed[0] != '\r') 
+                {
+                    int endOfTarget = 0;
+                    while (endOfTarget < rightTrimmed.Length && !char.IsWhiteSpace(rightTrimmed[endOfTarget])) endOfTarget++;
+                    
+                    targetTable = rightTrimmed[..endOfTarget];
+                    rightOfInto = rightTrimmed[endOfTarget..];
+                }
+                // FIX: Match ANY non-literal parameter/raw/projection segment trailing the INTO statement
+                else if (intoIdx + 1 < rewritten.Count && rewritten[intoIdx + 1].Type != SqlSegmentType.Literal)
+                {
+                    targetParamSegment = rewritten[intoIdx + 1];
+                    targetTable = targetParamSegment.Value ?? targetParamSegment;
+                }
+
+                if (targetTable != null)
+                {
+                    var sourceSegments = new List<SqlSegment>();
+                    
+                    for(int i = 0; i <= selectIdx; i++) sourceSegments.Add(rewritten[i]);
+                    for(int i = selectIdx + 1; i < intoIdx; i++) sourceSegments.Add(rewritten[i]);
+                    
+                    if (!string.IsNullOrWhiteSpace(leftOfInto)) 
+                        sourceSegments.Add(new SqlSegment(SqlSegmentType.Literal, leftOfInto));
+                        
+                    // Track the precise index where the INTO keyword originalmente resided
+                    int intoInsertionIndex = sourceSegments.Count;
+                        
+                    if (!string.IsNullOrWhiteSpace(rightOfInto))
+                        sourceSegments.Add(new SqlSegment(SqlSegmentType.Literal, rightOfInto));
+                        
+                    int startRest = targetParamSegment != null ? intoIdx + 2 : intoIdx + 1;
+                    for(int i = startRest; i < rewritten.Count; i++) sourceSegments.Add(rewritten[i]);
+                    
+                    // Package into the AST fragment with the correct structural insertion layout mapping
+                    var fragment = new SqlSelectIntoFragment(targetParamSegment ?? targetTable, sourceSegments, intoInsertionIndex);
+                    
+                    rewritten.Clear();
+                    rewritten.Add(new SqlSegment(SqlSegmentType.Raw, fragment));
+                    return rewritten;
+                }
+            }
+        }
+
+        // --- PASS 3: EVALUATE MULTI-TABLE UPDATE / DELETE ---
         int updateIdx = -1, setIdx = -1, fromIdx = -1, whereIdx = -1;
         int firstFromIdx = -1, secondFromIdx = -1, whereDeleteIdx = -1;
         bool isDelete = false;
@@ -350,7 +432,6 @@ public abstract class SqlDialectBase : ISqlDialect
             }
         }
 
-        // 1. Evaluate Multi-Table UPDATE
         if (updateIdx >= 0 && setIdx > updateIdx)
         {
             var target = new SqlSegmentCollectionFragment([.. rewritten.Skip(updateIdx + 1).Take(setIdx - updateIdx - 1)]);
@@ -385,7 +466,6 @@ public abstract class SqlDialectBase : ISqlDialect
             }
         }
 
-        // 2. Evaluate Multi-Table DELETE
         if (isDelete && firstFromIdx > -1 && secondFromIdx > -1)
         {
             var targetSegments = rewritten.Skip(firstFromIdx + 1).Take(secondFromIdx - firstFromIdx - 1).ToList();
@@ -449,5 +529,38 @@ public abstract class SqlDialectBase : ISqlDialect
             sql += $"{Environment.NewLine}WHERE {delete.WhereClause.ToSql(context)}";
             
         return sql;
+    }
+
+    protected virtual string RenderSelectInto(SqlSelectIntoFragment fragment, ISqlContext context)
+    {
+        string target = fragment.TargetTable switch
+        {
+            string s => QuoteIdentifier(s),
+            SqlSegment paramSeg => SqlSegmentRenderer.Instance.Render(context, paramSeg, 0, [paramSeg]) ?? "",
+            ISqlFragment frag => frag.ToSql(context),
+            _ => fragment.TargetTable.ToString()!
+        };
+
+        var vsb = new System.Text.StringBuilder();
+
+        for (int i = 0; i < fragment.SourceSegments.Count; i++)
+        {
+            // Inject native INTO statement accurately at the conclusion of the column sequence block
+            if (i == fragment.IntoSegmentIndex)
+            {
+                vsb.Append($"{Environment.NewLine}INTO {target}");
+            }
+
+            var seg = fragment.SourceSegments[i];
+            vsb.Append(SqlSegmentRenderer.Instance.Render(context, seg, i, fragment.SourceSegments));
+        }
+
+        // Fallback guard if the insertion point is at the very end of the segment array
+        if (fragment.IntoSegmentIndex >= fragment.SourceSegments.Count)
+        {
+            vsb.Append($"{Environment.NewLine}INTO {target}");
+        }
+
+        return vsb.ToString();
     }
 }
