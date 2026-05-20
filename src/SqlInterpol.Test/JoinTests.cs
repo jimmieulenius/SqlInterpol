@@ -45,6 +45,19 @@ public class JoinTests
             ]
         ),
         new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT
+                    "dbo"."Products"."Id",
+                    "OrderLine"."OrderId"
+                FROM "dbo"."Products"
+                JOIN "OrderLine"
+                    ON "dbo"."Products"."Id" = "OrderLine"."ProductItemNumber"
+                """
+            ]
+        ),
+        new SqlTestCase(
             SqlDialectKind.MySql,
             [
                 """
@@ -97,7 +110,7 @@ public class JoinTests
             ]
         ),
         new SqlTestCase(
-            SqlDialectKind.SqlServer, 
+            SqlDialectKind.SqlServer,
             [
                 """
                 SELECT

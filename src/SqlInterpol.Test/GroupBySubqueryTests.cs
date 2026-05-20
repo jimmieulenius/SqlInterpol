@@ -44,6 +44,18 @@ public class GroupBySubqueryTests
             ]
         ),
         new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT CategoryId, COUNT(*)
+                FROM (
+                    SELECT CategoryId, MAX(Price) AS MaxPrice FROM Products GROUP BY CategoryId
+                ) AS "stats"
+                GROUP BY "stats"."CategoryId"
+                """
+            ]
+        ),
+        new SqlTestCase(
             SqlDialectKind.MySql, 
             [
                 """
@@ -92,7 +104,7 @@ public class GroupBySubqueryTests
             ]
         ),
         new SqlTestCase(
-            SqlDialectKind.SqlServer, 
+            SqlDialectKind.SqlServer,
             [
                 """
                 SELECT CategoryId, COUNT(*)

@@ -1,9 +1,6 @@
-using System;
-using System.Linq;
 using SqlInterpol.Config;
 using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
-using Xunit;
 
 namespace SqlInterpol.Test;
 
@@ -186,6 +183,16 @@ public class InsertTests
             ]
         ),
         new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                INSERT INTO "dbo"."Products"
+                ("PROD_NAME", "CategoryId", "Price")
+                VALUES (@p0, @p1, @p2)
+                """
+            ]
+        ),
+        new SqlTestCase(
             SqlDialectKind.MySql,
             [
                 """
@@ -246,6 +253,16 @@ public class InsertTests
                 INSERT INTO <<dbo>>.<<Orders>>
                 (<<order_status>>, <<Total>>)
                 VALUES (!!100, !!101)
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                INSERT INTO "dbo"."Orders"
+                ("order_status", "Total")
+                VALUES (@p0, @p1)
                 """
             ]
         ),
@@ -313,6 +330,15 @@ public class InsertTests
             ]
         ),
         new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                INSERT INTO "dbo"."Products" ("PROD_NAME", "CategoryId", "Price")
+                VALUES (@p0, @p1, @p2), (@p3, @p4, @p5)
+                """
+            ]
+        ),
+        new SqlTestCase(
             SqlDialectKind.MySql,
             [
                 """
@@ -362,6 +388,16 @@ public class InsertTests
     public static TheoryData<SqlTestCase> ReturningSingleData =>
     [
         new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                INSERT INTO "dbo"."Products" ("PROD_NAME", "CategoryId", "Price")
+                VALUES (@p0, @p1, @p2)
+                RETURNING "Id"
+                """
+            ]
+        ),
+        new SqlTestCase(
             SqlDialectKind.Oracle,
             [
                 """
@@ -405,6 +441,16 @@ public class InsertTests
 
     public static TheoryData<SqlTestCase> ReturningMultipleData =>
     [
+        new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                INSERT INTO "dbo"."Products" ("PROD_NAME", "CategoryId", "Price")
+                VALUES (@p0, @p1, @p2)
+                RETURNING "Id", "PROD_NAME"
+                """
+            ]
+        ),
         new SqlTestCase(
             SqlDialectKind.Oracle,
             [
@@ -461,6 +507,15 @@ public class InsertTests
                 """
                 INSERT INTO <<dbo>>.<<Products>> (<<Id>>, <<PROD_NAME>>)
                 VALUES (!!100, !!101)
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                INSERT INTO "dbo"."Products" ("Id", "PROD_NAME")
+                VALUES (@p0, @p1)
                 """
             ]
         ),

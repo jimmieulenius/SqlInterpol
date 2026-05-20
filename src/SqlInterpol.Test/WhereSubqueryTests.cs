@@ -58,6 +58,23 @@ public class WhereSubqueryTests
             ]
         ),
         new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT 
+                    "c"."Name"
+                FROM "Category" AS "c"
+                WHERE "c"."Id" IN
+                (
+                    SELECT 
+                        "p"."CategoryId"
+                    FROM "dbo"."Products" AS "p"
+                    WHERE "p"."Price" > 0
+                )
+                """
+            ]
+        ),
+        new SqlTestCase(
             SqlDialectKind.MySql,
             [
                 """

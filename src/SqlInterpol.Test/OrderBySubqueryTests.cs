@@ -53,6 +53,23 @@ public class OrderBySubqueryTests
             ]
         ),
         new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT *
+                FROM
+                (
+                    SELECT
+                        CategoryId,
+                        MAX(Price) AS MaxPrice
+                    FROM Products
+                    GROUP BY CategoryId
+                ) AS "stats"
+                ORDER BY "stats"."MaxPrice" DESC
+                """
+            ]
+        ),
+        new SqlTestCase(
             SqlDialectKind.MySql, 
             [
                 """
@@ -121,7 +138,7 @@ public class OrderBySubqueryTests
             ]
         ),
         new SqlTestCase(
-            SqlDialectKind.SqlServer, 
+            SqlDialectKind.SqlServer,
             [
                 """
                 SELECT *

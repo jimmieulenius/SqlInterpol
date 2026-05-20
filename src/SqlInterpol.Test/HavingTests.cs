@@ -50,6 +50,19 @@ public class HavingTests
             ]
         ),
         new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT 
+                    "dbo"."Products"."CategoryId",
+                    COUNT("dbo"."Products"."Id") AS ProductCount
+                FROM "dbo"."Products"
+                GROUP BY "dbo"."Products"."CategoryId"
+                HAVING COUNT("dbo"."Products"."Id") > @p0
+                """
+            ]
+        ),
+        new SqlTestCase(
             SqlDialectKind.MySql,
             [
                 """

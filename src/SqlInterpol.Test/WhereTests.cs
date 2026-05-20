@@ -72,6 +72,17 @@ public class WhereTests
             ]
         ),
         new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT
+                    "dbo"."Products"."Id"
+                FROM "dbo"."Products"
+                WHERE "dbo"."Products"."Id" = @p0
+                """
+            ]
+        ),
+        new SqlTestCase(
             SqlDialectKind.MySql,
             [
                 """
@@ -142,6 +153,17 @@ public class WhereTests
             ]
         ),
         new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT
+                    "dbo"."Products"."Id"
+                FROM "dbo"."Products"
+                WHERE "dbo"."Products"."CategoryId" IN (@p0, @p1, @p2)
+                """
+            ]
+        ),
+        new SqlTestCase(
             SqlDialectKind.MySql, 
             [
                 """
@@ -186,7 +208,7 @@ public class WhereTests
             ]
         ),
         new SqlTestCase(
-            SqlDialectKind.SqlServer, 
+            SqlDialectKind.SqlServer,
             [
                 """
                 SELECT

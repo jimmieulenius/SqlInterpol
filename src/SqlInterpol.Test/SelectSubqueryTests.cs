@@ -131,6 +131,35 @@ public class SelectSubqueryTests
             ]
         ),
         new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT 
+                    prod."Id",
+                    (
+                        SELECT
+                            "Category"."Name"
+                        FROM "Category"
+                        WHERE "Category"."Id" = prod."CategoryId" AND "Category"."IsActive" = @p0
+                    ) AS CategoryName
+                FROM "dbo"."Products" AS prod
+                WHERE prod."Price" > @p1
+                """,
+                """
+                SELECT 
+                    second_prod."Id",
+                    (
+                        SELECT
+                            "Category"."Name"
+                        FROM "Category"
+                        WHERE "Category"."Id" = second_prod."CategoryId" AND "Category"."IsActive" = @p0
+                    ) AS CategoryName
+                FROM "dbo"."Products" AS second_prod
+                WHERE second_prod."Price" > @p1
+                """
+            ]
+        ),
+        new SqlTestCase(
             SqlDialectKind.MySql,
             [
                 """

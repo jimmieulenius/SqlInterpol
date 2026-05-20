@@ -121,6 +121,16 @@ public class FromAsTests
             ]
         ),
         new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT
+                    p."Id"
+                FROM "dbo"."Products" AS p
+                """
+            ]
+        ),
+        new SqlTestCase(
             SqlDialectKind.MySql, 
             [
                 """
@@ -161,7 +171,7 @@ public class FromAsTests
             ]
         ),
         new SqlTestCase(
-            SqlDialectKind.SqlServer, 
+            SqlDialectKind.SqlServer,
             [
                 """
                 SELECT
@@ -181,6 +191,16 @@ public class FromAsTests
                 SELECT
                     prod.<<Id>>
                 FROM <<dbo>>.<<Products>> AS prod
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT
+                    prod."Id"
+                FROM "dbo"."Products" AS prod
                 """
             ]
         ),
@@ -225,7 +245,7 @@ public class FromAsTests
             ]
         ),
         new SqlTestCase(
-            SqlDialectKind.SqlServer, 
+            SqlDialectKind.SqlServer,
             [
                 """
                 SELECT
@@ -245,6 +265,16 @@ public class FromAsTests
                 SELECT
                     <<OrderLine>>.<<OrderId>>
                 FROM ORDER_LINES AS <<OrderLine>>
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT
+                    "OrderLine"."OrderId"
+                FROM ORDER_LINES AS "OrderLine"
                 """
             ]
         ),
@@ -313,6 +343,16 @@ public class FromAsTests
             ]
         ),
         new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT
+                    "prod"."Id"
+                FROM products AS "prod"
+                """
+            ]
+        ),
+        new SqlTestCase(
             SqlDialectKind.MySql,
             [
                 """
@@ -353,7 +393,7 @@ public class FromAsTests
             ]
         ),
         new SqlTestCase(
-            SqlDialectKind.SqlServer, 
+            SqlDialectKind.SqlServer,
             [
                 """
                 SELECT
@@ -373,6 +413,16 @@ public class FromAsTests
                 SELECT
                     <<Product>>.<<Id>>
                 FROM <<dbo>>.<<Products>> AS <<Product>>
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT
+                    "Product"."Id"
+                FROM "dbo"."Products" AS "Product"
                 """
             ]
         ),
@@ -417,7 +467,7 @@ public class FromAsTests
             ]
         ),
         new SqlTestCase(
-            SqlDialectKind.SqlServer, 
+            SqlDialectKind.SqlServer,
             [
                 """
                 SELECT
@@ -436,6 +486,15 @@ public class FromAsTests
                 """
                 SELECT <<Product>>.<<Id>>, <<Product>>.<<PROD_NAME>>, <<Product>>.<<IsActive>>, <<Product>>.<<CategoryId>>, <<Product>>.<<Price>>
                 FROM <<dbo>>.<<Products>> AS <<Product>>
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT "Product"."Id", "Product"."PROD_NAME", "Product"."IsActive", "Product"."CategoryId", "Product"."Price"
+                FROM "dbo"."Products" AS "Product"
                 """
             ]
         ),

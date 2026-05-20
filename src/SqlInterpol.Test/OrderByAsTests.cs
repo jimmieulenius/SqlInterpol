@@ -41,6 +41,17 @@ public class OrderByAsTests
             ]
         ),
         new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT *
+                FROM "dbo"."Products" AS "prod"
+                ORDER BY
+                    "prod"."PROD_NAME" ASC
+                """
+            ]
+        ),
+        new SqlTestCase(
             SqlDialectKind.MySql, 
             [
                 """
@@ -85,7 +96,7 @@ public class OrderByAsTests
             ]
         ),
         new SqlTestCase(
-            SqlDialectKind.SqlServer, 
+            SqlDialectKind.SqlServer,
             [
                 """
                 SELECT *

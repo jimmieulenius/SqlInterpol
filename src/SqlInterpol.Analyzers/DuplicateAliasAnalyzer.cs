@@ -12,15 +12,37 @@ namespace SqlInterpol.Analyzers;
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public class DuplicateAliasAnalyzer : DiagnosticAnalyzer
 {
-    private static readonly DiagnosticDescriptor Rule = new(
+    private static readonly DiagnosticDescriptor DuplicateRule = new(
         id: "SQLI008",
         title: "Duplicate SQL Alias",
-        messageFormat: "The alias '{0}' is defined multiple times in this query string. This will cause a SQL execution error.",
+        messageFormat: "The alias '{0}' is defined multiple times in this scope. This will cause a SQL execution error.",
         category: "Naming",
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true);
 
-    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ImmutableArray.Create(Rule);
+    private static readonly DiagnosticDescriptor ShadowRule = new(
+        id: "SQLI009",
+        title: "Alias shadows physical column",
+        messageFormat: "The explicit alias '{0}' matches an existing physical column on a queried table. Ensure this does not cause ambiguity.",
+        category: "Naming",
+        defaultSeverity: DiagnosticSeverity.Info, // Info level, as it's legal SQL but potentially dangerous
+        isEnabledByDefault: true);
+
+    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ImmutableArray.Create(DuplicateRule, ShadowRule);
+
+    private class LexicalScope
+    {
+        public HashSet<string> ColumnAliases { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public HashSet<string> TableAliases { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public HashSet<string> PhysicalColumns { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public bool InSelectClause { get; set; } = false;
+    }
+
+    private static readonly HashSet<string> ScopeResetKeywords = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "FROM", "WHERE", "GROUP", "HAVING", "ORDER", "JOIN", "ON", 
+        "LIMIT", "OFFSET", "FETCH", "SET", "VALUES", "INTO", "UPDATE", "DELETE", "INSERT"
+    };
 
     public override void Initialize(AnalysisContext context)
     {
@@ -45,21 +67,55 @@ public class DuplicateAliasAnalyzer : DiagnosticAnalyzer
         var firstArg = invocation.ArgumentList.Arguments[0].Expression;
         if (firstArg is not InterpolatedStringExpressionSyntax interpolatedString) return;
 
-        var seenAliases = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var scopeStack = new Stack<LexicalScope>();
+        scopeStack.Push(new LexicalScope());
 
-        // State machine variables MUST persist outside the loop to handle interpolation holes properly!
-        // E.g., it can handle: CAST({{p[x => x.Price]}} AS INT)
         int parenDepth = 0;
         var castDepths = new Stack<int>();
         bool expectingCastParen = false;
         bool nextWordIsAlias = false;
+        
         bool inString = false;
         bool inBlockComment = false;
         bool inLineComment = false;
 
         foreach (var content in interpolatedString.Contents)
         {
-            // We only parse the raw SQL text chunks, ignoring the C# AST holes
+            // --- 1. C# INTERPOLATION HOLE PARSING ---
+            if (content is InterpolationSyntax interpolation)
+            {
+                var scope = scopeStack.Peek();
+
+                // If this is a table variable (e.g. {{p}}), extract its physical C# properties!
+                ExtractPhysicalColumns(interpolation, context.SemanticModel, scope.PhysicalColumns);
+
+                if (nextWordIsAlias)
+                {
+                    nextWordIsAlias = false;
+                    string? holeName = ExtractColumnName(interpolation);
+                    
+                    if (holeName != null)
+                    {
+                        var targetSet = scope.InSelectClause ? scope.ColumnAliases : scope.TableAliases;
+                        string upperName = holeName.ToUpperInvariant();
+
+                        if (!targetSet.Add(upperName))
+                        {
+                            context.ReportDiagnostic(Diagnostic.Create(DuplicateRule, interpolation.GetLocation(), holeName));
+                        }
+                        else if (scope.InSelectClause && scope.PhysicalColumns.Contains(upperName))
+                        {
+                            // Flag that this new alias perfectly matches a physical column name
+                            context.ReportDiagnostic(Diagnostic.Create(ShadowRule, interpolation.GetLocation(), holeName));
+                        }
+                    }
+                }
+                
+                expectingCastParen = false;
+                continue;
+            }
+
+            // --- 2. SQL RAW TEXT PARSING ---
             if (content is not InterpolatedStringTextSyntax textSyntax) continue;
 
             var text = textSyntax.TextToken.ToString();
@@ -67,65 +123,31 @@ public class DuplicateAliasAnalyzer : DiagnosticAnalyzer
 
             while (i < text.Length)
             {
-                // 1. Process active strings and comments
-                if (inLineComment)
-                {
-                    if (text[i] == '\n') inLineComment = false;
-                    i++; continue;
-                }
-                if (inBlockComment)
-                {
-                    if (text[i] == '*' && i + 1 < text.Length && text[i + 1] == '/')
-                    {
-                        inBlockComment = false;
-                        i += 2;
-                    }
-                    else i++;
-                    continue;
-                }
-                if (inString)
-                {
-                    if (text[i] == '\'')
-                    {
-                        if (i + 1 < text.Length && text[i + 1] == '\'') i += 2; // Escaped quote
-                        else { inString = false; i++; }
-                    }
-                    else i++;
-                    continue;
-                }
+                if (char.IsWhiteSpace(text[i])) { i++; continue; }
 
-                // 2. Detect starts of strings and comments
+                if (inLineComment) { if (text[i] == '\n') inLineComment = false; i++; continue; }
+                if (inBlockComment) { if (text[i] == '*' && i + 1 < text.Length && text[i + 1] == '/') { inBlockComment = false; i += 2; } else i++; continue; }
+                if (inString) { if (text[i] == '\'') { if (i + 1 < text.Length && text[i + 1] == '\'') i += 2; else { inString = false; i++; } } else i++; continue; }
+
                 if (text[i] == '-' && i + 1 < text.Length && text[i + 1] == '-') { inLineComment = true; i += 2; continue; }
                 if (text[i] == '/' && i + 1 < text.Length && text[i + 1] == '*') { inBlockComment = true; i += 2; continue; }
                 if (text[i] == '\'') { inString = true; i++; continue; }
 
-                // 3. Track Parenthesis Depth for CAST logic
                 if (text[i] == '(')
                 {
                     parenDepth++;
-                    if (expectingCastParen)
-                    {
-                        castDepths.Push(parenDepth);
-                        expectingCastParen = false;
-                    }
+                    scopeStack.Push(new LexicalScope());
+                    if (expectingCastParen) { castDepths.Push(parenDepth); expectingCastParen = false; }
                     i++; continue;
                 }
                 if (text[i] == ')')
                 {
-                    if (castDepths.Count > 0 && castDepths.Peek() == parenDepth)
-                    {
-                        castDepths.Pop(); // We have exited the CAST context
-                    }
+                    if (scopeStack.Count > 1) scopeStack.Pop();
+                    if (castDepths.Count > 0 && castDepths.Peek() == parenDepth) castDepths.Pop();
                     parenDepth--;
                     i++; continue;
                 }
 
-                if (char.IsWhiteSpace(text[i]))
-                {
-                    i++; continue;
-                }
-
-                // 4. Read words and identifiers
                 if (char.IsLetter(text[i]) || text[i] == '_' || text[i] == '[' || text[i] == '"' || text[i] == '`')
                 {
                     int start = i;
@@ -135,7 +157,7 @@ public class DuplicateAliasAnalyzer : DiagnosticAnalyzer
                     {
                         i++;
                         while (i < text.Length && text[i] != quote) i++;
-                        if (i < text.Length) i++; // Consume closing quote
+                        if (i < text.Length) i++;
                     }
                     else
                     {
@@ -145,38 +167,99 @@ public class DuplicateAliasAnalyzer : DiagnosticAnalyzer
                     string word = text.Substring(start, i - start);
                     string normalized = word.Trim('[', ']', '"', '`').ToUpperInvariant();
 
+                    // --- STATE MACHINE UPDATES ---
+                    if (normalized == "SELECT") 
+                    {
+                        scopeStack.Peek().InSelectClause = true;
+                    }
+                    else if (normalized == "UNION" || normalized == "INTERSECT" || normalized == "EXCEPT" || normalized == "MINUS")
+                    {
+                        // Wipe the column memory so the next SELECT block can reuse aliases safely!
+                        scopeStack.Peek().InSelectClause = false;
+                        scopeStack.Peek().ColumnAliases.Clear();
+                    }
+                    else if (ScopeResetKeywords.Contains(normalized)) 
+                    {
+                        scopeStack.Peek().InSelectClause = false;
+                    }
+
+                    // --- EXPLICIT ALIAS TRACKING ---
                     if (nextWordIsAlias)
                     {
                         nextWordIsAlias = false;
-                        if (!seenAliases.Add(normalized))
+                        var scope = scopeStack.Peek();
+                        var targetSet = scope.InSelectClause ? scope.ColumnAliases : scope.TableAliases;
+
+                        if (!targetSet.Add(normalized))
                         {
-                            // Precision mapping for the red squiggly line!
                             var spanStart = textSyntax.SpanStart + start;
                             var location = Location.Create(context.Node.SyntaxTree, TextSpan.FromBounds(spanStart, spanStart + word.Length));
-                            context.ReportDiagnostic(Diagnostic.Create(Rule, location, word));
+                            context.ReportDiagnostic(Diagnostic.Create(DuplicateRule, location, word));
                         }
-                    }
-                    else if (normalized == "CAST")
-                    {
-                        expectingCastParen = true;
-                    }
-                    else if (normalized == "AS")
-                    {
-                        // The magic: Only expect an alias if we are NOT inside a CAST() block!
-                        if (castDepths.Count == 0)
+                        else if (scope.InSelectClause && scope.PhysicalColumns.Contains(normalized))
                         {
-                            nextWordIsAlias = true;
+                            var spanStart = textSyntax.SpanStart + start;
+                            var location = Location.Create(context.Node.SyntaxTree, TextSpan.FromBounds(spanStart, spanStart + word.Length));
+                            context.ReportDiagnostic(Diagnostic.Create(ShadowRule, location, word));
                         }
                     }
-                    else
-                    {
-                        expectingCastParen = false;
-                    }
+                    else if (normalized == "CAST") expectingCastParen = true;
+                    else if (normalized == "AS" && castDepths.Count == 0) nextWordIsAlias = true;
+                    else expectingCastParen = false;
+                    
                     continue;
                 }
 
                 expectingCastParen = false;
                 i++;
+            }
+        }
+    }
+
+    private static string? ExtractColumnName(InterpolationSyntax interpolation)
+    {
+        if (interpolation.Expression is ElementAccessExpressionSyntax elementAccess &&
+            elementAccess.ArgumentList.Arguments.Count == 1 &&
+            elementAccess.ArgumentList.Arguments[0].Expression is LambdaExpressionSyntax lambda)
+        {
+            if (lambda.Body is MemberAccessExpressionSyntax memberAccess)
+                return memberAccess.Name.Identifier.Text;
+                
+            if (lambda.Body is IdentifierNameSyntax identifierName)
+                return identifierName.Identifier.Text;
+        }
+        
+        if (interpolation.Expression is LiteralExpressionSyntax literal && 
+            literal.IsKind(SyntaxKind.StringLiteralExpression))
+        {
+            return literal.Token.ValueText;
+        }
+
+        return null;
+    }
+
+    private static void ExtractPhysicalColumns(InterpolationSyntax interpolation, SemanticModel semanticModel, HashSet<string> physicalColumns)
+    {
+        // Identifies variables like `{{p}}` or `{{ol}}` to extract their underlying C# class properties
+        if (interpolation.Expression is IdentifierNameSyntax identifier)
+        {
+            var symbolInfo = semanticModel.GetSymbolInfo(identifier);
+            if (symbolInfo.Symbol is IParameterSymbol parameterSymbol)
+            {
+                var parameterType = parameterSymbol.Type;
+                
+                // Assuming your table parameters are generic, e.g., Table<Product>
+                if (parameterType is INamedTypeSymbol namedType && namedType.TypeArguments.Length == 1)
+                {
+                    var entityType = namedType.TypeArguments[0];
+                    foreach (var member in entityType.GetMembers())
+                    {
+                        if (member is IPropertySymbol property && property.DeclaredAccessibility == Accessibility.Public)
+                        {
+                            physicalColumns.Add(property.Name.ToUpperInvariant());
+                        }
+                    }
+                }
             }
         }
     }

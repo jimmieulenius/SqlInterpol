@@ -189,6 +189,8 @@ public class ParserTests
         Assert.Equal(expected, result);
     }
 
+    // --- TEST DATA ---
+
     public static TheoryData<SqlTestCase> EscapedQuotesInLiteralData =>
     [
         new SqlTestCase(
@@ -198,6 +200,16 @@ public class ParserTests
                 SELECT <<dbo>>.<<Products>>.<<Id>>
                 FROM <<dbo>>.<<Products>>
                 WHERE <<dbo>>.<<Products>>.<<PROD_NAME>> = 'O''Connor' AND <<dbo>>.<<Products>>.<<CategoryId>> = 1
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT "dbo"."Products"."Id"
+                FROM "dbo"."Products"
+                WHERE "dbo"."Products"."PROD_NAME" = 'O''Connor' AND "dbo"."Products"."CategoryId" = 1
                 """
             ]
         ),
@@ -266,6 +278,16 @@ public class ParserTests
             ]
         ),
         new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT "dbo"."Products"."Id"
+                FROM "dbo"."Products"
+                WHERE "dbo"."Products"."PROD_NAME" = @p0
+                """
+            ]
+        ),
+        new SqlTestCase(
             SqlDialectKind.MySql,
             [
                 """
@@ -329,6 +351,19 @@ public class ParserTests
                    The parser should completely ignore them.
                 */
                 FROM <<dbo>>.<<Products>>
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT "dbo"."Products"."Id"
+                /* This is a multi-line comment.
+                   It has 'single quotes' and "double quotes".
+                   The parser should completely ignore them.
+                */
+                FROM "dbo"."Products"
                 """
             ]
         ),
@@ -412,6 +447,16 @@ public class ParserTests
             ]
         ),
         new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT "dbo"."Products"."Id"
+                -- This is a single-line comment with 'quotes' and "more quotes"
+                FROM "dbo"."Products"
+                """
+            ]
+        ),
+        new SqlTestCase(
             SqlDialectKind.MySql,
             [
                 """
@@ -472,6 +517,16 @@ public class ParserTests
                 SELECT <<dbo>>.<<Products>>.<<Id>>
                 FROM <<dbo>>.<<Products>>
                 WHERE <<dbo>>.<<Products>>.<<PROD_NAME>> = 'Item /* Note */ -- 1'
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT "dbo"."Products"."Id"
+                FROM "dbo"."Products"
+                WHERE "dbo"."Products"."PROD_NAME" = 'Item /* Note */ -- 1'
                 """
             ]
         ),
@@ -540,6 +595,16 @@ public class ParserTests
             ]
         ),
         new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT "dbo"."Products"."Id"
+                FROM "dbo"."Products"
+                WHERE "dbo"."Products"."PROD_NAME" = 'INSERT VALUES RETURNING FOR UPDATE'
+                """
+            ]
+        ),
+        new SqlTestCase(
             SqlDialectKind.MySql,
             [
                 """
@@ -579,7 +644,6 @@ public class ParserTests
                 """
             ]
         ),
-        // Notice: SQL Server does NOT rewrite the 'FOR UPDATE' here! It stays exact.
         new SqlTestCase(
             SqlDialectKind.SqlServer,
             [
@@ -600,6 +664,16 @@ public class ParserTests
                 """
                 SELECT <<dbo>>.<<Products>>.<<Id>>
                 FROM <<dbo>>.<<Products>>
+                /* We don't want to INSERT VALUES RETURNING FOR UPDATE here */
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT "dbo"."Products"."Id"
+                FROM "dbo"."Products"
                 /* We don't want to INSERT VALUES RETURNING FOR UPDATE here */
                 """
             ]

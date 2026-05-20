@@ -45,6 +45,20 @@ public class WindowFunctionTests
             ]
         ),
         new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT
+                    "dbo"."Products"."PROD_NAME",
+                    SUM("dbo"."Products"."Price") OVER (
+                        PARTITION BY "dbo"."Products"."CategoryId"
+                        ORDER BY "dbo"."Products"."Id" DESC
+                    ) AS CategoryTotal
+                FROM "dbo"."Products"
+                """
+            ]
+        ),
+        new SqlTestCase(
             SqlDialectKind.MySql,
             [
                 """
@@ -110,6 +124,102 @@ public class WindowFunctionTests
                         PARTITION BY [dbo].[Products].[CategoryId]
                         ORDER BY [dbo].[Products].[Id] DESC
                     ) AS CategoryTotal
+                FROM [dbo].[Products]
+                """
+            ]
+        )
+    ];
+
+    [Theory]
+    [MemberData(nameof(RawWindowFunctionData))]
+    public void Select_RawWindowFunction_PassesThrough(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+
+        // Act
+        var result = db.Query<Product>(p => db.Append($$"""
+            SELECT 
+                {{p[x => x.Name]}},
+                {{p[x => x.Price]}},
+                AVG({{p[x => x.Price]}}) OVER (PARTITION BY {{p[x => x.CategoryId]}}) as AvgCategoryPrice
+            FROM {{p}}
+            """)).Build();
+
+        // Assert
+        testCase.AssertSql(result.Sql);
+    }
+
+    public static TheoryData<SqlTestCase> RawWindowFunctionData =>
+    [
+        new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT 
+                    "dbo"."Products"."PROD_NAME",
+                    "dbo"."Products"."Price",
+                    AVG("dbo"."Products"."Price") OVER (PARTITION BY "dbo"."Products"."CategoryId") as AvgCategoryPrice
+                FROM "dbo"."Products"
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.MySql,
+            [
+                """
+                SELECT 
+                    `dbo`.`Products`.`PROD_NAME`,
+                    `dbo`.`Products`.`Price`,
+                    AVG(`dbo`.`Products`.`Price`) OVER (PARTITION BY `dbo`.`Products`.`CategoryId`) as AvgCategoryPrice
+                FROM `dbo`.`Products`
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Oracle,
+            [
+                """
+                SELECT 
+                    "dbo"."Products"."PROD_NAME",
+                    "dbo"."Products"."Price",
+                    AVG("dbo"."Products"."Price") OVER (PARTITION BY "dbo"."Products"."CategoryId") as AvgCategoryPrice
+                FROM "dbo"."Products"
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.PostgreSql,
+            [
+                """
+                SELECT 
+                    "dbo"."Products"."PROD_NAME",
+                    "dbo"."Products"."Price",
+                    AVG("dbo"."Products"."Price") OVER (PARTITION BY "dbo"."Products"."CategoryId") as AvgCategoryPrice
+                FROM "dbo"."Products"
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqLite,
+            [
+                """
+                SELECT 
+                    "dbo"."Products"."PROD_NAME",
+                    "dbo"."Products"."Price",
+                    AVG("dbo"."Products"."Price") OVER (PARTITION BY "dbo"."Products"."CategoryId") as AvgCategoryPrice
+                FROM "dbo"."Products"
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqlServer,
+            [
+                """
+                SELECT 
+                    [dbo].[Products].[PROD_NAME],
+                    [dbo].[Products].[Price],
+                    AVG([dbo].[Products].[Price]) OVER (PARTITION BY [dbo].[Products].[CategoryId]) as AvgCategoryPrice
                 FROM [dbo].[Products]
                 """
             ]

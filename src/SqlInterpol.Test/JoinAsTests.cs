@@ -116,6 +116,19 @@ public class JoinAsTests
             ]
         ),
         new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT
+                    p."Id",
+                    ol."OrderId"
+                FROM "dbo"."Products" AS p
+                JOIN "OrderLine" AS ol
+                    ON p."Id" = ol."ProductItemNumber"
+                """
+            ]
+        ),
+        new SqlTestCase(
             SqlDialectKind.MySql, 
             [
                 """
@@ -168,7 +181,7 @@ public class JoinAsTests
             ]
         ),
         new SqlTestCase(
-            SqlDialectKind.SqlServer, 
+            SqlDialectKind.SqlServer,
             [
                 """
                 SELECT
@@ -194,6 +207,19 @@ public class JoinAsTests
                 FROM dbo.Products AS <<prod>>
                 JOIN order_lines AS <<OrderLine>>
                     ON <<prod>>.<<Id>> = <<OrderLine>>.<<ProductItemNumber>>
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT
+                    "prod"."Id",
+                    "OrderLine"."OrderId"
+                FROM dbo.Products AS "prod"
+                JOIN order_lines AS "OrderLine"
+                    ON "prod"."Id" = "OrderLine"."ProductItemNumber"
                 """
             ]
         ),
@@ -250,7 +276,7 @@ public class JoinAsTests
             ]
         ),
         new SqlTestCase(
-            SqlDialectKind.SqlServer, 
+            SqlDialectKind.SqlServer,
             [
                 """
                 SELECT
@@ -276,6 +302,19 @@ public class JoinAsTests
                 FROM <<dbo>>.<<Products>> AS original
                 JOIN <<dbo>>.<<Products>> AS related
                     ON original.<<CategoryId>> = related.<<CategoryId>>
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT
+                    original."Id",
+                    related."Id"
+                FROM "dbo"."Products" AS original
+                JOIN "dbo"."Products" AS related
+                    ON original."CategoryId" = related."CategoryId"
                 """
             ]
         ),
@@ -332,7 +371,7 @@ public class JoinAsTests
             ]
         ),
         new SqlTestCase(
-            SqlDialectKind.SqlServer, 
+            SqlDialectKind.SqlServer,
             [
                 """
                 SELECT
@@ -358,6 +397,19 @@ public class JoinAsTests
                 FROM <<history>>.<<Archive_Products>>
                 JOIN <<OrderLine>>
                     ON <<history>>.<<Archive_Products>>.<<Id>> = <<OrderLine>>.<<ProductItemNumber>>
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT
+                    "history"."Archive_Products"."Id",
+                    "OrderLine"."OrderId"
+                FROM "history"."Archive_Products"
+                JOIN "OrderLine"
+                    ON "history"."Archive_Products"."Id" = "OrderLine"."ProductItemNumber"
                 """
             ]
         ),

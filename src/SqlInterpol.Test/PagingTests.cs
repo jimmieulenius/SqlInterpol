@@ -48,6 +48,17 @@ public class PagingTests
             ]
         ),
         new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT "dbo"."Products"."Id", "dbo"."Products"."PROD_NAME"
+                FROM "dbo"."Products"
+                ORDER BY "dbo"."Products"."Id"
+                FIRST @p0 SKIP @p1
+                """
+            ]
+        ),
+        new SqlTestCase(
             SqlDialectKind.MySql,
             [
                 """

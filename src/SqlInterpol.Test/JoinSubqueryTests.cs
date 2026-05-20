@@ -65,6 +65,26 @@ public class JoinSubqueryTests
             ]
         ),
         new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT 
+                    "c"."Name", 
+                    "stats"."TotalPrice"
+                FROM "Category" AS "c"
+                LEFT JOIN
+                (
+                    SELECT 
+                        "p"."CategoryId" AS "CategoryId",
+                        SUM("p"."Price") AS "TotalPrice"
+                    FROM "dbo"."Products" AS "p"
+                    GROUP BY "p"."CategoryId"
+                ) AS "stats"
+                    ON "stats"."CategoryId" = "c"."Id"
+                """
+            ]
+        ),
+        new SqlTestCase(
             SqlDialectKind.MySql,
             [
                 """

@@ -41,6 +41,16 @@ public class GroupByAsTests
             ]
         ),
         new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT "prod"."PROD_NAME", "prod"."IsActive", COUNT(*)
+                FROM "dbo"."Products" AS "prod"
+                GROUP BY "prod"."PROD_NAME", "prod"."IsActive"
+                """
+            ]
+        ),
+        new SqlTestCase(
             SqlDialectKind.MySql, 
             [
                 """
@@ -81,7 +91,7 @@ public class GroupByAsTests
             ]
         ),
         new SqlTestCase(
-            SqlDialectKind.SqlServer, 
+            SqlDialectKind.SqlServer,
             [
                 """
                 SELECT [prod].[PROD_NAME], [prod].[IsActive], COUNT(*)

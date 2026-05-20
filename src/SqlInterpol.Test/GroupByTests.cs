@@ -109,6 +109,16 @@ public class GroupByTests
             ]
         ),
         new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT CategoryId, order_status, COUNT(*)
+                FROM "dbo"."Orders"
+                GROUP BY "dbo"."Orders"."CategoryId", "dbo"."Orders"."order_status"
+                """
+            ]
+        ),
+        new SqlTestCase(
             SqlDialectKind.MySql,
             [
                 """
@@ -213,6 +223,16 @@ public class GroupByTests
             ]
         ),
         new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT YEAR(created_at), COUNT(*)
+                FROM "dbo"."Orders"
+                GROUP BY YEAR(created_at)
+                """
+            ]
+        ),
+        new SqlTestCase(
             SqlDialectKind.SqlServer,
             [
                 """
@@ -268,6 +288,16 @@ public class GroupByTests
         ),
         new SqlTestCase(
             SqlDialectKind.SqLite,
+            [
+                """
+                SELECT order_status, YEAR(created_at), COUNT(*)
+                FROM "dbo"."Orders"
+                GROUP BY "dbo"."Orders"."order_status", YEAR(created_at)
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Firebird,
             [
                 """
                 SELECT order_status, YEAR(created_at), COUNT(*)

@@ -42,6 +42,17 @@ public class WhereAsTests
             ]
         ),
         new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT
+                    p."Id"
+                FROM "dbo"."Products" AS p
+                WHERE p."CategoryId" = @p0
+                """
+            ]
+        ),
+        new SqlTestCase(
             SqlDialectKind.MySql,
             [
                 """
@@ -86,7 +97,7 @@ public class WhereAsTests
             ]
         ),
         new SqlTestCase(
-            SqlDialectKind.SqlServer, 
+            SqlDialectKind.SqlServer,
             [
                 """
                 SELECT

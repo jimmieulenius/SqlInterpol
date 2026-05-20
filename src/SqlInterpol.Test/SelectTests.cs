@@ -159,6 +159,15 @@ public class SelectTests
             ]
         ),
         new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT p1."Id", p1."PROD_NAME"
+                FROM "dbo"."Products" AS p1
+                """
+            ]
+        ),
+        new SqlTestCase(
             SqlDialectKind.MySql,
             [
                 """
@@ -218,6 +227,16 @@ public class SelectTests
             ]
         ),
         new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT
+                    "dbo"."Products"."Id"
+                FROM "dbo"."Products"
+                """
+            ]
+        ),
+        new SqlTestCase(
             SqlDialectKind.MySql,
             [
                 """
@@ -258,7 +277,7 @@ public class SelectTests
             ]
         ),
         new SqlTestCase(
-            SqlDialectKind.SqlServer, 
+            SqlDialectKind.SqlServer,
             [
                 """
                 SELECT
@@ -279,6 +298,17 @@ public class SelectTests
                     <<dbo>>.<<Products>>.<<Id>>,
                     <<dbo>>.<<Products>>.<<CategoryId>>
                 FROM <<dbo>>.<<Products>>
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT
+                    "dbo"."Products"."Id",
+                    "dbo"."Products"."CategoryId"
+                FROM "dbo"."Products"
                 """
             ]
         ),
@@ -327,7 +357,7 @@ public class SelectTests
             ]
         ),
         new SqlTestCase(
-            SqlDialectKind.SqlServer, 
+            SqlDialectKind.SqlServer,
             [
                 """
                 SELECT
@@ -348,6 +378,16 @@ public class SelectTests
                 SELECT
                     COUNT(<<dbo>>.<<Products>>.<<Id>>)
                 FROM <<dbo>>.<<Products>>
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT
+                    COUNT("dbo"."Products"."Id")
+                FROM "dbo"."Products"
                 """
             ]
         ),
@@ -392,7 +432,7 @@ public class SelectTests
             ]
         ),
         new SqlTestCase(
-            SqlDialectKind.SqlServer, 
+            SqlDialectKind.SqlServer,
             [
                 """
                 SELECT
@@ -413,6 +453,16 @@ public class SelectTests
                 SELECT
                     !!100
                 FROM <<dbo>>.<<Products>>
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT
+                    @p0
+                FROM "dbo"."Products"
                 """
             ]
         ),
@@ -457,7 +507,7 @@ public class SelectTests
             ]
         ),
         new SqlTestCase(
-            SqlDialectKind.SqlServer, 
+            SqlDialectKind.SqlServer,
             [
                 """
                 SELECT
@@ -477,6 +527,16 @@ public class SelectTests
                 SELECT
                     <<dbo>>.<<Products>>.<<PROD_NAME>>
                 FROM <<dbo>>.<<Products>>
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT
+                    "dbo"."Products"."PROD_NAME"
+                FROM "dbo"."Products"
                 """
             ]
         ),
@@ -521,7 +581,7 @@ public class SelectTests
             ]
         ),
         new SqlTestCase(
-            SqlDialectKind.SqlServer, 
+            SqlDialectKind.SqlServer,
             [
                 """
                 SELECT
@@ -542,6 +602,17 @@ public class SelectTests
                     p1.<<Id>>,
                     p1.<<PROD_NAME>>
                 FROM <<dbo>>.<<Products>> AS p1
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT DISTINCT
+                    p1."Id",
+                    p1."PROD_NAME"
+                FROM "dbo"."Products" AS p1
                 """
             ]
         ),
@@ -601,4 +672,32 @@ public class SelectTests
             ]
         )
     ];
-}
+    [Theory]
+    [MemberData(nameof(TopKeywordData))]
+    public void Select_TopKeyword_PassesThrough(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+
+        // Act
+        var result = db.Query<Product>(p => db.Append($$"""
+            SELECT TOP 10 {{p[x => x.Id]}}
+            FROM {{p}}
+            """)).Build();
+
+        // Assert
+        testCase.AssertSql(result.Sql);
+    }
+
+    public static TheoryData<SqlTestCase> TopKeywordData =>
+    [
+        new SqlTestCase(
+            SqlDialectKind.SqlServer,
+            [
+                """
+                SELECT TOP 10 [dbo].[Products].[Id]
+                FROM [dbo].[Products]
+                """
+            ]
+        )
+    ];}

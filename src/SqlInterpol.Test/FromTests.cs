@@ -75,6 +75,15 @@ public class FromTests
             ]
         ),
         new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT *
+                FROM "OrderLine"
+                """
+            ]
+        ),
+        new SqlTestCase(
             SqlDialectKind.MySql,
             [
                 """
@@ -129,6 +138,15 @@ public class FromTests
                 """
                 SELECT *
                 FROM <<MyTable>>
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT *
+                FROM "MyTable"
                 """
             ]
         ),
@@ -196,6 +214,15 @@ public class FromTests
                 """
                 SELECT *
                 FROM `MySchema`.`MyTable`
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT *
+                FROM "MySchema"."MyTable"
                 """
             ]
         ),

@@ -1,9 +1,6 @@
-using System;
-using System.Linq;
 using SqlInterpol.Config;
 using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
-using Xunit;
 
 namespace SqlInterpol.Test;
 
@@ -98,6 +95,17 @@ public class LockTests
 
     public static TheoryData<SqlTestCase> SelectWithForUpdateData =>
     [
+        new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT "dbo"."Products"."Id", "dbo"."Products"."PROD_NAME"
+                FROM "dbo"."Products"
+                WHERE "dbo"."Products"."Id" = @p0
+                WITH LOCK
+                """
+            ]
+        ),
         new SqlTestCase(
             SqlDialectKind.MySql,
             [
@@ -201,12 +209,17 @@ public class LockTests
             "'FOR SHARE' is not supported"
         ),
         new SqlErrorTestCase(
-            SqlDialectKind.SqLite,
+            SqlDialectKind.Firebird,
             typeof(SqlDialectException),
             "'FOR SHARE' is not supported"
         ),
         new SqlErrorTestCase(
             SqlDialectKind.Oracle,
+            typeof(SqlDialectException),
+            "'FOR SHARE' is not supported"
+        ),
+        new SqlErrorTestCase(
+            SqlDialectKind.SqLite,
             typeof(SqlDialectException),
             "'FOR SHARE' is not supported"
         )

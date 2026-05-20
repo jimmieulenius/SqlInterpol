@@ -81,6 +81,16 @@ public class SelectAsTests
             ]
         ),
         new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT
+                    "dbo"."Products"."Id" AS ProductId
+                FROM "dbo"."Products"
+                """
+            ]
+        ),
+        new SqlTestCase(
             SqlDialectKind.MySql, 
             [
                 """
@@ -121,7 +131,7 @@ public class SelectAsTests
             ]
         ),
         new SqlTestCase(
-            SqlDialectKind.SqlServer, 
+            SqlDialectKind.SqlServer,
             [
                 """
                 SELECT
@@ -141,6 +151,16 @@ public class SelectAsTests
                 SELECT
                     <<dbo>>.<<Products>>.<<ProductId>> AS <<Id>>
                 FROM <<dbo>>.<<Products>>
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT
+                    "dbo"."Products"."ProductId" AS "Id"
+                FROM "dbo"."Products"
                 """
             ]
         ),
@@ -185,7 +205,7 @@ public class SelectAsTests
             ]
         ),
         new SqlTestCase(
-            SqlDialectKind.SqlServer, 
+            SqlDialectKind.SqlServer,
             [
                 """
                 SELECT
@@ -205,6 +225,16 @@ public class SelectAsTests
                 SELECT
                     <<dbo>>.<<Products>>.<<PROD_NAME>> AS <<Name>>
                 FROM <<dbo>>.<<Products>>
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT
+                    "dbo"."Products"."PROD_NAME" AS "Name"
+                FROM "dbo"."Products"
                 """
             ]
         ),
@@ -249,7 +279,7 @@ public class SelectAsTests
             ]
         ),
         new SqlTestCase(
-            SqlDialectKind.SqlServer, 
+            SqlDialectKind.SqlServer,
             [
                 """
                 SELECT

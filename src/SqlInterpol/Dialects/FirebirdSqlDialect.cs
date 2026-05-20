@@ -1,4 +1,5 @@
 using SqlInterpol.Config;
+using SqlInterpol.Parsing;
 
 namespace SqlInterpol.Dialects;
 
@@ -13,6 +14,45 @@ public class FirebirdSqlDialect : SqlDialectBase
         SqlFeature.ForUpdate,
         SqlFeature.Returning,
     };
+
+    public override string RenderFragment(ISqlFragment fragment, ISqlContext context)
+    {
+        if (fragment is SqlPagingFragment p)
+        {
+            return $"FIRST {p.Limit} SKIP {p.Offset}";
+        }
+
+        if (fragment is SqlLockFragment)
+        {
+            return string.Empty;
+        }
+
+        if (fragment is SqlMultiTableUpdateFragment update && update.FromClause != null)
+        {
+            var target = update.Target.ToSql(context).Trim();
+            var setClause = update.SetClause.ToSql(context).Trim();
+            var fromClause = update.FromClause.ToSql(context).Trim();
+            var whereClause = update.WhereClause?.ToSql(context).Trim() ?? "1=1";
+
+            fromClause = SqlInterpolationParser.Instance.ReplaceKeyword(fromClause, "AS", "").Replace("  ", " ");
+
+            return $"MERGE INTO {target}{Environment.NewLine}USING {fromClause}{Environment.NewLine}ON ({whereClause}){Environment.NewLine}WHEN MATCHED THEN UPDATE SET {setClause}";
+        }
+
+        if (fragment is SqlMultiTableDeleteFragment delete)
+        {
+            var targetDecl = delete.Target.ToSql(context).Trim();
+            var fromClause = delete.FromClause.ToSql(context).Trim();
+            var whereClause = delete.WhereClause?.ToSql(context).Trim() ?? "1=1";
+
+            fromClause = SqlInterpolationParser.Instance.ReplaceKeyword(fromClause, "AS", "").Replace("  ", " ");
+            var indent = new string(' ', context.Options.IndentSize);
+
+            return $"DELETE FROM {targetDecl}{Environment.NewLine}WHERE EXISTS ({Environment.NewLine}{indent}SELECT 1{Environment.NewLine}{indent}FROM {fromClause}{Environment.NewLine}{indent}WHERE {whereClause}{Environment.NewLine})";
+        }
+
+        return base.RenderFragment(fragment, context);
+    }
 
     public override IEnumerable<SqlSegment> RewriteSegments(IReadOnlyList<SqlSegment> segments)
     {
@@ -32,6 +72,30 @@ public class FirebirdSqlDialect : SqlDialectBase
                 continue;
             }
 
+            // Parameterized paging: convert LIMIT @pX OFFSET @pY → FIRST @pX SKIP @pY
+            if (segment.Tag == SqlSegmentTag.Paging && segment.Value is string pagingValue)
+            {
+                if (i + 3 < baseRewritten.Count &&
+                    baseRewritten[i + 1].Type == SqlSegmentType.Parameter &&
+                    baseRewritten[i + 3].Type == SqlSegmentType.Parameter)
+                {
+                    int index = pagingValue.LastIndexOf(SqlKeyword.Limit, StringComparison.OrdinalIgnoreCase);
+
+                    if (index > -1)
+                    {
+                        rewritten.Add(new SqlSegment(SqlSegmentType.Literal, pagingValue[..index]));
+                    }
+
+                    rewritten.Add(new SqlSegment(SqlSegmentType.Literal, "FIRST "));
+                    rewritten.Add(baseRewritten[i + 1]); // limit param
+                    rewritten.Add(new SqlSegment(SqlSegmentType.Literal, " SKIP "));
+                    rewritten.Add(baseRewritten[i + 3]); // offset param
+
+                    i += 3;
+                    continue;
+                }
+            }
+
             rewritten.Add(segment);
         }
 
@@ -42,23 +106,5 @@ public class FirebirdSqlDialect : SqlDialectBase
         }
 
         return rewritten;
-    }
-
-    public override string RenderFragment(ISqlFragment fragment, ISqlContext context)
-    {
-        if (fragment is SqlPagingFragment p)
-        {
-            // Firebird uses 1-based ROWS m TO n syntax
-            int from = p.Offset + 1;
-            int to   = p.Offset + p.Limit;
-            return $"ROWS {from} TO {to}";
-        }
-
-        if (fragment is SqlLockFragment)
-        {
-            return string.Empty;
-        }
-
-        return base.RenderFragment(fragment, context);
     }
 }

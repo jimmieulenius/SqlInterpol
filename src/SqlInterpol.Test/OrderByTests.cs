@@ -149,6 +149,16 @@ public class OrderByTests
             ]
         ),
         new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT *
+                FROM "dbo"."Orders"
+                ORDER BY "dbo"."Orders"."created_at" DESC
+                """
+            ]
+        ),
+        new SqlTestCase(
             SqlDialectKind.MySql,
             [
                 """
@@ -209,6 +219,16 @@ public class OrderByTests
                 SELECT *
                 FROM <<dbo>>.<<Orders>>
                 ORDER BY <<dbo>>.<<Orders>>.<<Total>>, <<dbo>>.<<Orders>>.<<Id>> DESC
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT *
+                FROM "dbo"."Orders"
+                ORDER BY "dbo"."Orders"."Total", "dbo"."Orders"."Id" DESC
                 """
             ]
         ),
@@ -277,6 +297,16 @@ public class OrderByTests
             ]
         ),
         new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT *
+                FROM "dbo"."Orders"
+                ORDER BY Total DESC
+                """
+            ]
+        ),
+        new SqlTestCase(
             SqlDialectKind.MySql,
             [
                 """
@@ -337,6 +367,16 @@ public class OrderByTests
                 SELECT *
                 FROM <<dbo>>.<<Orders>>
                 ORDER BY <<dbo>>.<<Orders>>.<<created_at>> ASC, (Total * 0.9) DESC
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT *
+                FROM "dbo"."Orders"
+                ORDER BY "dbo"."Orders"."created_at" ASC, (Total * 0.9) DESC
                 """
             ]
         ),

@@ -66,4 +66,83 @@ public class UpsertTests
             """
         ])
     ];
+
+    [Theory]
+    [MemberData(nameof(OnDuplicateKeyData))]
+    public void Upsert_OnDuplicateKey_PassesThrough(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        var id = 1;
+        var newPrice = 99.99m;
+
+        // Act
+        var result = db.Query<Product>(p => db.Append($$"""
+            INSERT INTO {{p}} (Id, Price) 
+            VALUES ({{id}}, {{newPrice}}) 
+            ON DUPLICATE KEY UPDATE Price = {{newPrice}}
+            """)).Build();
+
+        // Assert
+        testCase.AssertSql(result.Sql);
+        Assert.Equal(3, result.Parameters.Count);
+    }
+
+    [Theory]
+    [MemberData(nameof(OnConflictData))]
+    public void Upsert_OnConflictDoNothing_PassesThrough(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        var id = 1;
+
+        // Act
+        var result = db.Query<Product>(p => db.Append($$"""
+            INSERT INTO {{p}} (Id) 
+            VALUES ({{id}}) 
+            ON CONFLICT DO NOTHING
+            """)).Build();
+
+        // Assert
+        testCase.AssertSql(result.Sql);
+        Assert.Single(result.Parameters);
+    }
+
+    public static TheoryData<SqlTestCase> OnDuplicateKeyData =>
+    [
+        new SqlTestCase(
+            SqlDialectKind.MySql,
+            [
+                """
+                INSERT INTO `dbo`.`Products` (Id, Price) 
+                VALUES (@p0, @p1) 
+                ON DUPLICATE KEY UPDATE Price = @p2
+                """
+            ]
+        )
+    ];
+
+    public static TheoryData<SqlTestCase> OnConflictData =>
+    [
+        new SqlTestCase(
+            SqlDialectKind.PostgreSql,
+            [
+                """
+                INSERT INTO "dbo"."Products" (Id) 
+                VALUES ($1) 
+                ON CONFLICT DO NOTHING
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqLite,
+            [
+                """
+                INSERT INTO "dbo"."Products" (Id) 
+                VALUES (?0) 
+                ON CONFLICT DO NOTHING
+                """
+            ]
+        )
+    ];
 }

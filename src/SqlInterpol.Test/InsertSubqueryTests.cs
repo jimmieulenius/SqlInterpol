@@ -48,6 +48,18 @@ public class InsertSubqueryTests
             ]
         ),
         new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                INSERT INTO "dbo"."Orders" 
+                ("Id", "Total")
+                SELECT "OrderLine"."OrderId", "OrderLine"."Quantity"
+                FROM "OrderLine"
+                WHERE "OrderLine"."OrderId" = @p0
+                """
+            ]
+        ),
+        new SqlTestCase(
             SqlDialectKind.MySql,
             [
                 """

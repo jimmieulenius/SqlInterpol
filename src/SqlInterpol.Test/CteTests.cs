@@ -58,6 +58,22 @@ public class CteTests
             ]
         ),
         new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                WITH "CategoryStats" AS (
+                    SELECT "dbo"."Products"."CategoryId", SUM("dbo"."Products"."Price") AS TotalPrice
+                    FROM "dbo"."Products"
+                    GROUP BY "dbo"."Products"."CategoryId"
+                )
+                SELECT "c"."Name", "cs"."TotalPrice"
+                FROM "Category" AS "c"
+                JOIN "CategoryStats" AS "cs"
+                    ON "c"."Id" = "cs"."CategoryId"
+                """
+            ]
+        ),
+        new SqlTestCase(
             SqlDialectKind.MySql,
             [
                 """
@@ -251,6 +267,97 @@ public class CteTests
                     SELECT n + 1 FROM Numbers WHERE n < 10
                 )
                 SELECT n FROM Numbers
+                """
+            ]
+        )
+    ];
+
+    [Theory]
+    [MemberData(nameof(RawCteData))]
+    public void Select_WithRawCte(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        var threshold = 100;
+
+        // Act
+        var result = db.Query<Product>(p => db.Append($$"""
+            WITH ExpensiveProducts AS (
+                SELECT * FROM {{p}} WHERE {{p[x => x.Price]}} > {{threshold}}
+            )
+            SELECT * FROM ExpensiveProducts
+            """)).Build();
+
+        // Assert
+        testCase.AssertSql(result.Sql);
+        Assert.Single(result.Parameters);
+    }
+
+    public static TheoryData<SqlTestCase> RawCteData =>
+    [
+        new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                WITH ExpensiveProducts AS (
+                    SELECT * FROM "dbo"."Products" WHERE "dbo"."Products"."Price" > @p0
+                )
+                SELECT * FROM ExpensiveProducts
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.MySql,
+            [
+                """
+                WITH ExpensiveProducts AS (
+                    SELECT * FROM `dbo`.`Products` WHERE `dbo`.`Products`.`Price` > @p0
+                )
+                SELECT * FROM ExpensiveProducts
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Oracle,
+            [
+                """
+                WITH ExpensiveProducts AS (
+                    SELECT * FROM "dbo"."Products" WHERE "dbo"."Products"."Price" > :0
+                )
+                SELECT * FROM ExpensiveProducts
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.PostgreSql,
+            [
+                """
+                WITH ExpensiveProducts AS (
+                    SELECT * FROM "dbo"."Products" WHERE "dbo"."Products"."Price" > $1
+                )
+                SELECT * FROM ExpensiveProducts
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqLite,
+            [
+                """
+                WITH ExpensiveProducts AS (
+                    SELECT * FROM "dbo"."Products" WHERE "dbo"."Products"."Price" > ?0
+                )
+                SELECT * FROM ExpensiveProducts
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqlServer,
+            [
+                """
+                WITH ExpensiveProducts AS (
+                    SELECT * FROM [dbo].[Products] WHERE [dbo].[Products].[Price] > @p0
+                )
+                SELECT * FROM ExpensiveProducts
                 """
             ]
         )
