@@ -1,6 +1,5 @@
-using SqlInterpol.Config;
 
-namespace SqlInterpol.References;
+namespace SqlInterpol;
 
 public class SqlColumnReference(ISqlReference sourceReference, string columnName, string propertyName) 
     : SqlColumnReferenceBase(sourceReference)

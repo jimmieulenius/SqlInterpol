@@ -1,6 +1,6 @@
 using SqlInterpol.Parsing;
 
-namespace SqlInterpol.Config;
+namespace SqlInterpol;
 
 public class SqlContext(SqlBuilder builder, ISqlDialect dialect, ISqlInterpolationParser parser, ISqlSegmentRenderer renderer, SqlInterpolOptions? options = null) : ISqlParserContext
 {

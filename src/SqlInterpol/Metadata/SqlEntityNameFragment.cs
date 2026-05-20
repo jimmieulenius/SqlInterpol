@@ -1,6 +1,5 @@
-using SqlInterpol.Config;
 
-namespace SqlInterpol.Metadata;
+namespace SqlInterpol;
 
 public record SqlEntityNameFragment(ISqlEntityBase Entity, string Name) : ISqlFragment
 {

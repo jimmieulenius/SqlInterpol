@@ -1,4 +1,4 @@
-namespace SqlInterpol.Metadata;
+namespace SqlInterpol;
 
 public class SqlTableAttribute(string? name = null, string? schema = null) : SqlEntityAttribute(name, schema)
 {

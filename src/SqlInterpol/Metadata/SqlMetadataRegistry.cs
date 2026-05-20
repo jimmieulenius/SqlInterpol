@@ -3,7 +3,7 @@ using System.Linq.Expressions;
 using System.Reflection;
 using SqlInterpol.Parsing;
 
-namespace SqlInterpol.Metadata;
+namespace SqlInterpol;
 
 public static class SqlMetadataRegistry
 {

@@ -1,6 +1,5 @@
-using SqlInterpol.Config;
 
-namespace SqlInterpol.References;
+namespace SqlInterpol;
 
 public abstract class SqlColumnReferenceBase(ISqlReference sourceReference) 
     : SqlReference(sourceReference.Source), ISqlProjection

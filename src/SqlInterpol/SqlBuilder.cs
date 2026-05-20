@@ -1,8 +1,5 @@
 using System.Runtime.CompilerServices;
-using SqlInterpol.Config;
-using SqlInterpol.Metadata;
 using SqlInterpol.Parsing;
-using SqlInterpol.Rendering;
 
 namespace SqlInterpol;
 

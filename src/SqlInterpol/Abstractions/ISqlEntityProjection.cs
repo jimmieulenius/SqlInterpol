@@ -1,5 +1,4 @@
-// using SqlInterpol.Metadata;
-
+// 
 // namespace SqlInterpol;
 
 // public interface ISqlEntityProjection : ISqlProjection

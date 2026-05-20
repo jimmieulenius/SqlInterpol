@@ -1,6 +1,6 @@
 using SqlInterpol.Dialects;
 
-namespace SqlInterpol.Config;
+namespace SqlInterpol;
 
 public record SqlInterpolOptions
 {

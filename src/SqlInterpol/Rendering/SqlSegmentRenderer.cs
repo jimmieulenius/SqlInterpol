@@ -1,8 +1,6 @@
-using SqlInterpol.Config;
-using SqlInterpol.Metadata;
 using SqlInterpol.Parsing;
 
-namespace SqlInterpol.Rendering;
+namespace SqlInterpol;
 
 public class SqlSegmentRenderer : ISqlSegmentRenderer
 {

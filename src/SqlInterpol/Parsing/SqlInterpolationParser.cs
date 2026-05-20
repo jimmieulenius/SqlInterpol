@@ -1,8 +1,6 @@
 using System.Buffers;
 using System.Collections;
 using System.Runtime.CompilerServices;
-using SqlInterpol.Metadata;
-using SqlInterpol.References;
 
 namespace SqlInterpol.Parsing;
 

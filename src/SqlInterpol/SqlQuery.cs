@@ -1,8 +1,5 @@
 using System.Linq.Expressions;
-using SqlInterpol.Config;
-using SqlInterpol.Metadata;
 using SqlInterpol.Parsing;
-using SqlInterpol.References;
 
 namespace SqlInterpol;
 

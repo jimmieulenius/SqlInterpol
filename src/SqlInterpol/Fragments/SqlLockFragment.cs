@@ -1,4 +1,3 @@
-using SqlInterpol.Config;
 
 namespace SqlInterpol;
 

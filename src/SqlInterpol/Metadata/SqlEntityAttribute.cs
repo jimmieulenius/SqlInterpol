@@ -1,4 +1,4 @@
-namespace SqlInterpol.Metadata;
+namespace SqlInterpol;
 
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
 public abstract class SqlEntityAttribute(string? name = null, string? schema = null) : Attribute

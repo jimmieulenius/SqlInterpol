@@ -1,6 +1,5 @@
 using BenchmarkDotNet.Attributes;
 using SqlInterpol.Benchmarks.Models;
-using SqlInterpol.Metadata;
 
 namespace SqlInterpol.Benchmarks;
 

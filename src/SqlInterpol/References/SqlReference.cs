@@ -1,6 +1,5 @@
-using SqlInterpol.Config;
 
-namespace SqlInterpol.References;
+namespace SqlInterpol;
 
 public abstract class SqlReference(ISqlFragment parent) : ISqlReference
 {

@@ -1,4 +1,3 @@
-using SqlInterpol.Config;
 using Xunit.Abstractions;
 
 namespace SqlInterpol.Test.Models;

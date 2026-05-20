@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using SqlInterpol.Config;
 
 namespace SqlInterpol;
 

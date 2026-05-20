@@ -1,6 +1,6 @@
 using System;
 
-namespace SqlInterpol.Metadata;
+namespace SqlInterpol;
 
 [AttributeUsage(AttributeTargets.Property)]
 public sealed class SqlIgnoreAttribute : Attribute

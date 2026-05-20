@@ -1,5 +1,4 @@
 using SqlInterpol;
-using SqlInterpol.Config;
 
 public class SqlSelectFragment : ISqlFragment
 {

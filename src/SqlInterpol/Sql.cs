@@ -1,5 +1,3 @@
-using SqlInterpol.Metadata;
-using SqlInterpol.References;
 
 namespace SqlInterpol;
 

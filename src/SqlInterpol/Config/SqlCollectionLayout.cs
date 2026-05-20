@@ -1,4 +1,4 @@
-namespace SqlInterpol.Config;
+namespace SqlInterpol;
 
 public enum SqlCollectionLayout
 {

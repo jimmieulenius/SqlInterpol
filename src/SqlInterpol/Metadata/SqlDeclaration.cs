@@ -1,6 +1,5 @@
-using SqlInterpol.Config;
 
-namespace SqlInterpol.Metadata;
+namespace SqlInterpol;
 
 public class SqlDeclaration(ISqlEntityBase entity) : ISqlDeclaration
 {

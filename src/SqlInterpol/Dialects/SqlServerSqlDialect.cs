@@ -1,4 +1,3 @@
-using SqlInterpol.Config;
 using SqlInterpol.Parsing;
 
 namespace SqlInterpol.Dialects;

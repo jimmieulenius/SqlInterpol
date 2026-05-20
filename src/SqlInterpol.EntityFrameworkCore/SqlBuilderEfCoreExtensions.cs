@@ -1,6 +1,5 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore;
-using SqlInterpol.Config;
 
 namespace SqlInterpol.EntityFrameworkCore;
 

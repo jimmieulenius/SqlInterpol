@@ -1,5 +1,4 @@
 using System.Linq.Expressions;
-using SqlInterpol.Metadata;
 using SqlInterpol.Parsing;
 
 namespace SqlInterpol;

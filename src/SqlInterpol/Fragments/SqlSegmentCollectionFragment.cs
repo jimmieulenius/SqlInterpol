@@ -1,6 +1,4 @@
 using System.Text;
-using SqlInterpol.Config;
-using SqlInterpol.Rendering;
 
 namespace SqlInterpol;
 

@@ -1,6 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
 using SqlInterpol;
-using SqlInterpol.Config;
 using SqlInterpol.Parsing;
 
 public static class ServiceCollectionExtensions

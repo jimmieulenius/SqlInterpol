@@ -1,6 +1,4 @@
-using System.Collections.Generic;
-
-namespace SqlInterpol.Config;
+namespace SqlInterpol;
 
 public interface ISqlContext
 {

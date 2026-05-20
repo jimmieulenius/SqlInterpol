@@ -1,4 +1,4 @@
-namespace SqlInterpol.Metadata;
+namespace SqlInterpol;
 
 [AttributeUsage(AttributeTargets.Property)]
 public class SqlColumnAttribute : Attribute

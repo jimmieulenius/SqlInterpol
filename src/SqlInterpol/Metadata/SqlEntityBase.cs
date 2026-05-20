@@ -1,8 +1,6 @@
 using System.Linq.Expressions;
-using SqlInterpol.Config;
-using SqlInterpol.References;
 
-namespace SqlInterpol.Metadata;
+namespace SqlInterpol;
 
 public abstract class SqlEntityBase<T> : ISqlEntityBase<T>
 {

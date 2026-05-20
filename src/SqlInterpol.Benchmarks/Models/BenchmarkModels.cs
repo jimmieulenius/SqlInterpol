@@ -1,4 +1,3 @@
-using SqlInterpol.Metadata;
 
 namespace SqlInterpol.Benchmarks.Models;
 

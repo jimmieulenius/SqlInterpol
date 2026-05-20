@@ -1,4 +1,4 @@
-namespace SqlInterpol.Config;
+namespace SqlInterpol;
 
 public readonly record struct SqlDialectKind(string Value)
 {

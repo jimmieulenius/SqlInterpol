@@ -1,4 +1,4 @@
-namespace SqlInterpol.Metadata;
+namespace SqlInterpol;
 
 public interface ISqlDeclaration : ISqlFragment
 {

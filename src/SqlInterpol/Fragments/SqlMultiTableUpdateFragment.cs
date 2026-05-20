@@ -1,16 +1,21 @@
-using SqlInterpol.Config;
 
 namespace SqlInterpol;
 
-public class SqlMultiTableDeleteFragment : ISqlFragment
+public class SqlMultiTableUpdateFragment : ISqlFragment
 {
     public ISqlFragment Target { get; }
+    public ISqlFragment SetClause { get; }
     public ISqlFragment FromClause { get; }
     public ISqlFragment? WhereClause { get; }
 
-    public SqlMultiTableDeleteFragment(ISqlFragment target, ISqlFragment fromClause, ISqlFragment? whereClause)
+    public SqlMultiTableUpdateFragment(
+        ISqlFragment target, 
+        ISqlFragment setClause, 
+        ISqlFragment fromClause, 
+        ISqlFragment? whereClause = null)
     {
         Target = target;
+        SetClause = setClause;
         FromClause = fromClause;
         WhereClause = whereClause;
     }

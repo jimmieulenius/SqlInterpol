@@ -1,7 +1,5 @@
-using SqlInterpol.Config;
-using SqlInterpol.References;
 
-namespace SqlInterpol.Metadata;
+namespace SqlInterpol;
 
 public abstract class SqlEntity<T> : SqlEntityBase<T>, ISqlEntity<T>
 {
