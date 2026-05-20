@@ -107,6 +107,7 @@ ORDER BY prod."Name"
 |---|---|
 | [DML — INSERT, UPDATE, DELETE, UPSERT](docs/dml.md) | Full mutation examples with generated SQL for all dialects |
 | [How It Works](docs/how-it-works.md) | IN clause expansion, composable subqueries, dynamic SQL, alias resolution, name mapping, DI setup |
+| [ADO.NET](docs/ado-net.md) | Using `SqlQueryResult` directly with `DbCommand` |
 | [Entity Framework Core](docs/efcore.md) | `FromSql` integration, `Include()`, and `DbContext` usage |
 | [Roslyn Analyzers](docs/analyzers.md) | Compile-time diagnostics, severity levels, and suppression |
 | [Dialect Cheat-Sheet](docs/dialect-cheatsheet.md) | Full cross-dialect reference: `LIMIT`, `FOR UPDATE`, `RETURNING`, `ON CONFLICT`, and more |
