@@ -4,7 +4,7 @@
   <img src="docs/Images/SqlInterpol.svg" alt="SqlInterpol" width="200"/>
 </p>
 
-![NuGet Version](https://img.shields.io/nuget/v/SqlInterpol?style=flat-square) ![NuGet Downloads](https://img.shields.io/nuget/dt/SqlInterpol?style=flat-square) ![License](https://img.shields.io/github/license/jimmieulenius/SqlInterpol?style=flat-square)
+![CI](https://github.com/jimmieulenius/SqlInterpol/actions/workflows/ci.yml/badge.svg) ![NuGet Version](https://img.shields.io/nuget/v/SqlInterpol?style=flat-square) ![NuGet Downloads](https://img.shields.io/nuget/dt/SqlInterpol?style=flat-square) ![License](https://img.shields.io/github/license/jimmieulenius/SqlInterpol?style=flat-square)
 
 **SqlInterpol** is a next-generation, zero-boilerplate SQL Query Builder for .NET 8+.
 
@@ -21,6 +21,7 @@ Stop writing clumsy `SelectBuilder` chains. Write real SQL, and let C# do the he
   - [Installation](#installation)
   - [Quick Start (with Dapper)](#quick-start-with-dapper)
     - [What actually happens under the hood?](#what-actually-happens-under-the-hood)
+    - [Effortless Inserts](#effortless-inserts)
   - [Documentation](#documentation)
   - [Contributing](#contributing)
   - [License](#license)
@@ -34,6 +35,13 @@ Stop writing clumsy `SelectBuilder` chains. Write real SQL, and let C# do the he
 * **Composable Subqueries:** A built `SqlQuery` can be interpolated directly into another query as a subquery — compose complex nested SQL from typed, reusable query variables.
 * **Compile-Time Safety:** Bundled Roslyn Analyzers catch injection attempts, unsupported dialect features, and invalid selectors *while you type*.
 * **Native Integrations:** Drop-in support for **Dapper** and **Entity Framework Core**.
+* **High-Performance, Zero-Allocation Parsing:** The interpolation engine is built on `Span<char>` and `ArrayPool<T>`, minimizing heap allocations and GC pressure — built for high-throughput APIs.
+
+<!-- **Compiler Safety in Action:** The Roslyn analyzer catches SQL errors *as you type* — no compile step required. -->
+>
+> <!-- Record a 5-second GIF with ScreenToGif: type `GROUP AAA` and capture the squiggly diagnostic appearing.
+>      Save to docs/Images/analyzer-demo.gif, then replace this comment block with:
+>      ![Analyzer Demo](docs/Images/analyzer-demo.gif) -->
 
 ## Installation
 
@@ -100,6 +108,27 @@ WHERE prod."IsActive" = $1
     AND prod."Price" > $2 /* minPrice is parameterized */
 ORDER BY prod."Name"
 ```
+
+### Effortless Inserts
+
+No more mapping parameters one-by-one. Pass any POCO directly into the interpolation and SqlInterpol shreds it into a fully parameterized `INSERT`:
+
+```csharp
+var newProduct = new Product { Name = "Mechanical Keyboard", Price = 120m };
+
+var query = db.Query<Product>(p => db.Append($$"""
+    INSERT INTO {{p}}
+    {{newProduct}}
+    """)).Build();
+```
+
+**Generated SQL (PostgreSQL):**
+```sql
+INSERT INTO "Product" ("Name", "Price")
+VALUES ($1, $2)
+```
+
+The same pattern works for bulk `INSERT`, `UPDATE SET {{patch}}`, and full `UPSERT` — all with zero parameter wiring. See the [DML docs](docs/dml.md) for the complete reference.
 
 ## Documentation
 
