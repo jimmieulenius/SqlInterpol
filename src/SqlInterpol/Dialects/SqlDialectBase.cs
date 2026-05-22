@@ -2,17 +2,35 @@ using SqlInterpol.Parsing;
 
 namespace SqlInterpol.Dialects;
 
+/// <summary>
+/// Abstract base class for all SQL dialect implementations, providing ANSI-compatible
+/// identifier quoting, parameter naming, expression context detection, and multi-pass
+/// segment rewriting for DML transformations.
+/// </summary>
 public abstract class SqlDialectBase : ISqlDialect
 {
+    /// <inheritdoc />
     public abstract SqlDialectKind Kind { get; }
+    /// <inheritdoc />
     public abstract string OpenQuote { get; }
+    /// <inheritdoc />
     public abstract string CloseQuote { get; }
+    /// <inheritdoc />
     public abstract string ParameterPrefix { get; }
+
+    /// <summary>
+    /// SQL comparison and arithmetic operator symbols used to detect expression context
+    /// before a parenthesized subquery.
+    /// </summary>
     protected static readonly string[] DefaultExpressionSymbols = 
     [
         "=", "<", ">", "<=", ">=", "<>", "!=", "+", "-", "*", "/", "%"
     ];
 
+    /// <summary>
+    /// SQL keyword operators (IN, EXISTS, ANY, ALL, SOME) that indicate expression context
+    /// before a parenthesized subquery.
+    /// </summary>
     protected static readonly string[] DefaultExpressionKeywords = 
     [
         SqlKeyword.In,
@@ -22,9 +40,10 @@ public abstract class SqlDialectBase : ISqlDialect
         SqlKeyword.Some
     ];
 
+    /// <inheritdoc />
     public virtual IReadOnlySet<SqlFeature> SupportedFeatures { get; } = new HashSet<SqlFeature>();
 
-    // Common logic for all dialects
+    /// <inheritdoc />
     public virtual string QuoteIdentifier(string name)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -34,8 +53,6 @@ public abstract class SqlDialectBase : ISqlDialect
 
         var trimmed = name.Trim();
 
-        // If the string is too short to be quoted (e.g., "[A]"), or 
-        // it doesn't start/end with the dialect's quotes, add them.
         if (trimmed.Length < 2 || 
             !trimmed.StartsWith(OpenQuote) || 
             !trimmed.EndsWith(CloseQuote))
@@ -46,6 +63,7 @@ public abstract class SqlDialectBase : ISqlDialect
         return trimmed;
     }
 
+    /// <inheritdoc />
     public virtual string UnquoteIdentifier(string identifier)
     {
         if (string.IsNullOrEmpty(identifier))
@@ -58,14 +76,13 @@ public abstract class SqlDialectBase : ISqlDialect
 
         if (identifier.StartsWith(open) && identifier.EndsWith(close))
         {
-            // Dynamically strip based on the length of the quote characters.
-            // This safely handles single chars like '[' or multi-chars like '<<'
             return identifier.Substring(open.Length, identifier.Length - open.Length - close.Length);
         }
 
         return identifier;
     }
 
+    /// <inheritdoc />
     public virtual string QuoteEntityName(string table, string? schema = null)
     {
         var quotedTable = QuoteIdentifier(table);
@@ -78,24 +95,23 @@ public abstract class SqlDialectBase : ISqlDialect
         return $"{QuoteIdentifier(schema)}.{quotedTable}";
     }
 
+    /// <inheritdoc />
     public virtual string GetParameterName(int index)
     {
-        // Default logic: @p0, @p1, etc.
         return $"{ParameterPrefix}{index}";
     }
 
+    /// <inheritdoc />
     public virtual bool IsExpressionContext(string textBeforeParen)
     {
         if (string.IsNullOrWhiteSpace(textBeforeParen)) 
             return false;
 
-        // 1. Check for symbol operators (they can touch the previous word safely)
         foreach (var symbol in DefaultExpressionSymbols)
         {
             if (textBeforeParen.EndsWith(symbol)) return true;
         }
 
-        // 2. Check for word operators (they need to be isolated words)
         int lastSeparator = textBeforeParen.LastIndexOfAny([' ', '\t', '\n', '\r', '(']);
         string lastWord = lastSeparator >= 0 
             ? textBeforeParen[(lastSeparator + 1)..] 
@@ -109,6 +125,7 @@ public abstract class SqlDialectBase : ISqlDialect
         return false;
     }
 
+    /// <inheritdoc />
     public string ApplyAlias(string source, string? alias = null)
     {
         if (string.IsNullOrWhiteSpace(alias))
@@ -119,6 +136,7 @@ public abstract class SqlDialectBase : ISqlDialect
         return $"{QuoteIdentifier(source)} {SqlKeyword.As.Value} {alias}";
     }
 
+    /// <inheritdoc />
     public virtual string RenderFragment(ISqlFragment fragment, ISqlContext context)
     {
         return fragment switch
@@ -132,12 +150,12 @@ public abstract class SqlDialectBase : ISqlDialect
         };
     }
 
+    /// <inheritdoc />
     public virtual IEnumerable<SqlSegment> RewriteSegments(IReadOnlyList<SqlSegment> segments)
     {
         var rewritten = new List<SqlSegment>(segments.Count);
         bool forceBaseNamePhase = false;
         
-        // Hoist our scope trackers so both Pass 1 and Pass 3 can use them!
         int parenDepth = 0;
         bool inString = false, inLineComment = false, inBlockComment = false;
 
@@ -162,7 +180,6 @@ public abstract class SqlDialectBase : ISqlDialect
             return false;
         }
 
-        // --- PASS 1: RESOLVE INLINE FRAGMENTS & SET OPERATORS ---
         for (int i = 0; i < segments.Count; i++)
         {
             var segment = segments[i];
@@ -192,8 +209,6 @@ public abstract class SqlDialectBase : ISqlDialect
 
                     if (c == '(') parenDepth++;
                     else if (c == ')') parenDepth--;
-                    
-                    // THE MAGIC RESET: If we hit a semicolon outside of quotes/comments, the statement is over!
                     else if (c == ';' && parenDepth == 0)
                     {
                         forceBaseNamePhase = false; 
@@ -211,7 +226,6 @@ public abstract class SqlDialectBase : ISqlDialect
                 forceBaseNamePhase = keywordMeta.ExpectsBaseName.Value;
             }
             
-            // Handle Dialect-Specific Literal Rewrites
             if (segment.Tag == SqlSegmentTag.OnConflictKeyword || 
                 (segment.Type == SqlSegmentType.Literal && segment.Value is string s1 && s1.Contains("ON CONFLICT", StringComparison.OrdinalIgnoreCase)))
             {
@@ -333,7 +347,6 @@ public abstract class SqlDialectBase : ISqlDialect
             rewritten.Add(segment);
         }
 
-        // --- PASS 2: EVALUATE SELECT INTO ---
         int intoIdx = -1;
         for (int i = 0; i < rewritten.Count; i++)
         {
@@ -415,12 +428,10 @@ public abstract class SqlDialectBase : ISqlDialect
             }
         }
 
-        // --- PASS 3: EVALUATE MULTI-TABLE UPDATE / DELETE ---
         int updateIdx = -1, setIdx = -1, fromIdx = -1, whereIdx = -1;
         int firstFromIdx = -1, secondFromIdx = -1, whereDeleteIdx = -1;
         bool isDelete = false;
         
-        // Reset trackers for Pass 3 scanning
         parenDepth = 0;
         inString = false;
         inLineComment = false; 
@@ -432,7 +443,6 @@ public abstract class SqlDialectBase : ISqlDialect
             
             if (segment.Type == SqlSegmentType.Literal && segment.Value is string litText)
             {
-                // Safely track parenthesis depth so we don't bleed into subqueries!
                 for (int j = 0; j < litText.Length; j++)
                 {
                     char c = litText[j];
@@ -469,7 +479,6 @@ public abstract class SqlDialectBase : ISqlDialect
                 if (segment.Tag == SqlSegmentTag.UpdateKeyword && updateIdx == -1) updateIdx = i;
                 else if (segment.Tag == SqlSegmentTag.SetKeyword && setIdx == -1) setIdx = i;
                 
-                // FIX: Treat the new DeleteKeyword as the first FROM boundary!
                 else if (segment.Tag == SqlSegmentTag.DeleteKeyword)
                 {
                     isDelete = true;
@@ -548,8 +557,10 @@ public abstract class SqlDialectBase : ISqlDialect
         return rewritten;
     }
 
+    /// <inheritdoc />
     public virtual SqlInterpolOptions GetDefaultOptions() => new();
 
+    /// <summary>Renders a set operation (UNION, EXCEPT, INTERSECT) combining two query fragments.</summary>
     protected virtual string RenderSetOperation(SqlSetOperationFragment fragment, ISqlContext context)
     {
         string opKeyword = fragment.Operator switch
@@ -564,9 +575,9 @@ public abstract class SqlDialectBase : ISqlDialect
         return $"{fragment.Left.ToSql(context)}{Environment.NewLine}{opKeyword}{Environment.NewLine}{fragment.Right.ToSql(context)}";
     }
 
+    /// <summary>Renders the default multi-table UPDATE as <c>UPDATE ... SET ... FROM ... WHERE ...</c>.</summary>
     protected virtual string RenderMultiTableUpdate(SqlMultiTableUpdateFragment update, ISqlContext context)
     {
-        // Standard Layout (SQL Server, Postgres, SQLite, Oracle)
         var sql = $"UPDATE {update.Target.ToSql(context)}{Environment.NewLine}SET {update.SetClause.ToSql(context)}";
         
         if (update.FromClause != null) 
@@ -578,9 +589,9 @@ public abstract class SqlDialectBase : ISqlDialect
         return sql;
     }
 
+    /// <summary>Renders the default multi-table DELETE as <c>DELETE FROM ... FROM ... WHERE ...</c>.</summary>
     protected virtual string RenderMultiTableDelete(SqlMultiTableDeleteFragment delete, ISqlContext context)
     {
-        // Standard Layout (SQL Server, Postgres, SQLite, Oracle)
         var sql = $"DELETE FROM {delete.Target.ToSql(context)}";
         
         if (delete.FromClause != null) 
@@ -592,6 +603,7 @@ public abstract class SqlDialectBase : ISqlDialect
         return sql;
     }
 
+    /// <summary>Renders a SELECT INTO fragment, injecting <c>INTO [target]</c> at the correct segment position.</summary>
     protected virtual string RenderSelectInto(SqlSelectIntoFragment fragment, ISqlContext context)
     {
         string target = fragment.TargetTable switch
@@ -606,7 +618,6 @@ public abstract class SqlDialectBase : ISqlDialect
 
         for (int i = 0; i < fragment.SourceSegments.Count; i++)
         {
-            // Inject native INTO statement accurately at the conclusion of the column sequence block
             if (i == fragment.IntoSegmentIndex)
             {
                 vsb.Append($"{Environment.NewLine}INTO {target}");
@@ -616,7 +627,6 @@ public abstract class SqlDialectBase : ISqlDialect
             vsb.Append(SqlSegmentRenderer.Instance.Render(context, seg, i, fragment.SourceSegments));
         }
 
-        // Fallback guard if the insertion point is at the very end of the segment array
         if (fragment.IntoSegmentIndex >= fragment.SourceSegments.Count)
         {
             vsb.Append($"{Environment.NewLine}INTO {target}");

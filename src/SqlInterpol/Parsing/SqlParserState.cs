@@ -1,5 +1,8 @@
 namespace SqlInterpol.Parsing;
 
+/// <summary>
+/// The default mutable implementation of <see cref="ISqlParserState"/> used during interpolated SQL parsing.
+/// </summary>
 internal class SqlParserState : ISqlParserState
 {
     public SqlKeyword? CurrentKeyword { get; set; }
@@ -16,6 +19,7 @@ internal class SqlParserState : ISqlParserState
     private Dictionary<string, object?>? _properties;
     public IDictionary<string, object?> Properties => _properties ??= [];
 
+    /// <inheritdoc />
     public void Reset()
     {
         _properties = null;

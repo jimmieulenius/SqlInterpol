@@ -1,8 +1,14 @@
 
 namespace SqlInterpol;
 
+/// <summary>
+/// A collection fragment for raw SQL string items, rendering them joined by a separator
+/// with support for horizontal and <see cref="SqlCollectionLayout.Vertical"/> layouts.
+/// </summary>
+/// <param name="items">The raw SQL string items to include.</param>
 public sealed class SqlRawCollectionFragment(List<string> items) : ISqlFragment
 {
+    /// <inheritdoc />
     public string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
     {
         var separator = context.Options.CollectionSeparator;

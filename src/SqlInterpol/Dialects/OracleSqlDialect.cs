@@ -2,6 +2,10 @@ using SqlInterpol.Parsing;
 
 namespace SqlInterpol.Dialects;
 
+/// <summary>
+/// The Oracle dialect: colon-prefixed parameters, double-quote identifiers, OFFSET/FETCH paging,
+/// MERGE-based multi-table UPDATE, EXISTS-based multi-table DELETE, and MINUS for EXCEPT.
+/// </summary>
 public class OracleSqlDialect : SqlDialectBase
 {
     public override SqlDialectKind Kind => SqlDialectKind.Oracle;
@@ -15,6 +19,7 @@ public class OracleSqlDialect : SqlDialectBase
         SqlFeature.SelectInto
     };
 
+    /// <inheritdoc />
     public override string RenderFragment(ISqlFragment fragment, ISqlContext context)
     {
         if (fragment is SqlPagingFragment p)
@@ -22,7 +27,6 @@ public class OracleSqlDialect : SqlDialectBase
             return $"OFFSET {p.Offset} ROWS FETCH NEXT {p.Limit} ROWS ONLY";
         }
         
-        // Just in case a lock fragment bypasses the rewriter, return empty
         if (fragment is SqlLockFragment)
         {
             return string.Empty;
@@ -40,8 +44,6 @@ public class OracleSqlDialect : SqlDialectBase
             var fromClause = update.FromClause.ToSql(context).Trim();
             var whereClause = update.WhereClause?.ToSql(context).Trim() ?? "1=1";
 
-            // WYSIWYG FIX: Safely strip the 'AS' keyword using the Parser's state-aware engine!
-            // This guarantees we never accidentally mutate 'AS' inside a string literal or comment.
             fromClause = SqlInterpolationParser.Instance.ReplaceKeyword(fromClause, "AS", "").Replace("  ", " ");
 
             return $"MERGE INTO {target}{Environment.NewLine}USING {fromClause}{Environment.NewLine}ON ({whereClause}){Environment.NewLine}WHEN MATCHED THEN UPDATE SET {setClause}";
@@ -53,7 +55,6 @@ public class OracleSqlDialect : SqlDialectBase
             var fromClause = delete.FromClause.ToSql(context).Trim();
             var whereClause = delete.WhereClause?.ToSql(context).Trim() ?? "1=1";
 
-            // Strip the explicit alias mapping as it's unsupported in the subquery
             fromClause = SqlInterpolationParser.Instance.ReplaceKeyword(fromClause, "AS", "").Replace("  ", " ");
             var indent = new string(' ', context.Options.IndentSize);
 
@@ -63,9 +64,9 @@ public class OracleSqlDialect : SqlDialectBase
         return base.RenderFragment(fragment, context);
     }
 
+    /// <inheritdoc />
     public override IEnumerable<SqlSegment> RewriteSegments(IReadOnlyList<SqlSegment> segments)
     {
-        // 1. Let the base class swallow VALUES, inject Locks, etc FIRST
         var baseRewritten = base.RewriteSegments(segments).ToList();
         var rewritten = new List<SqlSegment>(baseRewritten.Count);
         
@@ -75,14 +76,12 @@ public class OracleSqlDialect : SqlDialectBase
         {
             var segment = baseRewritten[i];
 
-            // 2. Extract and swallow Lock Fragments
             if (segment.Type == SqlSegmentType.Raw && segment.Value is SqlLockFragment lockFrag)
             {
                 deferredLock = lockFrag.Mode;
-                continue; // Do not add it to the rewritten stream
+                continue;
             }
 
-            // 3. Apply Oracle specific paging logic to the cleaned AST
             if (segment.Tag == SqlSegmentTag.Paging && segment.Value is string pagingValue)
             {
                 if (i + 3 < baseRewritten.Count &&
@@ -93,20 +92,18 @@ public class OracleSqlDialect : SqlDialectBase
                     
                     if (index > -1)
                     {
-                        // Preserve formatting before the word LIMIT
                         rewritten.Add(new SqlSegment(SqlSegmentType.Literal, pagingValue[..index]));
                     }
 
-                    // Swapping LIMIT/OFFSET to Oracle 12c+ syntax
                     rewritten.Add(new SqlSegment(SqlSegmentType.Literal, $"{SqlKeyword.Offset} "));
-                    rewritten.Add(baseRewritten[i + 3]); // offset param
+                    rewritten.Add(baseRewritten[i + 3]);
                     
                     rewritten.Add(new SqlSegment(SqlSegmentType.Literal, " ROWS FETCH NEXT "));
-                    rewritten.Add(baseRewritten[i + 1]); // limit param
+                    rewritten.Add(baseRewritten[i + 1]);
                     
                     rewritten.Add(new SqlSegment(SqlSegmentType.Literal, " ROWS ONLY"));
 
-                    i += 3; // Skip consumed segments
+                    i += 3;
 
                     continue;
                 }
@@ -129,7 +126,6 @@ public class OracleSqlDialect : SqlDialectBase
             rewritten.Add(segment);
         }
 
-        // 4. Append deferred locks to the end of the query (Oracle maps Share to Update)
         if (deferredLock == SqlLockMode.Update || deferredLock == SqlLockMode.Share)
         {
             rewritten.Add(new SqlSegment(SqlSegmentType.Literal, "\nFOR UPDATE"));

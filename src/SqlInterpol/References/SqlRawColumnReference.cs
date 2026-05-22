@@ -1,11 +1,17 @@
-
 namespace SqlInterpol;
 
+/// <summary>
+/// A column reference created from a raw string column name, where the property name
+/// and physical column name are identical.
+/// </summary>
+/// <param name="sourceReference">The entity reference that provides the table/alias prefix.</param>
+/// <param name="columnName">The physical column name, used as both the column name and the property name.</param>
 public class SqlRawColumnReference(ISqlReference sourceReference, string columnName) 
     : SqlColumnReferenceBase(sourceReference)
 {
-    // For raw columns, the PropertyName falls back to the column name
+    /// <summary>Gets the column name, which doubles as the property name for raw string-based references.</summary>
     public override string PropertyName => columnName;
 
+    /// <inheritdoc />
     protected override string GetColumnName(ISqlContext context) => columnName;
 }

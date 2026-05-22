@@ -2,10 +2,16 @@ using SqlInterpol.Parsing;
 
 namespace SqlInterpol;
 
+/// <summary>
+/// The default implementation of <see cref="ISqlSegmentRenderer"/> that converts individual
+/// <see cref="SqlSegment"/> instances to their rendered SQL strings, handling entity promotion,
+/// subquery alias injection, and render-mode resolution.
+/// </summary>
 public class SqlSegmentRenderer : ISqlSegmentRenderer
 {
     public static readonly SqlSegmentRenderer Instance = new();
 
+    /// <inheritdoc />
     public string? Render(ISqlContext context, SqlSegment segment, int index, IReadOnlyList<SqlSegment> segments)
     {
         string? rendered = null;
@@ -16,17 +22,14 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
             case SqlSegmentType.Reference:
                 if (segment.Value is ISqlFragment fragment)
                 {
-                    // Prioritize the segment's specific RenderMode if set by the parser
                     var mode = segment.RenderMode ?? ResolveRenderMode(index, segment, segments);
 
-                    // CTE Schema Override Check
                     if (segment.Type == SqlSegmentType.Reference && 
                         segment.Value is ISqlEntityBase entity &&
                         context is ISqlParserContext parserContext &&
                         parserContext.ParserState.EntityRoles.TryGetValue(entity, out var role) &&
                         role == SqlEntityRole.Cte)
                     {
-                        // CTEs don't have schemas! We build it raw.
                         if (mode == SqlRenderMode.BaseName || mode == SqlRenderMode.Declaration)
                         {
                             string baseName = context.Dialect.QuoteIdentifier(SqlMetadataRegistry.GetEntityName(entity));
@@ -47,7 +50,6 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
                     }
                     else
                     {
-                        // Standard entity/projection rendering
                         rendered = fragment.ToSql(context, mode);
                     }
                 }
@@ -121,6 +123,7 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
         return rendered;
     }
 
+    /// <summary>Indents all newlines in <paramref name="rendered"/> to match the whitespace prefix of the preceding literal segment.</summary>
     private string ApplyAutoIndentation(string rendered, int index, IReadOnlyList<SqlSegment> segments)
     {
         if (index <= 0 || segments[index - 1].Type != SqlSegmentType.Literal)
@@ -148,12 +151,12 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
         return rendered;
     }
 
+    /// <summary>Determines the appropriate <see cref="SqlRenderMode"/> for the given entity segment based on context look-behind and look-ahead.</summary>
     private SqlRenderMode ResolveRenderMode(int index, SqlSegment segment, IReadOnlyList<SqlSegment> segments)
     {
-        // Use ISqlEntityBase so both Queries and Tables can be checked for aliases!
         if (segment.Value is not ISqlEntityBase entity) return SqlRenderMode.Default;
 
-        // 1. WYSIWYG Look-Behind: Did the user manually open a parenthesis?
+        // 1. Look-Behind: Did the user manually open a parenthesis?
         if (index > 0 && segments[index - 1].Type == SqlSegmentType.Literal)
         {
             var prevText = segments[index - 1].Value?.ToString()?.TrimEnd();
@@ -190,7 +193,7 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
                     }
                 }
 
-                // WYSIWYG Look-Ahead: If the next string closes a parenthesis, they opened one.
+                // If the next string closes a parenthesis, they opened one.
                 if (text?.StartsWith(")") == true)
                 {
                     return SqlRenderMode.Default;
@@ -208,8 +211,7 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
             return SqlRenderMode.Declaration;
         }
 
-        // PERFECT FIX: 
-        // Subqueries without an alias (like UNION) render natively so they don't get arbitrary parentheses!
+        // Subqueries without an alias (like UNION) render natively to avoid arbitrary parentheses.
         // Physical tables without an alias render their BaseName (e.g., [Products]).
         return entity is ISqlQuery ? SqlRenderMode.Default : SqlRenderMode.BaseName;
     }

@@ -2,6 +2,10 @@ using SqlInterpol.Parsing;
 
 namespace SqlInterpol.Dialects;
 
+/// <summary>
+/// The Firebird dialect: double-quote identifiers, FIRST/SKIP paging, WITH LOCK row locking,
+/// and MERGE-based multi-table UPDATE and EXISTS-based multi-table DELETE.
+/// </summary>
 public class FirebirdSqlDialect : SqlDialectBase
 {
     public override SqlDialectKind Kind => SqlDialectKind.Firebird;
@@ -14,6 +18,7 @@ public class FirebirdSqlDialect : SqlDialectBase
         SqlFeature.Returning,
     };
 
+    /// <inheritdoc />
     public override string RenderFragment(ISqlFragment fragment, ISqlContext context)
     {
         if (fragment is SqlPagingFragment p)
@@ -53,6 +58,7 @@ public class FirebirdSqlDialect : SqlDialectBase
         return base.RenderFragment(fragment, context);
     }
 
+    /// <inheritdoc />
     public override IEnumerable<SqlSegment> RewriteSegments(IReadOnlyList<SqlSegment> segments)
     {
         var baseRewritten = base.RewriteSegments(segments).ToList();
@@ -64,14 +70,12 @@ public class FirebirdSqlDialect : SqlDialectBase
         {
             var segment = baseRewritten[i];
 
-            // Extract and swallow Lock Fragments — Firebird uses WITH LOCK appended at the end
             if (segment.Type == SqlSegmentType.Raw && segment.Value is SqlLockFragment lockFrag)
             {
                 deferredLock = lockFrag.Mode;
                 continue;
             }
 
-            // Parameterized paging: convert LIMIT @pX OFFSET @pY → FIRST @pX SKIP @pY
             if (segment.Tag == SqlSegmentTag.Paging && segment.Value is string pagingValue)
             {
                 if (i + 3 < baseRewritten.Count &&
@@ -98,7 +102,6 @@ public class FirebirdSqlDialect : SqlDialectBase
             rewritten.Add(segment);
         }
 
-        // Append WITH LOCK after the full query (Firebird only supports row-level locking via WITH LOCK)
         if (deferredLock == SqlLockMode.Update)
         {
             rewritten.Add(new SqlSegment(SqlSegmentType.Literal, "\nWITH LOCK"));

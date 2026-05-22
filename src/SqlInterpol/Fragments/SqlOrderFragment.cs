@@ -1,6 +1,10 @@
 
 namespace SqlInterpol;
 
+/// <summary>
+/// Represents a single ORDER BY expression, rendering a column reference optionally
+/// followed by <c>ASC</c> or <c>DESC</c>.
+/// </summary>
 public class SqlOrderFragment : ISqlOrderFragment
 {
     private readonly ISqlReference? _reference;
@@ -8,12 +12,23 @@ public class SqlOrderFragment : ISqlOrderFragment
     private readonly string? _physicalColumnName;
     private readonly SqlOrderDirection? _direction;
 
+    /// <summary>
+    /// Initializes an order fragment from a typed column reference.
+    /// </summary>
+    /// <param name="reference">The column reference to sort by.</param>
+    /// <param name="direction">The sort direction, or <see langword="null"/> for no keyword.</param>
     public SqlOrderFragment(ISqlReference reference, SqlOrderDirection? direction = null)
     {
         _reference = reference;
         _direction = direction;
     }
 
+    /// <summary>
+    /// Initializes an order fragment from a raw physical column name on an entity.
+    /// </summary>
+    /// <param name="entity">The entity that provides the table/alias prefix.</param>
+    /// <param name="physicalColumnName">The physical column name to sort by.</param>
+    /// <param name="direction">The sort direction, or <see langword="null"/> for no keyword.</param>
     public SqlOrderFragment(ISqlEntityBase entity, string physicalColumnName, SqlOrderDirection? direction = null)
     {
         _entity = entity;
@@ -21,6 +36,7 @@ public class SqlOrderFragment : ISqlOrderFragment
         _direction = direction;
     }
 
+    /// <inheritdoc />
     public string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
     {
         string columnSql;

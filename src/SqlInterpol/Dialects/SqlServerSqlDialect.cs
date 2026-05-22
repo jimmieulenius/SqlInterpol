@@ -2,6 +2,10 @@ using SqlInterpol.Parsing;
 
 namespace SqlInterpol.Dialects;
 
+/// <summary>
+/// The SQL Server dialect: bracket identifiers, OFFSET/FETCH paging, WITH (UPDLOCK) row locking,
+/// OUTPUT-based RETURNING emulation, and MERGE-based upsert transpilation.
+/// </summary>
 public class SqlServerSqlDialect : SqlDialectBase
 {
     public override SqlDialectKind Kind => SqlDialectKind.SqlServer;
@@ -17,24 +21,20 @@ public class SqlServerSqlDialect : SqlDialectBase
         SqlFeature.SelectInto // Supported natively
     };
 
+    /// <inheritdoc />
     public override string RenderFragment(ISqlFragment fragment, ISqlContext context)
     {
         return fragment switch
         {
-            // The leading space here is intentional! 
-            // It perfectly replaces the space that .TrimEnd(' ', '\t') removed in SqlDialectBase.
             SqlLockFragment { Mode: SqlLockMode.Update } => " WITH (UPDLOCK)",
             SqlLockFragment { Mode: SqlLockMode.Share }  => " WITH (ROWLOCK, HOLDLOCK)",
             SqlLockFragment { Mode: SqlLockMode.NoLock } => " WITH (NOLOCK)",
-            
-            // Handle SQL Server specific pagination (OFFSET / FETCH)
             SqlPagingFragment p => $"OFFSET {p.Offset} ROWS FETCH NEXT {p.Limit} ROWS ONLY",
-            
-            // Pass everything else down to the base dialect
             _ => base.RenderFragment(fragment, context)
         };
     }
 
+    /// <inheritdoc />
     public override IEnumerable<SqlSegment> RewriteSegments(IReadOnlyList<SqlSegment> segments)
     {
         var baseRewritten = base.RewriteSegments(segments).ToList();
@@ -47,7 +47,6 @@ public class SqlServerSqlDialect : SqlDialectBase
             bool isOnConflict = segment.Tag == SqlSegmentTag.OnConflictKeyword || 
                 (segment.Type == SqlSegmentType.Literal && segment.Value is string s1 && s1.Contains("ON CONFLICT", StringComparison.OrdinalIgnoreCase));
 
-            // 0. Strip RECURSIVE keyword (SQL Server CTEs are implicitly recursive)
             if (segment.Type == SqlSegmentType.Literal && segment.Value is string literalValue &&
                 literalValue.Contains("WITH RECURSIVE", StringComparison.OrdinalIgnoreCase))
             {
@@ -55,7 +54,6 @@ public class SqlServerSqlDialect : SqlDialectBase
                     SqlInterpolationParser.Instance.ReplaceKeyword(literalValue, "WITH RECURSIVE", "WITH"));
             }
 
-            // 1. Transpile UPSERT -> ANSI MERGE
             if (isOnConflict)
             {
                 ISqlEntityBase? targetTable = null;
@@ -103,7 +101,6 @@ public class SqlServerSqlDialect : SqlDialectBase
                 }
             }
 
-            // 2. Transpile RETURNING -> OUTPUT 
             if (segment.Tag == SqlSegmentTag.ReturningKeyword)
             {
                 var projections = new List<ISqlProjection>();
@@ -145,7 +142,6 @@ public class SqlServerSqlDialect : SqlDialectBase
                 }
             }
 
-            // 3. Apply SQL Server specific paging logic
             if (segment.Tag == SqlSegmentTag.Paging && segment.Value is string textPaging)
             {
                 if (i + 3 < baseRewritten.Count && baseRewritten[i + 1].Type == SqlSegmentType.Parameter && baseRewritten[i + 3].Type == SqlSegmentType.Parameter)
@@ -173,9 +169,9 @@ public class SqlServerSqlDialect : SqlDialectBase
         return rewritten;
     }
 
+    /// <inheritdoc />
     protected override string RenderMultiTableDelete(SqlMultiTableDeleteFragment delete, ISqlContext context)
     {
-        // Natively formats idiomatic T-SQL / MySQL, dropping the redundant "FROM"
         var sql = $"DELETE FROM {delete.Target.ToSql(context)}";
         
         if (delete.FromClause != null) 
@@ -188,9 +184,18 @@ public class SqlServerSqlDialect : SqlDialectBase
     }
 }
 
+/// <summary>
+/// A helper fragment that wraps <see cref="SqlInsertValuesFragment"/> to inject an
+/// <c>OUTPUT inserted.*</c> clause for SQL Server's RETURNING emulation.
+/// </summary>
+/// <param name="original">The original INSERT values fragment.</param>
+/// <param name="returnedColumns">The columns to project in the OUTPUT clause.</param>
 public class SqlServerInsertValuesFragment(SqlInsertValuesFragment original, IReadOnlyList<ISqlProjection> returnedColumns) : ISqlFragment, ISqlParameterGenerator
 {
+    /// <inheritdoc />
     public void GenerateParameters(ISqlContext context) => original.GenerateParameters(context);
+
+    /// <inheritdoc />
     public string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
     {
         var baseSql = original.ToSql(context, mode);
@@ -199,12 +204,21 @@ public class SqlServerInsertValuesFragment(SqlInsertValuesFragment original, IRe
     }
 }
 
+/// <summary>
+/// A helper fragment that renders an ANSI MERGE statement for SQL Server's upsert
+/// (ON CONFLICT DO UPDATE SET) emulation.
+/// </summary>
+/// <param name="targetTable">The target entity for the MERGE.</param>
+/// <param name="insertFragment">The INSERT values fragment providing source rows and column mappings.</param>
+/// <param name="conflictColumns">The columns used in the ON clause to detect conflicts.</param>
+/// <param name="updateFragment">The SET fragment applied when a match is found.</param>
 public class SqlServerMergeFragment(
     ISqlEntityBase targetTable,
     SqlInsertValuesFragment insertFragment,
     IReadOnlyList<ISqlProjection> conflictColumns,
     SqlSetFragment updateFragment) : ISqlFragment
 {
+    /// <inheritdoc />
     public string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
     {
         var target = targetTable.ToSql(context);

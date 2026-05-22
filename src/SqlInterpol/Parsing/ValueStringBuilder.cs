@@ -20,8 +20,10 @@ internal ref struct ValueStringBuilder
         _pos = 0;
     }
 
+    /// <summary>Gets the current number of characters in the builder.</summary>
     public int Length => _pos;
 
+    /// <summary>Appends a single character.</summary>
     public void Append(char c)
     {
         int pos = _pos;
@@ -36,6 +38,7 @@ internal ref struct ValueStringBuilder
         }
     }
 
+    /// <summary>Appends a string.</summary>
     public void Append(string? s)
     {
         if (string.IsNullOrEmpty(s)) return;
@@ -64,6 +67,7 @@ internal ref struct ValueStringBuilder
         _pos = pos + s.Length;
     }
 
+    /// <summary>Appends a span of characters.</summary>
     public void Append(ReadOnlySpan<char> value)
     {
         int pos = _pos;
@@ -86,7 +90,6 @@ internal ref struct ValueStringBuilder
     [MethodImpl(MethodImplOptions.NoInlining)]
     private void Grow(int requiredMinCapacity)
     {
-        // Standard growth strategy: double the buffer or take what is required
         int newCapacity = Math.Max(_pos + requiredMinCapacity, _chars.Length * 2);
         
         char[] poolArray = ArrayPool<char>.Shared.Rent(newCapacity);
@@ -100,6 +103,7 @@ internal ref struct ValueStringBuilder
         _chars = _arrayToReturn = poolArray;
     }
 
+    /// <summary>Returns the built string and disposes any pooled buffer.</summary>
     public override string ToString()
     {
         string s = _chars.Slice(0, _pos).ToString();
@@ -107,6 +111,7 @@ internal ref struct ValueStringBuilder
         return s;
     }
 
+    /// <summary>Releases any pooled array back to the shared pool.</summary>
     public void Dispose()
     {
         char[]? toReturn = _arrayToReturn;

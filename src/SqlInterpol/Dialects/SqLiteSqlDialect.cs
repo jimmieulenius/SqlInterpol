@@ -1,6 +1,10 @@
 
 namespace SqlInterpol.Dialects;
 
+/// <summary>
+/// The SQLite dialect: double-quote identifiers, <c>@pN</c>-style parameters starting at 1,
+/// RETURNING support, ON CONFLICT upserts, and SELECT INTO emulated via CREATE TABLE AS.
+/// </summary>
 public class SqLiteSqlDialect : SqlDialectBase
 {
     public override SqlDialectKind Kind => SqlDialectKind.SqLite;
@@ -19,6 +23,7 @@ public class SqLiteSqlDialect : SqlDialectBase
         ParameterIndexStart = 1 
     };
 
+    /// <inheritdoc />
     public override IEnumerable<SqlSegment> RewriteSegments(IReadOnlyList<SqlSegment> segments)
     {
         var rewritten = base.RewriteSegments(segments).ToList();
@@ -27,15 +32,14 @@ public class SqLiteSqlDialect : SqlDialectBase
         {
             if (rewritten[i].Type == SqlSegmentType.Raw && rewritten[i].Value is SqlLockFragment)
             {
-                // Just erase it from the AST to prevent SQLite syntax errors!
                 rewritten[i] = new SqlSegment(SqlSegmentType.Literal, ""); 
             }
         }
 
-        // Notice we do NOT append anything to the end here!
         return rewritten;
     }
 
+    /// <inheritdoc />
     public override string RenderFragment(ISqlFragment fragment, ISqlContext context)
     {
         if (fragment is SqlLockFragment)
@@ -46,6 +50,7 @@ public class SqLiteSqlDialect : SqlDialectBase
         return base.RenderFragment(fragment, context);
     }
 
+    /// <inheritdoc />
     protected override string RenderSelectInto(SqlSelectIntoFragment fragment, ISqlContext context)
     {
         string target = fragment.TargetTable switch

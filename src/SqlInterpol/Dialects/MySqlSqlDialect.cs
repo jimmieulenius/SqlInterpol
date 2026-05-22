@@ -2,6 +2,10 @@ using SqlInterpol.Parsing;
 
 namespace SqlInterpol.Dialects;
 
+/// <summary>
+/// The MySQL/MariaDB dialect: backtick identifiers, <c>@pN</c> parameters, ON DUPLICATE KEY UPDATE
+/// emulation of upserts, and MySQL-style multi-table UPDATE/DELETE syntax.
+/// </summary>
 public class MySqlSqlDialect : SqlDialectBase
 {
     public override SqlDialectKind Kind => SqlDialectKind.MySql;
@@ -16,6 +20,7 @@ public class MySqlSqlDialect : SqlDialectBase
         SqlFeature.SelectInto
     };
 
+    /// <inheritdoc />
     public override IEnumerable<SqlSegment> RewriteSegments(IReadOnlyList<SqlSegment> segments)
     {
         var baseRewritten = base.RewriteSegments(segments).ToList();
@@ -27,14 +32,12 @@ public class MySqlSqlDialect : SqlDialectBase
         {
             var segment = baseRewritten[i];
 
-            // 1. Extract and swallow Lock Fragments
             if (segment.Type == SqlSegmentType.Raw && segment.Value is SqlLockFragment lockFrag)
             {
                 deferredLock = lockFrag.Mode;
-                continue; // Do not add it to the rewritten stream (erases it inline)
+                continue;
             }
 
-            // 2. Existing ON CONFLICT -> ON DUPLICATE KEY UPDATE logic
             bool isOnConflict = segment.Tag == SqlSegmentTag.OnConflictKeyword || 
                                (segment.Type == SqlSegmentType.Literal && segment.Value is string s1 && s1.Contains("ON CONFLICT", StringComparison.OrdinalIgnoreCase));
 
@@ -77,7 +80,6 @@ public class MySqlSqlDialect : SqlDialectBase
             rewritten.Add(segment);
         }
 
-        // 3. Append deferred locks to the end of the query
         if (deferredLock == SqlLockMode.Update)
             rewritten.Add(new SqlSegment(SqlSegmentType.Literal, "\nFOR UPDATE"));
         else if (deferredLock == SqlLockMode.Share)
@@ -86,15 +88,15 @@ public class MySqlSqlDialect : SqlDialectBase
         return rewritten;
     }
 
+    /// <inheritdoc />
     public override string RenderFragment(ISqlFragment fragment, ISqlContext context)
     {
         if (fragment is SqlMultiTableUpdateFragment update)
         {
-            // MySQL Block Swapping!
             var sql = $"{SqlKeyword.Update} {update.Target.ToSql(context)}";
-            if (update.FromClause != null) sql += $", {update.FromClause.ToSql(context)}"; // Swap FROM for a comma
+            if (update.FromClause != null) sql += $", {update.FromClause.ToSql(context)}";
             
-            sql += $"{Environment.NewLine}{SqlKeyword.Set} {update.SetClause.ToSql(context)}"; // SET moves to the middle
+            sql += $"{Environment.NewLine}{SqlKeyword.Set} {update.SetClause.ToSql(context)}";
             
             if (update.WhereClause != null) sql += $"{Environment.NewLine}{SqlKeyword.Where} {update.WhereClause.ToSql(context)}";
             
@@ -107,15 +109,12 @@ public class MySqlSqlDialect : SqlDialectBase
             var fromClause = delete.FromClause.ToSql(context).Trim();
             var whereClause = delete.WhereClause?.ToSql(context).Trim() ?? "1=1";
 
-            // If the target has an alias (e.g. `Products` AS `p`), MySQL requires `DELETE p FROM Products AS p...`
-            // You can extract the alias easily using Regex, or default to the base target.
             var targetAliasMatch = System.Text.RegularExpressions.Regex.Match(targetDecl, @"AS\s+(`?[a-zA-Z0-9_]+`?)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
             var deleteTarget = targetAliasMatch.Success ? targetAliasMatch.Groups[1].Value : targetDecl;
 
             return $"DELETE {deleteTarget}{Environment.NewLine}FROM {targetDecl}, {fromClause}{Environment.NewLine}WHERE {whereClause}";
         }
 
-        // Just in case a lock fragment bypasses the rewriter, return empty
         if (fragment is SqlLockFragment) return string.Empty;
         
         return base.RenderFragment(fragment, context);
@@ -144,8 +143,14 @@ public class MySqlSqlDialect : SqlDialectBase
     }
 }
 
+/// <summary>
+/// A helper fragment that strips the leading <c>SET</c> keyword from a <see cref="SqlSetFragment"/>
+/// for use in MySQL's ON DUPLICATE KEY UPDATE clause.
+/// </summary>
+/// <param name="original">The SET fragment to wrap.</param>
 public class MySqlUpdateFragment(SqlSetFragment original) : ISqlFragment
 {
+    /// <inheritdoc />
     public string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
     {
         var sql = original.ToSql(context, mode);

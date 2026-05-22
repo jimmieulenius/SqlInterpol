@@ -4,11 +4,14 @@ using System.Runtime.CompilerServices;
 
 namespace SqlInterpol.Parsing;
 
+/// <summary>
+/// The default implementation of <see cref="ISqlInterpolationParser"/> that drives keyword detection,
+/// entity promotion, DTO mapping, parameter binding, and alias resolution during query construction.
+/// </summary>
 public class SqlInterpolationParser : ISqlInterpolationParser
 {
     public static readonly SqlInterpolationParser Instance = new();
 
-    // WYSIWYG FIX: Invisibly attach a keyword stack to the parser state without breaking the interface!
     private static readonly ConditionalWeakTable<ISqlParserState, Stack<SqlKeyword?>> _keywordStacks = new();
 
     private Stack<SqlKeyword?> GetKeywordStack(ISqlParserState state)
@@ -16,6 +19,7 @@ public class SqlInterpolationParser : ISqlInterpolationParser
         return _keywordStacks.GetValue(state, _ => new Stack<SqlKeyword?>());
     }
 
+    /// <inheritdoc />
     public virtual SqlSegment ProcessValue(ISqlParserContext context, object? value)
     {
         bool isAlias = context.ParserState.ExpectsAliasOnly;
@@ -44,8 +48,6 @@ public class SqlInterpolationParser : ISqlInterpolationParser
                 
                 context.ParserState.LastAliasableTarget = null;
                 
-                // WYSIWYG FIX: Even if consumed as an alias, if we are in a DML context, 
-                // this entity MUST become the ActiveEntityTarget so DTO properties can map to it!
                 string? currentKeyword = context.ParserState.CurrentKeyword?.Value;
                 if (string.Equals(currentKeyword, SqlKeyword.Update, StringComparison.OrdinalIgnoreCase) ||
                     string.Equals(currentKeyword, SqlKeyword.Insert, StringComparison.OrdinalIgnoreCase))
@@ -53,14 +55,12 @@ public class SqlInterpolationParser : ISqlInterpolationParser
                     context.ParserState.ActiveEntityTarget = entityAlias;
                 }
                 
-                // DEFER RENDERING! Store the AST node to be evaluated later 
-                // so it perfectly picks up any late-bound mutations!
                 return new SqlSegment(SqlSegmentType.Raw, entityAlias, SqlRenderMode.AliasOnly);
             }
 
             string? rawAlias = null;
             SqlSegment? segmentToReturn = null;
-            bool isQuoted = true; // Interpolated variables used as aliases are programmatic, so safely quote them!
+            bool isQuoted = true;
 
             if (value is string stringAlias)
             {
@@ -98,7 +98,6 @@ public class SqlInterpolationParser : ISqlInterpolationParser
         }
 
         // 2. SELECT PROMOTION
-        // Explicitly guard against ISqlProjection AND ISqlQuery so subqueries retain WYSIWYG indentation!
         bool isSelect = context.ParserState.CurrentKeyword == SqlKeyword.Select;
         bool isSelectDistinct = context.ParserState.CurrentKeyword == SqlKeyword.SelectDistinct;
 
@@ -288,8 +287,6 @@ public class SqlInterpolationParser : ISqlInterpolationParser
         return CreateParameter(context, value);
     }
 
-    // --- Keyword Detection Infrastructure ---
-
     private enum KeywordMatchMode { EndsWithWord, ContainsWord, EqualsWord }
 
     private readonly record struct KeywordRule(string Text, KeywordMatchMode Mode, string? Tag, SqlKeyword? ForcedKeyword);
@@ -297,7 +294,6 @@ public class SqlInterpolationParser : ISqlInterpolationParser
     // Ordering IS priority — multi-word patterns must come before their single-word suffixes.
     private static readonly KeywordRule[] _keywordRules =
     [
-        // --- ADDED DDL SCHEMA MODIFIERS ---
         new(SqlKeyword.Create.Value,                   KeywordMatchMode.ContainsWord, SqlSegmentTag.CreateKeyword,        SqlKeyword.Create),
         new(SqlKeyword.Drop.Value,                     KeywordMatchMode.ContainsWord, SqlSegmentTag.DropKeyword,          SqlKeyword.Drop),
         new(SqlKeyword.Alter.Value,                    KeywordMatchMode.ContainsWord, SqlSegmentTag.AlterKeyword,         SqlKeyword.Alter),
@@ -312,7 +308,6 @@ public class SqlInterpolationParser : ISqlInterpolationParser
         new(SqlKeyword.Update.Value,                   KeywordMatchMode.EndsWithWord, SqlSegmentTag.UpdateKeyword,        SqlKeyword.Update),
         new(SqlKeyword.Set.Value,                      KeywordMatchMode.EndsWithWord, SqlSegmentTag.SetKeyword,           SqlKeyword.Set),
         
-        // --- UPDATED INSERT TO MAP NATIVELY ---
         new($"{SqlKeyword.Insert.Value} {SqlKeyword.Into.Value}",      KeywordMatchMode.ContainsWord, SqlSegmentTag.InsertKeyword,        SqlKeyword.Insert), 
         new(SqlKeyword.Insert.Value,                   KeywordMatchMode.EndsWithWord, SqlSegmentTag.InsertKeyword,        SqlKeyword.Insert),
         
@@ -353,9 +348,9 @@ public class SqlInterpolationParser : ISqlInterpolationParser
         return false;
     }
 
+    /// <inheritdoc />
     public virtual string? ProcessLiteral(ISqlParserContext context, ReadOnlySpan<char> span)
     {
-        // 1. --- ZERO-ALLOCATION, STATE-AWARE SCRUBBING ---
         int length = span.Length;
         char[]? rented = null;
         Span<char> cleanBuffer = length <= 1024 
@@ -418,7 +413,6 @@ public class SqlInterpolationParser : ISqlInterpolationParser
 
         var activeSpan = cleanBuffer.Slice(0, cleanIndex);
 
-        // 3. --- KEYWORD SCANNING ON SCRUBBED SPAN ---
         var trimmed = activeSpan.Trim();
         string? tag = null;
         SqlKeyword? forcedKeyword = null;
@@ -482,8 +476,6 @@ public class SqlInterpolationParser : ISqlInterpolationParser
         
         UpdateScannerState(context, activeSpan);
 
-        // WYSIWYG FIX: Do not let naive keyword scanning override the 
-        // precise keyword state if we are trapped inside a subquery!
         if (forcedKeyword != null && context.ParserState.ParenDepth == 0)
         {
             context.ParserState.CurrentKeyword = forcedKeyword;
@@ -494,6 +486,7 @@ public class SqlInterpolationParser : ISqlInterpolationParser
         return tag;
     }
 
+    /// <inheritdoc />
     public virtual string ReplaceKeyword(string sql, string keyword, string replacement)
     {
         if (string.IsNullOrEmpty(sql) || sql.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) == -1)
@@ -576,7 +569,7 @@ public class SqlInterpolationParser : ISqlInterpolationParser
                 if (leftSafe && rightSafe)
                 {
                     result.Append(replacement);
-                    i += keywordLen - 1; // Skip the original keyword
+                    i += keywordLen - 1;
                     continue;
                 }
             }
@@ -587,12 +580,16 @@ public class SqlInterpolationParser : ISqlInterpolationParser
         return result.ToString();
     }
 
+    /// <summary>Creates a single named parameter for <paramref name="value"/> and returns its segment.</summary>
     protected virtual SqlSegment CreateParameter(ISqlParserContext context, object? value)
     {
         string paramKey = context.AddParameter(value);
         return new SqlSegment(SqlSegmentType.Parameter, paramKey);
     }
 
+    /// <summary>
+    /// Attempts to extract an inline alias from the beginning of <paramref name="span"/>, handling optional AS keyword and quote styles.
+    /// </summary>
     protected virtual bool TryPeekAlias(ISqlParserContext context, ReadOnlySpan<char> span, out string? alias, out bool isQuoted)
     {
         alias = null;
@@ -678,8 +675,6 @@ public class SqlInterpolationParser : ISqlInterpolationParser
 
     private void UpdateScannerState(ISqlParserContext context, ReadOnlySpan<char> span)
     {
-        // Guard Check: If the literal ends with a targeted vertical override block,
-        // do not let the forward sliding window loop overwrite our forced keyword context!
         var trimmedSpan = span.Trim();
 
         if (trimmedSpan.EndsWith($"{SqlKeyword.Select} {SqlKeyword.Distinct}", StringComparison.OrdinalIgnoreCase))
@@ -694,7 +689,6 @@ public class SqlInterpolationParser : ISqlInterpolationParser
         {
             var slice = span[i..];
 
-            // WYSIWYG FIX: Seamlessly push/pop the semantic context for subqueries!
             if (span[i] == '(')
             {
                 context.ParserState.ParenDepth++;
@@ -705,12 +699,11 @@ public class SqlInterpolationParser : ISqlInterpolationParser
                 context.ParserState.ParenDepth--;
                 if (stack.Count > 0)
                 {
-                    // Restore outer parent's keyword state automatically!
                     context.ParserState.CurrentKeyword = stack.Pop();
                 }
             }
 
-            // Evaluate state natively even inside parentheses so subqueries map their columns properly
+            // Evaluate state natively even inside parentheses so subqueries map their columns correctly
             if (i == 0 || char.IsWhiteSpace(span[i - 1]) || span[i - 1] == '(' || span[i - 1] == ')')
             {
                 bool matchedInitiator = false;
@@ -728,8 +721,6 @@ public class SqlInterpolationParser : ISqlInterpolationParser
                     }
                 }
 
-                // If not an initiator, natively detect FROM to safely exit the SELECT state!
-                // This ensures entities in the FROM clause are treated as tables, not columns.
                 if (!matchedInitiator && slice.StartsWith("FROM", StringComparison.OrdinalIgnoreCase))
                 {
                     if (slice.Length == 4 || !char.IsLetterOrDigit(slice[4]))
@@ -742,6 +733,10 @@ public class SqlInterpolationParser : ISqlInterpolationParser
         }
     }
 
+    /// <summary>
+    /// Returns <see langword="true"/> if <paramref name="span"/> starts with a token that terminates a capture group
+    /// (comma, closing parenthesis, semicolon, or opening parenthesis).
+    /// </summary>
     protected virtual bool IsCaptureTerminated(ReadOnlySpan<char> span)
     {
         int i = 0;
