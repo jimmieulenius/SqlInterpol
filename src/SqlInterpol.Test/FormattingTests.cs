@@ -637,8 +637,8 @@ public class FormattingTests
                 )
                 VALUES
                 (
-                    ?0,
-                    ?1
+                    @p1,
+                    @p2
                 )
                 """
             ]
@@ -714,8 +714,8 @@ public class FormattingTests
                 $$"""
                 UPDATE "dbo"."Orders"
                 SET
-                    "order_status" = ?0,
-                    "Total" = ?1
+                    "order_status" = @p1,
+                    "Total" = @p2
                 """
             ]
         ),
@@ -842,14 +842,14 @@ public class FormattingTests
                 )
                 VALUES
                 (
-                    ?0,
-                    ?1,
-                    ?2
+                    @p1,
+                    @p2,
+                    @p3
                 ),
                 (
-                    ?3,
-                    ?4,
-                    ?5
+                    @p4,
+                    @p5,
+                    @p6
                 )
                 """
             ]
@@ -945,9 +945,9 @@ public class FormattingTests
                 SELECT *
                 FROM "dbo"."Orders"
                 WHERE "dbo"."Orders"."Id" IN (
-                    ?0,
-                    ?1,
-                    ?2
+                    @p1,
+                    @p2,
+                    @p3
                 )
                 """
             ]

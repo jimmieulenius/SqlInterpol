@@ -91,7 +91,7 @@ public class DeleteTests
             [
                 """
                 DELETE FROM "dbo"."Orders"
-                WHERE "dbo"."Orders"."Id" = ?0
+                WHERE "dbo"."Orders"."Id" = @p1
                 """
             ]
         ),

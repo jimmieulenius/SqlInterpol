@@ -2,7 +2,9 @@
   <Project Path="SqlInterpol/SqlInterpol.csproj" />
   <Project Path="SqlInterpol.Analyzers/SqlInterpol.Analyzers.csproj" />
   <Project Path="SqlInterpol.Dapper/SqlInterpol.Dapper.csproj" />
+  <Project Path="SqlInterpol.Dapper.Test/SqlInterpol.Dapper.Test.csproj" />
   <Project Path="SqlInterpol.EntityFrameworkCore/SqlInterpol.EntityFrameworkCore.csproj" />
+  <Project Path="SqlInterpol.EntityFrameworkCore.Test/SqlInterpol.EntityFrameworkCore.Test.csproj" />
   <Project Path="SqlInterpol.Test/SqlInterpol.Test.csproj" />
   <Project Path="SqlInterpol.Benchmarks/SqlInterpol.Benchmarks.csproj" />
 </Solution>

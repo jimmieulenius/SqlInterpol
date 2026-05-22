@@ -78,7 +78,7 @@ public class UpdateAsTests
             [
                 """
                 UPDATE "dbo"."Orders" AS "ord"
-                SET "order_status" = ?0, "Total" = ?1
+                SET "order_status" = @p1, "Total" = @p2
                 WHERE "ord"."Id" = 1
                 """
             ]

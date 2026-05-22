@@ -98,7 +98,7 @@ public class PagingTests
                 SELECT "dbo"."Products"."Id", "dbo"."Products"."PROD_NAME"
                 FROM "dbo"."Products"
                 ORDER BY "dbo"."Products"."Id"
-                LIMIT ?0 OFFSET ?1
+                LIMIT @p1 OFFSET @p2
                 """
         ]),
         // SQL Server (Swaps the visual order and applies ANSI syntax)

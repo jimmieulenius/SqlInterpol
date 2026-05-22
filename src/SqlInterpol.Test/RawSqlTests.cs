@@ -101,7 +101,7 @@ public class RawSqlTests
                 """
                 SELECT "dbo"."Products"."Id", "dbo"."Products"."PROD_NAME"
                 FROM "dbo"."Products"
-                WHERE "dbo"."Products"."Price" > ?0
+                WHERE "dbo"."Products"."Price" > @p1
                   AND p.Status = 'ACTIVE' /* Raw SQL condition */
                 GROUP BY "dbo"."Products"."Id", "dbo"."Products"."PROD_NAME"
                 HAVING COUNT(*) > 1

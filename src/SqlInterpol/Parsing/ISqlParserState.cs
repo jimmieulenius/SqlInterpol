@@ -14,4 +14,6 @@ public interface ISqlParserState
     bool InBlockComment { get; set; }
     bool InLineComment { get; set; }
     int ParenDepth { get; set; }
+
+    void Reset();
 }

@@ -118,7 +118,7 @@ public class UpdateSubqueryTests
                 UPDATE (
                     SELECT CategoryId, MAX(Price) AS max_price FROM Products GROUP BY CategoryId
                 ) AS "stats"
-                SET "max_price" = ?0
+                SET "max_price" = @p1
                 WHERE "stats"."CategoryId" = 5
                 """
             ]
@@ -214,7 +214,7 @@ public class UpdateSubqueryTests
                     FROM "dbo"."Products" AS "p" 
                     GROUP BY "p"."CategoryId"
                 ) AS "stats"
-                SET "max_price" = ?0
+                SET "max_price" = @p1
                 WHERE "stats"."CategoryId" = 5
                 """
             ]

@@ -5,6 +5,16 @@ public static class SqlSegmentTag
     public const string Paging = "Paging";
     public const string InsertTarget = "InsertTarget";
     public const string UpdateTarget = "UpdateTarget";
+
+    // --- DDL & DML Schema Modifiers ---
+    public const string CreateKeyword = "CreateKeyword";
+    public const string DropKeyword = "DropKeyword";
+    public const string AlterKeyword = "AlterKeyword";
+    public const string TruncateKeyword = "TruncateKeyword";
+    public const string DeleteKeyword = "DeleteKeyword";
+    public const string InsertKeyword = "InsertKeyword";
+
+    // --- Standard Clauses & Keywords ---
     public const string InsertValuesKeyword = "InsertValuesKeyword";
     public const string ReturningKeyword = "ReturningKeyword";
     public const string OnConflictKeyword = "OnConflictKeyword";

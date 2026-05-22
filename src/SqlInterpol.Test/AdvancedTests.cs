@@ -236,9 +236,9 @@ public class AdvancedTests
                     JOIN "OrderLine" AS "ol" ON "o"."Id" = "ol"."OrderId"
                     GROUP BY "o"."CustomerId", "o"."Id"
                 ) AS "stats"
-                WHERE "stats"."CustomerId" = ?0
+                WHERE "stats"."CustomerId" = @p1
                 ORDER BY "stats"."TotalAmount" DESC
-                LIMIT ?1 OFFSET ?2
+                LIMIT @p2 OFFSET @p3
                 """
             ]
         ),
@@ -438,7 +438,7 @@ public class AdvancedTests
                             "ol"."OrderId" AS "OrderId",
                             "ol"."ProductId" AS "ProductId",
                             SUM("ol"."Price") AS "TotalAmount"
-                        -- JOIN ?0 ON ...
+                        -- JOIN @p1 ON ...
                         FROM "OrderLine" AS "ol"
                         GROUP BY "ol"."OrderId", "ol"."ProductId"
                     ) AS "ol_agg" ON "o"."Id" = "ol_agg"."OrderId"
@@ -446,9 +446,9 @@ public class AdvancedTests
                     JOIN "dbo"."Products" AS "p" ON "ol_agg"."ProductId" = "p"."Id"
                     JOIN "Category" AS "cat" ON "p"."CategoryId" = "cat"."Id"
                 ) AS "stats"
-                WHERE "stats"."ProductName" = ?1
+                WHERE "stats"."ProductName" = @p2
                 ORDER BY "stats"."TotalAmount" DESC
-                LIMIT ?2 OFFSET ?3
+                LIMIT @p3 OFFSET @p4
                 """
             ]
         ),
@@ -580,7 +580,7 @@ public class AdvancedTests
                 """
                 SELECT "dbo"."Products"."Id", "dbo"."Products"."PROD_NAME"
                 FROM "dbo"."Products"
-                WHERE "dbo"."Products"."Price" > ?0
+                WHERE "dbo"."Products"."Price" > @p1
                   AND p.Status = 'ACTIVE' /* Raw SQL condition */
                 GROUP BY "dbo"."Products"."Id", "dbo"."Products"."PROD_NAME"
                 HAVING COUNT(*) > 1

@@ -1,12 +1,12 @@
-# SqlInterpol
+# SQL Interpolation
 
 <p align="center">
-  <img src="docs/Images/SqlInterpol.svg" alt="SqlInterpol" width="200"/>
+  <img src="docs/Images/SQLI_logo.svg" alt="SqlInterpol" width="200"/>
 </p>
 
 ![NuGet Version](https://img.shields.io/nuget/v/SqlInterpol?style=flat-square) ![NuGet Downloads](https://img.shields.io/nuget/dt/SqlInterpol?style=flat-square) ![License](https://img.shields.io/github/license/jimmieulenius/SqlInterpol?style=flat-square)
 
-**SqlInterpol** is a next-generation, zero-boilerplate SQL Query Builder for .NET 8+.
+**SQL Interpolation** (SQLI) is a next-generation, zero-boilerplate SQL Query Builder for .NET 8+.
 
 It leverages C# 12 Interpolated String Handlers to let you write WYSIWYG (What You See Is What You Get) SQL queries with flawless type-safety, automatic parameterization, and cross-dialect SQL rendering.
 
@@ -15,7 +15,7 @@ Stop writing clumsy `SelectBuilder` chains. Write real SQL, and let C# do the he
 > **Prerequisites:** .NET 8+ and C# 12+ (Visual Studio 2022 17.8+, JetBrains Rider 2023.3+, VS Code with C# Dev Kit, or `dotnet` CLI 8.0+).
 
 ## Table of Contents
-- [SqlInterpol](#sqlinterpol)
+- [SQL Interpolation](#sql-interpolation)
   - [Table of Contents](#table-of-contents)
   - [Features](#features)
   - [Installation](#installation)
@@ -83,7 +83,7 @@ public async Task<IEnumerable<ProductDto>> GetActiveProductsAsync(IDbConnection 
 ```
 
 ### What actually happens under the hood?
-Because SqlInterpol builds a typed segment pipeline, the query above is rendered into perfectly formatted, dialect-specific SQL, and `minPrice` is safely extracted as a parameter.
+Because SQLI builds a typed segment pipeline, the query above is rendered into perfectly formatted, dialect-specific SQL, and `minPrice` is safely extracted as a parameter.
 
 **Generated SQL (PostgreSQL):**
 ```sql

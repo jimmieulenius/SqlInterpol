@@ -322,7 +322,7 @@ public class ParserTests
                 """
                 SELECT "dbo"."Products"."Id"
                 FROM "dbo"."Products"
-                WHERE "dbo"."Products"."PROD_NAME" = ?0
+                WHERE "dbo"."Products"."PROD_NAME" = @p1
                 """
             ]
         ),

@@ -255,10 +255,10 @@ public class SelectSubqueryTests
                         SELECT
                             "Category"."Name"
                         FROM "Category"
-                        WHERE "Category"."Id" = prod."CategoryId" AND "Category"."IsActive" = ?0
+                        WHERE "Category"."Id" = prod."CategoryId" AND "Category"."IsActive" = @p1
                     ) AS CategoryName
                 FROM "dbo"."Products" AS prod
-                WHERE prod."Price" > ?1
+                WHERE prod."Price" > @p2
                 """,
                 """
                 SELECT 
@@ -267,10 +267,10 @@ public class SelectSubqueryTests
                         SELECT
                             "Category"."Name"
                         FROM "Category"
-                        WHERE "Category"."Id" = second_prod."CategoryId" AND "Category"."IsActive" = ?0
+                        WHERE "Category"."Id" = second_prod."CategoryId" AND "Category"."IsActive" = @p1
                     ) AS CategoryName
                 FROM "dbo"."Products" AS second_prod
-                WHERE second_prod."Price" > ?1
+                WHERE second_prod."Price" > @p2
                 """
             ]
         ),

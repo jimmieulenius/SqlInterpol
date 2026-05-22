@@ -343,7 +343,7 @@ public class CteTests
             [
                 """
                 WITH ExpensiveProducts AS (
-                    SELECT * FROM "dbo"."Products" WHERE "dbo"."Products"."Price" > ?0
+                    SELECT * FROM "dbo"."Products" WHERE "dbo"."Products"."Price" > @p1
                 )
                 SELECT * FROM ExpensiveProducts
                 """

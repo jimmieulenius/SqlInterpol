@@ -97,16 +97,18 @@ public class UpdateTests
         // Act
         var exception = Record.Exception(() => 
         {
+            var db = testCase.CreateBuilder();
+
             if (testCase.ExpectedMessageSubstring.Contains("implement"))
             {
-                Sql.BuildAssignments(new InvalidDummyEntity(), new { Name = "Test" });
+                Sql.BuildAssignments(new InvalidDummyEntity(), new { Name = "Test" }, db.Context);
             }
             else
             {
-                var db = testCase.CreateBuilder();
+                
                 var entity = db.AddEntity<Product>();
                 #pragma warning disable SQLI002
-                Sql.BuildAssignments(entity, new { Id = 1, NonExistentProperty = "Should Fail" });
+                Sql.BuildAssignments(entity, new { Id = 1, NonExistentProperty = "Should Fail" }, db.Context);
                 #pragma warning restore SQLI002
             }
         });
@@ -185,8 +187,8 @@ public class UpdateTests
             [
                 """
                 UPDATE "dbo"."Orders"
-                SET "order_status" = ?0, "Total" = ?1
-                WHERE "dbo"."Orders"."Id" = ?2
+                SET "order_status" = @p1, "Total" = @p2
+                WHERE "dbo"."Orders"."Id" = @p3
                 """
             ]
         ),
@@ -251,8 +253,8 @@ public class UpdateTests
             [
                 """
                 UPDATE "dbo"."Orders"
-                SET "dbo"."Orders"."order_status" = ?0, "dbo"."Orders"."Total" = ?1
-                WHERE "dbo"."Orders"."Id" = ?2
+                SET "dbo"."Orders"."order_status" = @p1, "dbo"."Orders"."Total" = @p2
+                WHERE "dbo"."Orders"."Id" = @p3
                 """
             ]
         ),
@@ -315,8 +317,8 @@ public class UpdateTests
             [
                 """
                 UPDATE "dbo"."Orders"
-                SET "Id" = ?0, "order_status" = ?1, "Total" = ?2
-                WHERE "dbo"."Orders"."Id" = ?3
+                SET "Id" = @p1, "order_status" = @p2, "Total" = @p3
+                WHERE "dbo"."Orders"."Id" = @p4
                 """
             ]
         ),
@@ -387,7 +389,7 @@ public class UpdateTests
             [
                 """
                 UPDATE "dbo"."Products"
-                SET "Price" = ?0
+                SET "Price" = @p1
                 FROM "Category" AS c1
                 WHERE "dbo"."Products"."CategoryId" = c1.Id
                 """

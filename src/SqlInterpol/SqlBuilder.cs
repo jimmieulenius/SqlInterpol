@@ -44,6 +44,14 @@ public partial class SqlBuilder : ISqlEntityRegistry
         return AppendLine();
     }
 
+    public virtual SqlBuilder Clear()
+    {
+        _segments.Clear();
+        Context.Reset();
+
+        return this;
+    }
+
     public ISqlQuery Query(Action action)
     {
         var mainSegments = _segments;
@@ -62,7 +70,18 @@ public partial class SqlBuilder : ISqlEntityRegistry
         return new SqlQuery(this, scopedSegments);
     }
 
-    public SqlQueryResult Build() => BuildSegments(_segments);
+    // public SqlQueryResult Build() => BuildSegments(_segments);
+    public SqlQueryResult Build(bool clear = true)
+    {
+        var result = BuildSegments(_segments);
+
+        if (clear)
+        {
+            Clear();
+        }
+
+        return result;
+    }
 
     public SqlQueryResult Build(ISqlQuery query) => BuildSegments(query.Segments);
 

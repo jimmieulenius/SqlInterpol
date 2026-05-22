@@ -7,4 +7,6 @@ public interface ISqlContext
     IDictionary<string, object?> Parameters { get; }
 
     string AddParameter(object? value);
+
+    void Reset();
 }

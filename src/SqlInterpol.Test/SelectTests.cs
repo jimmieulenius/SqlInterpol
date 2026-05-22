@@ -146,6 +146,43 @@ public class SelectTests
         testCase.AssertSql(result.Sql);
     }
 
+    [Theory]
+    [MemberData(nameof(TopKeywordData))]
+    public void Select_TopKeyword_PassesThrough(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+
+        // Act
+        var result = db.Query<Product>(p => db.Append($$"""
+            SELECT TOP 10 {{p[x => x.Id]}}
+            FROM {{p}}
+            """)).Build();
+
+        // Assert
+        testCase.AssertSql(result.Sql);
+    }
+
+    [Theory]
+    [MemberData(nameof(SelectComplexData))]
+    public void SelectPromotion_OnlyProjectsScalarColumns(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        
+        // Act - Ensure the entity resolves properly with an alias
+        var result = db.Query<ComplexProduct>(p => db.Append($$"""
+            SELECT {{p}}
+            FROM {{p}} AS {{Sql.Quote("p")}}
+            """)).Build();
+
+        // Assert
+        testCase.AssertSql(result.Sql);
+        
+        // Extra paranoia check to ensure the complex type didn't bleed into the SQL
+        Assert.DoesNotContain("Supplier", result.Sql);
+    }
+
     public static TheoryData<SqlTestCase> SelectExpansionData =>
     [
         new SqlTestCase(
@@ -500,7 +537,7 @@ public class SelectTests
             [
                 """
                 SELECT
-                    ?0
+                    @p1
                 FROM "dbo"."Products"
                 """
             ]
@@ -671,22 +708,6 @@ public class SelectTests
             ]
         )
     ];
-    [Theory]
-    [MemberData(nameof(TopKeywordData))]
-    public void Select_TopKeyword_PassesThrough(SqlTestCase testCase)
-    {
-        // Arrange
-        var db = testCase.CreateBuilder();
-
-        // Act
-        var result = db.Query<Product>(p => db.Append($$"""
-            SELECT TOP 10 {{p[x => x.Id]}}
-            FROM {{p}}
-            """)).Build();
-
-        // Assert
-        testCase.AssertSql(result.Sql);
-    }
 
     public static TheoryData<SqlTestCase> TopKeywordData =>
     [
@@ -699,4 +720,79 @@ public class SelectTests
                 """
             ]
         )
-    ];}
+    ];
+
+    public static TheoryData<SqlTestCase> SelectComplexData =>
+    [
+        new SqlTestCase
+        (
+            SqlDialectKind.CustomDb,
+            [
+                """
+                SELECT <<p>>.<<Id>>, <<p>>.<<Name>>, <<p>>.<<Status>>, <<p>>.<<Category>>
+                FROM <<tbl_complex_products>> AS <<p>>
+                """
+            ]
+        ),
+        new SqlTestCase
+        (
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT "p"."Id", "p"."Name", "p"."Status", "p"."Category"
+                FROM "tbl_complex_products" AS "p"
+                """
+            ] 
+        ),
+        new SqlTestCase
+        (
+            SqlDialectKind.MySql,
+            [
+                """
+                SELECT `p`.`Id`, `p`.`Name`, `p`.`Status`, `p`.`Category`
+                FROM `tbl_complex_products` AS `p`
+                """
+            ]
+        ),
+        new SqlTestCase
+        (
+            SqlDialectKind.Oracle,
+            [
+                """
+                SELECT "p"."Id", "p"."Name", "p"."Status", "p"."Category"
+                FROM "tbl_complex_products" AS "p"
+                """
+            ]
+        ),
+        new SqlTestCase
+        (
+            SqlDialectKind.PostgreSql,
+            [
+                """
+                SELECT "p"."Id", "p"."Name", "p"."Status", "p"."Category"
+                FROM "tbl_complex_products" AS "p"
+                """
+            ]
+        ),
+        new SqlTestCase
+        (
+            SqlDialectKind.SqLite,
+            [
+                """
+                SELECT "p"."Id", "p"."Name", "p"."Status", "p"."Category"
+                FROM "tbl_complex_products" AS "p"
+                """
+            ]
+        ),
+        new SqlTestCase
+        (
+            SqlDialectKind.SqlServer,
+            [
+                """
+                SELECT [p].[Id], [p].[Name], [p].[Status], [p].[Category]
+                FROM [tbl_complex_products] AS [p]
+                """
+            ]
+        )
+    ];
+}

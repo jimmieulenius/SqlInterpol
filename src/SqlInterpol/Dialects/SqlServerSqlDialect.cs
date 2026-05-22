@@ -172,6 +172,20 @@ public class SqlServerSqlDialect : SqlDialectBase
 
         return rewritten;
     }
+
+    protected override string RenderMultiTableDelete(SqlMultiTableDeleteFragment delete, ISqlContext context)
+    {
+        // Natively formats idiomatic T-SQL / MySQL, dropping the redundant "FROM"
+        var sql = $"DELETE FROM {delete.Target.ToSql(context)}";
+        
+        if (delete.FromClause != null) 
+            sql += $"{Environment.NewLine}FROM {delete.FromClause.ToSql(context)}";
+            
+        if (delete.WhereClause != null) 
+            sql += $"{Environment.NewLine}WHERE {delete.WhereClause.ToSql(context)}";
+            
+        return sql;
+    }
 }
 
 public class SqlServerInsertValuesFragment(SqlInsertValuesFragment original, IReadOnlyList<ISqlProjection> returnedColumns) : ISqlFragment, ISqlParameterGenerator

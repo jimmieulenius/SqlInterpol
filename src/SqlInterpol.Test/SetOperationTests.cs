@@ -184,7 +184,7 @@ public class SetOperationTests
                 """
                 SELECT "dbo"."Products"."Id" FROM "dbo"."Products"
                 INTERSECT
-                SELECT "dbo"."Products"."Id" FROM "dbo"."Products" WHERE "dbo"."Products"."CategoryId" = ?0
+                SELECT "dbo"."Products"."Id" FROM "dbo"."Products" WHERE "dbo"."Products"."CategoryId" = @p1
                 """
             ]
         ),
@@ -249,7 +249,7 @@ public class SetOperationTests
                 """
                 SELECT "dbo"."Products"."Id" FROM "dbo"."Products"
                 EXCEPT
-                SELECT "dbo"."Products"."Id" FROM "dbo"."Products" WHERE "dbo"."Products"."CategoryId" = ?0
+                SELECT "dbo"."Products"."Id" FROM "dbo"."Products" WHERE "dbo"."Products"."CategoryId" = @p1
                 """
             ]
         ),
@@ -329,11 +329,11 @@ public class SetOperationTests
                 """
                 SELECT "dbo"."Products"."Id", "dbo"."Products"."PROD_NAME"
                 FROM "dbo"."Products"
-                WHERE "dbo"."Products"."CategoryId" = ?0
+                WHERE "dbo"."Products"."CategoryId" = @p1
                 UNION ALL
                 SELECT "dbo"."Products"."Id", "dbo"."Products"."PROD_NAME"
                 FROM "dbo"."Products"
-                WHERE "dbo"."Products"."CategoryId" = ?1
+                WHERE "dbo"."Products"."CategoryId" = @p2
                 """
             ]
         ),

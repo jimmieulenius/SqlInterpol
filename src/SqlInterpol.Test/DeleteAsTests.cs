@@ -32,7 +32,7 @@ public class DeleteAsTests
     [
         new SqlTestCase(SqlDialectKind.SqlServer, [
             """
-            DELETE [o]
+            DELETE FROM [o]
             FROM [dbo].[Orders] AS [o]
             WHERE [o].[Id] = @p0
             """

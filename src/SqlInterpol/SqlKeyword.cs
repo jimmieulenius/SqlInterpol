@@ -5,26 +5,34 @@ public sealed class SqlKeyword
     public string Value { get; }
     public bool IsClauseInitiator { get; }
     public bool ExpectsDeclaration { get; }
+    public bool? ExpectsBaseName { get; }
 
-    private SqlKeyword(string value, bool isClauseInitiator = false, bool expectsDeclaration = false)
+    private SqlKeyword(string value, bool isClauseInitiator = false, bool expectsDeclaration = false, bool? expectsBaseName = null)
     {
         Value = value;
         IsClauseInitiator = isClauseInitiator;
         ExpectsDeclaration = expectsDeclaration;
+        ExpectsBaseName = expectsBaseName;
     }
 
+    // --- DDL Schema Modifiers (Expects Base Name ON) ---
+    public static readonly SqlKeyword Create = new("CREATE", true, false, expectsBaseName: true);
+    public static readonly SqlKeyword Drop = new("DROP", true, false, expectsBaseName: true);
+    public static readonly SqlKeyword Alter = new("ALTER", true, false, expectsBaseName: true);
+    public static readonly SqlKeyword Truncate = new("TRUNCATE", true, false, expectsBaseName: true);
+
     // --- CRUD & Main Clauses ---
-    public static readonly SqlKeyword Select = new("SELECT", true, false);
-    public static readonly SqlKeyword SelectDistinct = new("SELECT DISTINCT", true, false);
+    public static readonly SqlKeyword Select = new("SELECT", true, false, expectsBaseName: false);
+    public static readonly SqlKeyword SelectDistinct = new("SELECT DISTINCT", true, false, expectsBaseName: false);
     public static readonly SqlKeyword From = new("FROM", true, true);
-    public static readonly SqlKeyword Insert = new("INSERT", true, true);
-    public static readonly SqlKeyword Update = new("UPDATE", true, true);
-    public static readonly SqlKeyword Delete = new("DELETE", true, true);
+    public static readonly SqlKeyword Insert = new("INSERT", true, true, expectsBaseName: true);
+    public static readonly SqlKeyword Update = new("UPDATE", true, true, expectsBaseName: false);
+    public static readonly SqlKeyword Delete = new("DELETE", true, true, expectsBaseName: false);
     public static readonly SqlKeyword Set = new("SET", true, false);
-    public static readonly SqlKeyword Values = new("VALUES", true, false);
+    public static readonly SqlKeyword Values = new("VALUES", true, false, expectsBaseName: false);
     public static readonly SqlKeyword With = new("WITH", true, true);
-    public static readonly SqlKeyword Into = new("INTO");
-    public static readonly SqlKeyword Returning = new("RETURNING", true, false);
+    public static readonly SqlKeyword Into = new("INTO", false, false, expectsBaseName: false);
+    public static readonly SqlKeyword Returning = new("RETURNING", true, false, expectsBaseName: true);
     public static readonly SqlKeyword OnConflict = new("ON CONFLICT", true, false);
     public static readonly SqlKeyword DoUpdateSet = new("DO UPDATE SET", true, false);
     public static readonly SqlKeyword Do = new("DO");
@@ -80,6 +88,10 @@ public sealed class SqlKeyword
     // Registry for the Handler
     public static readonly SqlKeyword[] AllKeywords = 
     [ 
+        Create,
+        Drop,
+        Alter,
+        Truncate,
         Select,
         SelectDistinct,
         From,

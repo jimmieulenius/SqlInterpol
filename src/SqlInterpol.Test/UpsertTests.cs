@@ -5,7 +5,7 @@ namespace SqlInterpol.Test;
 public class UpsertTests
 {
     [Theory]
-    [MemberData(nameof(AllDialectsUpsertData))]
+    [MemberData(nameof(UpsertData))]
     public void Upsert_CrossDialect(SqlTestCase testCase)
     {
         // Arrange
@@ -23,48 +23,6 @@ public class UpsertTests
         // Assert
         testCase.AssertSql(result.Sql);
     }
-
-    public static TheoryData<SqlTestCase> AllDialectsUpsertData =>
-    [
-        // Postgres & SQLite pass through natively
-        new SqlTestCase(SqlDialectKind.PostgreSql, [
-            """
-            INSERT INTO "dbo"."Products" ("Id", "PROD_NAME", "CategoryId", "Price")
-            VALUES ($1, $2, $3, $4)
-            ON CONFLICT ("Id")
-            DO UPDATE SET "PROD_NAME" = $5, "Price" = $6
-            """
-        ]),
-        new SqlTestCase(SqlDialectKind.SqLite, [
-            """
-            INSERT INTO "dbo"."Products" ("Id", "PROD_NAME", "CategoryId", "Price")
-            VALUES (?0, ?1, ?2, ?3)
-            ON CONFLICT ("Id")
-            DO UPDATE SET "PROD_NAME" = ?4, "Price" = ?5
-            """
-        ]),
-        // MySQL converts to ON DUPLICATE KEY UPDATE and drops "SET"
-        new SqlTestCase(SqlDialectKind.MySql, [
-            """
-            INSERT INTO `dbo`.`Products` (`Id`, `PROD_NAME`, `CategoryId`, `Price`)
-            VALUES (@p0, @p1, @p2, @p3)
-            ON DUPLICATE KEY UPDATE `PROD_NAME` = @p4, `Price` = @p5
-            """
-        ]),
-        // SQL Server intercepts the ENTIRE syntax tree and generates a perfect ANSI MERGE statement
-        new SqlTestCase(SqlDialectKind.SqlServer, [
-            """
-            MERGE INTO [dbo].[Products] AS target
-            USING (VALUES (@p0, @p1, @p2, @p3)) AS source([Id], [PROD_NAME], [CategoryId], [Price])
-            ON target.[Id] = source.[Id]
-            WHEN MATCHED THEN
-              UPDATE SET target.[PROD_NAME] = @p4, target.[Price] = @p5
-            WHEN NOT MATCHED THEN
-              INSERT ([Id], [PROD_NAME], [CategoryId], [Price])
-              VALUES (source.[Id], source.[PROD_NAME], source.[CategoryId], source.[Price]);
-            """
-        ])
-    ];
 
     [Theory]
     [MemberData(nameof(OnDuplicateKeyData))]
@@ -107,6 +65,49 @@ public class UpsertTests
         Assert.Single(result.Parameters);
     }
 
+    public static TheoryData<SqlTestCase> UpsertData =>
+    [
+        // MySQL converts to ON DUPLICATE KEY UPDATE and drops "SET"
+        new SqlTestCase(SqlDialectKind.MySql, [
+            """
+            INSERT INTO `dbo`.`Products` (`Id`, `PROD_NAME`, `CategoryId`, `Price`)
+            VALUES (@p0, @p1, @p2, @p3)
+            ON DUPLICATE KEY UPDATE `PROD_NAME` = @p4, `Price` = @p5
+            """
+        ]),
+        // Postgres & SQLite pass through natively
+        new SqlTestCase(SqlDialectKind.PostgreSql, [
+            """
+            INSERT INTO "dbo"."Products" ("Id", "PROD_NAME", "CategoryId", "Price")
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT ("Id")
+            DO UPDATE SET "PROD_NAME" = $5, "Price" = $6
+            """
+        ]),
+        new SqlTestCase(SqlDialectKind.SqLite, [
+            """
+            INSERT INTO "dbo"."Products" ("Id", "PROD_NAME", "CategoryId", "Price")
+            VALUES (@p1, @p2, @p3, @p4)
+            ON CONFLICT ("Id")
+            DO UPDATE SET "PROD_NAME" = @p5, "Price" = @p6
+            """
+        ]),
+        
+        // SQL Server intercepts the ENTIRE syntax tree and generates a perfect ANSI MERGE statement
+        new SqlTestCase(SqlDialectKind.SqlServer, [
+            """
+            MERGE INTO [dbo].[Products] AS target
+            USING (VALUES (@p0, @p1, @p2, @p3)) AS source([Id], [PROD_NAME], [CategoryId], [Price])
+            ON target.[Id] = source.[Id]
+            WHEN MATCHED THEN
+              UPDATE SET target.[PROD_NAME] = @p4, target.[Price] = @p5
+            WHEN NOT MATCHED THEN
+              INSERT ([Id], [PROD_NAME], [CategoryId], [Price])
+              VALUES (source.[Id], source.[PROD_NAME], source.[CategoryId], source.[Price]);
+            """
+        ])
+    ];
+
     public static TheoryData<SqlTestCase> OnDuplicateKeyData =>
     [
         new SqlTestCase(
@@ -138,7 +139,7 @@ public class UpsertTests
             [
                 """
                 INSERT INTO "dbo"."Products" (Id) 
-                VALUES (?0) 
+                VALUES (@p1) 
                 ON CONFLICT DO NOTHING
                 """
             ]

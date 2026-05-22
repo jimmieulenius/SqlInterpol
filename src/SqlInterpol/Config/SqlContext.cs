@@ -9,7 +9,7 @@ public class SqlContext(SqlBuilder builder, ISqlDialect dialect, ISqlInterpolati
     public ISqlInterpolationParser Parser { get; } = parser;
     public ISqlSegmentRenderer Renderer { get; } = renderer;
     public SqlInterpolOptions Options { get; } = options ?? new() { Dialect = dialect.Kind };
-    public IDictionary<string, object?> Parameters { get; } = new Dictionary<string, object?>();
+    public IDictionary<string, object?> Parameters { get; private set; } = new Dictionary<string, object?>();
     internal SqlParserState ParserState { get; } = new();
 
     ISqlParserState ISqlParserContext.ParserState => ParserState;
@@ -26,5 +26,11 @@ public class SqlContext(SqlBuilder builder, ISqlDialect dialect, ISqlInterpolati
         ParserState.ParameterCount++;
         
         return paramKey;
+    }
+
+    public void Reset()
+    {
+        Parameters = new Dictionary<string, object?>();
+        ParserState.Reset();
     }
 }

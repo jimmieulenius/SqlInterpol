@@ -6,12 +6,17 @@ public class SqLiteSqlDialect : SqlDialectBase
     public override SqlDialectKind Kind => SqlDialectKind.SqLite;
     public override string OpenQuote => "\"";
     public override string CloseQuote => "\"";
-    public override string ParameterPrefix => "?";
+    public override string ParameterPrefix => "@p";
     public override IReadOnlySet<SqlFeature> SupportedFeatures { get; } = new HashSet<SqlFeature>
     {
         SqlFeature.Returning,
         SqlFeature.OnConflict,
         SqlFeature.SelectInto
+    };
+
+    public override SqlInterpolOptions GetDefaultOptions() => new() 
+    { 
+        ParameterIndexStart = 1 
     };
 
     public override IEnumerable<SqlSegment> RewriteSegments(IReadOnlyList<SqlSegment> segments)

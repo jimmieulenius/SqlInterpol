@@ -109,7 +109,7 @@ public class HavingTests
                     COUNT("dbo"."Products"."Id") AS ProductCount
                 FROM "dbo"."Products"
                 GROUP BY "dbo"."Products"."CategoryId"
-                HAVING COUNT("dbo"."Products"."Id") > ?0
+                HAVING COUNT("dbo"."Products"."Id") > @p1
                 """
             ]
         ),

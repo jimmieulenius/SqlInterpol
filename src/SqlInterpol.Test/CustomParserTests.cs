@@ -76,7 +76,7 @@ public class CustomParserTests
                 """
                 SELECT *
                 FROM Users
-                WHERE RoleId CUSTOM_IN (?0, ?1, ?2)
+                WHERE RoleId CUSTOM_IN (@p0, @p1, @p2)
                 """
             ]
         ),

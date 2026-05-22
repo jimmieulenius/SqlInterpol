@@ -102,7 +102,7 @@ public class InsertSubqueryTests
                 ("Id", "Total")
                 SELECT "OrderLine"."OrderId", "OrderLine"."Quantity"
                 FROM "OrderLine"
-                WHERE "OrderLine"."OrderId" = ?0
+                WHERE "OrderLine"."OrderId" = @p1
                 """
             ]
         ),

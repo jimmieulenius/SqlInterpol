@@ -50,7 +50,7 @@ public static class SqlMetadataRegistry
     {
         return _typePropertyCache.GetOrAdd(type, t => 
             t.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Where(p => p.GetCustomAttribute<SqlIgnoreAttribute>() == null)
+            .Where(p => p.GetCustomAttribute<SqlIgnoreAttribute>() == null && IsScalarType(p.PropertyType))
             .ToArray());
     }
 
@@ -81,13 +81,33 @@ public static class SqlMetadataRegistry
         string? schema = entityAttr?.Schema; 
         SqlEntityType entityType = entityAttr?.Type ?? SqlEntityType.Table;
 
-        // CRITICAL UPDATE: Filter out properties decorated with [SqlIgnore]
-        var columns = type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Where(p => p.GetCustomAttribute<SqlIgnoreAttribute>() == null)
-            .ToDictionary(
-                p => (MemberInfo)p,
-                p => p.GetCustomAttribute<SqlColumnAttribute>()?.Name ?? p.Name
-            );
+        var columns = new Dictionary<MemberInfo, string>();
+
+        foreach (var prop in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        {
+            // 1. Respect explicit ignores
+            if (prop.GetCustomAttribute<SqlIgnoreAttribute>() != null) continue;
+
+            var columnAttr = prop.GetCustomAttribute<SqlColumnAttribute>();
+
+            // 2. Strict Scalar Type Enforcement
+            if (!IsScalarType(prop.PropertyType))
+            {
+                // Fail-fast if the user explicitly mapped an unsupported complex type
+                if (columnAttr != null)
+                {
+                    throw new InvalidOperationException(
+                        $"Property '{prop.Name}' on type '{type.Name}' is marked with [SqlColumn] but is a complex type. " +
+                        "SqlInterpol only maps scalar database types. Use anonymous types for custom complex mapping.");
+                }
+                
+                // Safely ignore navigation properties/subclasses
+                continue; 
+            }
+
+            // 3. Register valid scalar columns
+            columns[(MemberInfo)prop] = columnAttr?.Name ?? prop.Name;
+        }
 
         return new SqlEntityMetadata(name, schema, entityType, columns);
     }
@@ -108,6 +128,24 @@ public static class SqlMetadataRegistry
 
         throw new ArgumentException("Expression must be a simple property access (e.g., x => x.Name).");
     }
+
+    public static bool IsScalarType(Type type)
+    {
+        // Unwrap nullable types (e.g., int? -> int)
+        var underlyingType = Nullable.GetUnderlyingType(type) ?? type;
+
+        return underlyingType.IsPrimitive || 
+               underlyingType.IsEnum || 
+               underlyingType == typeof(string) ||
+               underlyingType == typeof(decimal) ||
+               underlyingType == typeof(DateTime) ||
+               underlyingType == typeof(DateTimeOffset) ||
+               underlyingType == typeof(TimeSpan) ||
+               underlyingType == typeof(Guid) ||
+               underlyingType == typeof(byte[]) ||
+               underlyingType.FullName == "System.DateOnly" || // .NET 6+
+               underlyingType.FullName == "System.TimeOnly";   // .NET 6+
+    }
 }
 
 public record SqlEntityMetadata(
@@ -116,5 +154,3 @@ public record SqlEntityMetadata(
     SqlEntityType Type,
     IReadOnlyDictionary<MemberInfo, string> Columns
 );
-
-public enum SqlEntityType { Table, View, Subquery }

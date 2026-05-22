@@ -121,7 +121,7 @@ public class WhereTests
                 SELECT
                     "dbo"."Products"."Id"
                 FROM "dbo"."Products"
-                WHERE "dbo"."Products"."Id" = ?0
+                WHERE "dbo"."Products"."Id" = @p1
                 """
             ]
         ),
@@ -202,7 +202,7 @@ public class WhereTests
                 SELECT
                     "dbo"."Products"."Id"
                 FROM "dbo"."Products"
-                WHERE "dbo"."Products"."CategoryId" IN (?0, ?1, ?2)
+                WHERE "dbo"."Products"."CategoryId" IN (@p1, @p2, @p3)
                 """
             ]
         ),

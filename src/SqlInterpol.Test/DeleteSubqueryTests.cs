@@ -92,7 +92,7 @@ public class DeleteSubqueryTests
                 WHERE "OrderLine"."OrderId" IN (
                     SELECT "dbo"."Orders"."Id"
                     FROM "dbo"."Orders"
-                    WHERE "dbo"."Orders"."order_status" = ?0
+                    WHERE "dbo"."Orders"."order_status" = @p1
                 )
                 """
             ]

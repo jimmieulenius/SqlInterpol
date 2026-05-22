@@ -136,6 +136,10 @@ public abstract class SqlDialectBase : ISqlDialect
     {
         var rewritten = new List<SqlSegment>(segments.Count);
         bool forceBaseNamePhase = false;
+        
+        // Hoist our scope trackers so both Pass 1 and Pass 3 can use them!
+        int parenDepth = 0;
+        bool inString = false, inLineComment = false, inBlockComment = false;
 
         bool TryRewriteKeywordFragment<T>(string keyword, SqlSegment segment, int index) where T : ISqlFragment
         {
@@ -163,10 +167,53 @@ public abstract class SqlDialectBase : ISqlDialect
         {
             var segment = segments[i];
 
-            if (segment.Tag == SqlSegmentTag.ReturningKeyword) forceBaseNamePhase = true;
+            // 1. SCAN LITERALS FOR STATEMENT BOUNDARIES (;)
+            if (segment.Type == SqlSegmentType.Literal && segment.Value is string litText)
+            {
+                for (int j = 0; j < litText.Length; j++)
+                {
+                    char c = litText[j];
+                    
+                    if (c == '\'' && !inBlockComment && !inLineComment) 
+                    { 
+                        if (inString && j + 1 < litText.Length && litText[j + 1] == '\'') { j++; continue; }
+                        inString = !inString; 
+                        continue; 
+                    }
+                    if (inString) continue;
+
+                    if (!inLineComment && c == '/' && j + 1 < litText.Length && litText[j + 1] == '*') { inBlockComment = true; j++; continue; }
+                    if (inBlockComment && c == '*' && j + 1 < litText.Length && litText[j + 1] == '/') { inBlockComment = false; j++; continue; }
+                    if (inBlockComment) continue;
+
+                    if (!inBlockComment && c == '-' && j + 1 < litText.Length && litText[j + 1] == '-') { inLineComment = true; j++; continue; }
+                    if (inLineComment && (c == '\n' || c == '\r')) { inLineComment = false; continue; }
+                    if (inLineComment) continue;
+
+                    if (c == '(') parenDepth++;
+                    else if (c == ')') parenDepth--;
+                    
+                    // THE MAGIC RESET: If we hit a semicolon outside of quotes/comments, the statement is over!
+                    else if (c == ';' && parenDepth == 0)
+                    {
+                        forceBaseNamePhase = false; 
+                    }
+                }
+            }
+
+            // 2. CHECK KEYWORD METADATA TO TOGGLE BASE-NAME STRIPPING
+            var keywordMeta = SqlKeyword.AllKeywords.FirstOrDefault(k => 
+                segment.Tag != null && segment.Tag.StartsWith(k.Value, StringComparison.OrdinalIgnoreCase));
+
+            // If the keyword explicitly expects a state (true or false), apply it instantly!
+            if (keywordMeta?.ExpectsBaseName.HasValue == true)
+            {
+                forceBaseNamePhase = keywordMeta.ExpectsBaseName.Value;
+            }
             
-            else if (segment.Tag == SqlSegmentTag.OnConflictKeyword || 
-                    (segment.Type == SqlSegmentType.Literal && segment.Value is string s1 && s1.Contains("ON CONFLICT", StringComparison.OrdinalIgnoreCase)))
+            // Handle Dialect-Specific Literal Rewrites
+            if (segment.Tag == SqlSegmentTag.OnConflictKeyword || 
+                (segment.Type == SqlSegmentType.Literal && segment.Value is string s1 && s1.Contains("ON CONFLICT", StringComparison.OrdinalIgnoreCase)))
             {
                 forceBaseNamePhase = true;
                 if (segment.Value is string text)
@@ -252,10 +299,19 @@ public abstract class SqlDialectBase : ISqlDialect
                 }
             }
 
-            if (forceBaseNamePhase && segment.Type == SqlSegmentType.Projection && segment.Value is ISqlProjection proj)
+            // 3. APPLY THE BASE-NAME MODE
+            if (forceBaseNamePhase)
             {
-                rewritten.Add(new SqlSegment(SqlSegmentType.Projection, proj, SqlRenderMode.BaseName));
-                continue;
+                if (segment.Type == SqlSegmentType.Projection && segment.Value is ISqlProjection proj)
+                {
+                    rewritten.Add(new SqlSegment(SqlSegmentType.Projection, proj, SqlRenderMode.BaseName));
+                    continue;
+                }
+                if (segment.Type == SqlSegmentType.Reference && segment.Value is ISqlEntityBase entity)
+                {
+                    rewritten.Add(new SqlSegment(SqlSegmentType.Reference, entity, SqlRenderMode.BaseName));
+                    continue;
+                }
             }
 
             switch (segment.Tag)
@@ -326,7 +382,6 @@ public abstract class SqlDialectBase : ISqlDialect
                     targetTable = rightTrimmed[..endOfTarget];
                     rightOfInto = rightTrimmed[endOfTarget..];
                 }
-                // FIX: Match ANY non-literal parameter/raw/projection segment trailing the INTO statement
                 else if (intoIdx + 1 < rewritten.Count && rewritten[intoIdx + 1].Type != SqlSegmentType.Literal)
                 {
                     targetParamSegment = rewritten[intoIdx + 1];
@@ -343,7 +398,6 @@ public abstract class SqlDialectBase : ISqlDialect
                     if (!string.IsNullOrWhiteSpace(leftOfInto)) 
                         sourceSegments.Add(new SqlSegment(SqlSegmentType.Literal, leftOfInto));
                         
-                    // Track the precise index where the INTO keyword originalmente resided
                     int intoInsertionIndex = sourceSegments.Count;
                         
                     if (!string.IsNullOrWhiteSpace(rightOfInto))
@@ -352,7 +406,6 @@ public abstract class SqlDialectBase : ISqlDialect
                     int startRest = targetParamSegment != null ? intoIdx + 2 : intoIdx + 1;
                     for(int i = startRest; i < rewritten.Count; i++) sourceSegments.Add(rewritten[i]);
                     
-                    // Package into the AST fragment with the correct structural insertion layout mapping
                     var fragment = new SqlSelectIntoFragment(targetParamSegment ?? targetTable, sourceSegments, intoInsertionIndex);
                     
                     rewritten.Clear();
@@ -367,8 +420,11 @@ public abstract class SqlDialectBase : ISqlDialect
         int firstFromIdx = -1, secondFromIdx = -1, whereDeleteIdx = -1;
         bool isDelete = false;
         
-        int parenDepth = 0;
-        bool inString = false, inLineComment = false, inBlockComment = false;
+        // Reset trackers for Pass 3 scanning
+        parenDepth = 0;
+        inString = false;
+        inLineComment = false; 
+        inBlockComment = false;
 
         for (int i = 0; i < rewritten.Count; i++)
         {
@@ -412,6 +468,13 @@ public abstract class SqlDialectBase : ISqlDialect
             {
                 if (segment.Tag == SqlSegmentTag.UpdateKeyword && updateIdx == -1) updateIdx = i;
                 else if (segment.Tag == SqlSegmentTag.SetKeyword && setIdx == -1) setIdx = i;
+                
+                // FIX: Treat the new DeleteKeyword as the first FROM boundary!
+                else if (segment.Tag == SqlSegmentTag.DeleteKeyword)
+                {
+                    isDelete = true;
+                    if (firstFromIdx == -1) firstFromIdx = i;
+                }
                 
                 if (segment.Tag == SqlSegmentTag.FromKeyword)
                 {

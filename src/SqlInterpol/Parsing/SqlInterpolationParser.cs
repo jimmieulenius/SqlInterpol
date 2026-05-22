@@ -203,7 +203,7 @@ public class SqlInterpolationParser : ISqlInterpolationParser
 
             if (string.Equals(currentKeyword, SqlKeyword.Set, StringComparison.OrdinalIgnoreCase) && context.ParserState.ActiveEntityTarget != null)
             {
-                var assignments = Sql.BuildAssignments(context.ParserState.ActiveEntityTarget, value);
+                var assignments = Sql.BuildAssignments(context.ParserState.ActiveEntityTarget, value, context);
                 foreach (var assignment in assignments)
                 {
                     if (assignment is ISqlParameterGenerator gen) gen.GenerateParameters(context);
@@ -217,7 +217,7 @@ public class SqlInterpolationParser : ISqlInterpolationParser
 
             if ((isInsert || isValues) && context.ParserState.ActiveEntityTarget != null)
             {
-                var assignments = Sql.BuildAssignments(context.ParserState.ActiveEntityTarget, value);
+                var assignments = Sql.BuildAssignments(context.ParserState.ActiveEntityTarget, value, context);
                 foreach (var assignment in assignments)
                 {
                     if (assignment is ISqlParameterGenerator gen) gen.GenerateParameters(context);
@@ -239,7 +239,7 @@ public class SqlInterpolationParser : ISqlInterpolationParser
             {
                 if (item != null && item.GetType().IsClass && item is not string)
                 {
-                    var assignments = Sql.BuildAssignments(context.ParserState.ActiveEntityTarget, item);
+                    var assignments = Sql.BuildAssignments(context.ParserState.ActiveEntityTarget, item, context);
                     foreach (var assignment in assignments)
                     {
                         if (assignment is ISqlParameterGenerator gen) gen.GenerateParameters(context);
@@ -297,26 +297,36 @@ public class SqlInterpolationParser : ISqlInterpolationParser
     // Ordering IS priority — multi-word patterns must come before their single-word suffixes.
     private static readonly KeywordRule[] _keywordRules =
     [
-        new(SqlKeyword.ForUpdate.Value,                                KeywordMatchMode.ContainsWord, SqlSegmentTag.ForUpdateKeyword,      null),
-        new(SqlKeyword.ForShare.Value,                                 KeywordMatchMode.ContainsWord, SqlSegmentTag.ForShareKeyword,       null),
-        new(SqlKeyword.Limit.Value,                                    KeywordMatchMode.ContainsWord, SqlSegmentTag.Paging,                null),
-        new(SqlKeyword.DoUpdateSet.Value,                              KeywordMatchMode.EndsWithWord, SqlSegmentTag.DoUpdateSetKeyword,    SqlKeyword.Set),   // before Set
-        new(SqlKeyword.OnConflict.Value,                               KeywordMatchMode.EndsWithWord, SqlSegmentTag.OnConflictKeyword,     null),
-        new(SqlKeyword.Update.Value,                                   KeywordMatchMode.EndsWithWord, SqlSegmentTag.UpdateKeyword,         SqlKeyword.Update),
-        new(SqlKeyword.Set.Value,                                      KeywordMatchMode.EndsWithWord, SqlSegmentTag.SetKeyword,            SqlKeyword.Set),
-        new($"{SqlKeyword.Insert.Value} {SqlKeyword.Into.Value}",     KeywordMatchMode.EndsWithWord, null,                                SqlKeyword.Insert), // before Insert
-        new(SqlKeyword.Insert.Value,                                   KeywordMatchMode.EndsWithWord, null,                                SqlKeyword.Insert),
-        new(SqlKeyword.Values.Value,                                   KeywordMatchMode.EndsWithWord, SqlSegmentTag.InsertValuesKeyword,   SqlKeyword.Values),
-        new(SqlKeyword.Into.Value,                                     KeywordMatchMode.ContainsWord, SqlSegmentTag.IntoKeyword,           SqlKeyword.Into),
-        new(SqlKeyword.Returning.Value,                                KeywordMatchMode.EndsWithWord, SqlSegmentTag.ReturningKeyword,      null),
-        new(SqlKeyword.SelectDistinct.Value,                           KeywordMatchMode.EndsWithWord, SqlSegmentTag.SelectDistinctKeyword, SqlKeyword.SelectDistinct), // before Select
-        new(SqlKeyword.Select.Value,                                   KeywordMatchMode.EndsWithWord, SqlSegmentTag.SelectKeyword,         SqlKeyword.Select),
-        new(SqlKeyword.From.Value,                                     KeywordMatchMode.EndsWithWord, SqlSegmentTag.FromKeyword,           SqlKeyword.From),
-        new(SqlKeyword.Except.Value,                                   KeywordMatchMode.EqualsWord,   SqlSegmentTag.ExceptKeyword,         null),
-        new(SqlKeyword.Intersect.Value,                                KeywordMatchMode.EqualsWord,   SqlSegmentTag.IntersectKeyword,      null),
-        new(SqlKeyword.UnionAll.Value,                                 KeywordMatchMode.EqualsWord,   SqlSegmentTag.UnionAllKeyword,       null), // before Union
-        new(SqlKeyword.Union.Value,                                    KeywordMatchMode.EqualsWord,   SqlSegmentTag.UnionKeyword,          null),
-        new(SqlKeyword.Where.Value,                                    KeywordMatchMode.ContainsWord, SqlSegmentTag.WhereKeyword,          SqlKeyword.Where),
+        // --- ADDED DDL SCHEMA MODIFIERS ---
+        new(SqlKeyword.Create.Value,                   KeywordMatchMode.ContainsWord, SqlSegmentTag.CreateKeyword,        SqlKeyword.Create),
+        new(SqlKeyword.Drop.Value,                     KeywordMatchMode.ContainsWord, SqlSegmentTag.DropKeyword,          SqlKeyword.Drop),
+        new(SqlKeyword.Alter.Value,                    KeywordMatchMode.ContainsWord, SqlSegmentTag.AlterKeyword,         SqlKeyword.Alter),
+        new(SqlKeyword.Truncate.Value,                 KeywordMatchMode.ContainsWord, SqlSegmentTag.TruncateKeyword,      SqlKeyword.Truncate),
+        new(SqlKeyword.Delete.Value,                   KeywordMatchMode.ContainsWord, SqlSegmentTag.DeleteKeyword,        SqlKeyword.Delete),
+
+        new(SqlKeyword.ForUpdate.Value,                KeywordMatchMode.ContainsWord, SqlSegmentTag.ForUpdateKeyword,     null),
+        new(SqlKeyword.ForShare.Value,                 KeywordMatchMode.ContainsWord, SqlSegmentTag.ForShareKeyword,      null),
+        new(SqlKeyword.Limit.Value,                    KeywordMatchMode.ContainsWord, SqlSegmentTag.Paging,               null),
+        new(SqlKeyword.DoUpdateSet.Value,              KeywordMatchMode.EndsWithWord, SqlSegmentTag.DoUpdateSetKeyword,   SqlKeyword.Set),   // before Set
+        new(SqlKeyword.OnConflict.Value,               KeywordMatchMode.EndsWithWord, SqlSegmentTag.OnConflictKeyword,    null),
+        new(SqlKeyword.Update.Value,                   KeywordMatchMode.EndsWithWord, SqlSegmentTag.UpdateKeyword,        SqlKeyword.Update),
+        new(SqlKeyword.Set.Value,                      KeywordMatchMode.EndsWithWord, SqlSegmentTag.SetKeyword,           SqlKeyword.Set),
+        
+        // --- UPDATED INSERT TO MAP NATIVELY ---
+        new($"{SqlKeyword.Insert.Value} {SqlKeyword.Into.Value}",      KeywordMatchMode.ContainsWord, SqlSegmentTag.InsertKeyword,        SqlKeyword.Insert), 
+        new(SqlKeyword.Insert.Value,                   KeywordMatchMode.EndsWithWord, SqlSegmentTag.InsertKeyword,        SqlKeyword.Insert),
+        
+        new(SqlKeyword.Values.Value,                   KeywordMatchMode.EndsWithWord, SqlSegmentTag.InsertValuesKeyword,  SqlKeyword.Values),
+        new(SqlKeyword.Into.Value,                     KeywordMatchMode.ContainsWord, SqlSegmentTag.IntoKeyword,          SqlKeyword.Into),
+        new(SqlKeyword.Returning.Value,                KeywordMatchMode.EndsWithWord, SqlSegmentTag.ReturningKeyword,     null),
+        new(SqlKeyword.SelectDistinct.Value,           KeywordMatchMode.EndsWithWord, SqlSegmentTag.SelectDistinctKeyword, SqlKeyword.SelectDistinct), // before Select
+        new(SqlKeyword.Select.Value,                   KeywordMatchMode.EndsWithWord, SqlSegmentTag.SelectKeyword,        SqlKeyword.Select),
+        new(SqlKeyword.From.Value,                     KeywordMatchMode.EndsWithWord, SqlSegmentTag.FromKeyword,          SqlKeyword.From),
+        new(SqlKeyword.Except.Value,                   KeywordMatchMode.EqualsWord,   SqlSegmentTag.ExceptKeyword,        null),
+        new(SqlKeyword.Intersect.Value,                KeywordMatchMode.EqualsWord,   SqlSegmentTag.IntersectKeyword,     null),
+        new(SqlKeyword.UnionAll.Value,                 KeywordMatchMode.EqualsWord,   SqlSegmentTag.UnionAllKeyword,      null), // before Union
+        new(SqlKeyword.Union.Value,                    KeywordMatchMode.EqualsWord,   SqlSegmentTag.UnionKeyword,         null),
+        new(SqlKeyword.Where.Value,                    KeywordMatchMode.ContainsWord, SqlSegmentTag.WhereKeyword,         SqlKeyword.Where),
     ];
 
     private static bool EndsWithWholeWord(ReadOnlySpan<char> text, string keyword)

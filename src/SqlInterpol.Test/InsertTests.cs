@@ -167,7 +167,52 @@ public class InsertTests
         Assert.Equal(2, result.Parameters.Count);
     }
 
-    // --- TEST DATA ---
+    [Theory]
+    [MemberData(nameof(InsertComplexData))]
+    public void Insert_RespectsEnumFormats_AndIgnoresComplexTypes(SqlTestCase testCase)
+    {
+        // Arrange
+        var options = new SqlInterpolOptions { EnumFormat = SqlEnumFormat.Integer };
+        
+        // Assuming testCase.CreateBuilder accepts options. If not, just instantiate it:
+        // var db = new SqlBuilder(testCase.Dialect, options);
+        var db = testCase.CreateBuilder(options); 
+
+        var p = db.AddEntity<ComplexProduct>();
+
+        var product = new ComplexProduct
+        {
+            Id = 42,
+            Name = "Mechanical Keyboard",
+            Status = ProductStatus.Available,
+            Category = ProductCategoryType.Electronics,
+            Supplier = new Supplier { Id = 99, Name = "TechCorp" }
+        };
+
+        // Act
+        var result = db.Append($$"""
+            INSERT INTO {{p}}
+            VALUES {{product}};
+            """).Build();
+
+        // Assert SQL Structure
+        testCase.AssertSql(result.Sql);
+
+        // Assert Parameters (4 parameters total, Supplier ignored)
+        Assert.Equal(4, result.Parameters.Count);
+        
+        var parameters = result.Parameters.Values.ToList();
+        Assert.Equal(42, parameters[0]);
+        Assert.Equal("Mechanical Keyboard", parameters[1]);
+        
+        // Status is an Integer (Global Default)
+        Assert.IsType<int>(parameters[2]);
+        Assert.Equal(1, parameters[2]);
+        
+        // Category is a String (Property Override)
+        Assert.IsType<string>(parameters[3]);
+        Assert.Equal("Electronics", parameters[3]);
+    }
 
     public static TheoryData<SqlTestCase> InsertData =>
     [
@@ -227,7 +272,7 @@ public class InsertTests
                 """
                 INSERT INTO "dbo"."Products"
                 ("PROD_NAME", "CategoryId", "Price")
-                VALUES (?0, ?1, ?2)
+                VALUES (@p1, @p2, @p3)
                 """
             ]
         ),
@@ -301,7 +346,7 @@ public class InsertTests
                 """
                 INSERT INTO "dbo"."Orders"
                 ("order_status", "Total")
-                VALUES (?0, ?1)
+                VALUES (@p1, @p2)
                 """
             ]
         ),
@@ -369,7 +414,7 @@ public class InsertTests
             [
                 """
                 INSERT INTO "dbo"."Products" ("PROD_NAME", "CategoryId", "Price")
-                VALUES (?0, ?1, ?2), (?3, ?4, ?5)
+                VALUES (@p1, @p2, @p3), (@p4, @p5, @p6)
                 """
             ]
         ),
@@ -421,7 +466,7 @@ public class InsertTests
             [
                 """
                 INSERT INTO "dbo"."Products" ("PROD_NAME", "CategoryId", "Price")
-                VALUES (?0, ?1, ?2)
+                VALUES (@p1, @p2, @p3)
                 RETURNING "Id"
                 """
             ]
@@ -475,7 +520,7 @@ public class InsertTests
             [
                 """
                 INSERT INTO "dbo"."Products" ("PROD_NAME", "CategoryId", "Price")
-                VALUES (?0, ?1, ?2)
+                VALUES (@p1, @p2, @p3)
                 RETURNING "Id", "PROD_NAME"
                 """
             ]
@@ -550,7 +595,7 @@ public class InsertTests
             [
                 """
                 INSERT INTO "dbo"."Products" ("Id", "PROD_NAME")
-                VALUES (?0, ?1)
+                VALUES (@p1, @p2)
                 """
             ]
         ),
@@ -560,6 +605,87 @@ public class InsertTests
                 """
                 INSERT INTO [dbo].[Products] ([Id], [PROD_NAME])
                 VALUES (@p0, @p1)
+                """
+            ]
+        )
+    ];
+
+    public static TheoryData<SqlTestCase> InsertComplexData =>
+    [
+        new SqlTestCase
+        (
+            SqlDialectKind.CustomDb,
+            [
+                """
+                INSERT INTO <<tbl_complex_products>>
+                (<<Id>>, <<Name>>, <<Status>>, <<Category>>)
+                VALUES (!!0, !!1, !!2, !!3);
+                """
+            ]
+        ),
+        new SqlTestCase
+        (
+            SqlDialectKind.Firebird,
+            [
+                """
+                INSERT INTO "tbl_complex_products"
+                ("Id", "Name", "Status", "Category")
+                VALUES (@p0, @p1, @p2, @p3);
+                """
+            ]
+        ),
+        new SqlTestCase
+        (
+            SqlDialectKind.MySql,
+            [
+                """
+                INSERT INTO `tbl_complex_products`
+                (`Id`, `Name`, `Status`, `Category`)
+                VALUES (@p0, @p1, @p2, @p3);
+                """
+            ]
+        ),
+        new SqlTestCase
+        (
+            SqlDialectKind.Oracle,
+            [
+                """
+                INSERT INTO "tbl_complex_products"
+                ("Id", "Name", "Status", "Category")
+                VALUES (:0, :1, :2, :3);
+                """
+            ]
+        ),
+        new SqlTestCase
+        (
+            SqlDialectKind.PostgreSql,
+            [
+                """
+                INSERT INTO "tbl_complex_products"
+                ("Id", "Name", "Status", "Category")
+                VALUES ($0, $1, $2, $3);
+                """
+            ]
+        ),
+        new SqlTestCase
+        (
+            SqlDialectKind.SqLite,
+            [
+                """
+                INSERT INTO "tbl_complex_products"
+                ("Id", "Name", "Status", "Category")
+                VALUES (@p0, @p1, @p2, @p3);
+                """
+            ]
+        ),
+        new SqlTestCase
+        (
+            SqlDialectKind.SqlServer,
+            [
+                """
+                INSERT INTO [tbl_complex_products]
+                ([Id], [Name], [Status], [Category])
+                VALUES (@p0, @p1, @p2, @p3);
                 """
             ]
         )

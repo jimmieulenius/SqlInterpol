@@ -91,7 +91,7 @@ public class WhereAsTests
                 SELECT
                     p."Id"
                 FROM "dbo"."Products" AS p
-                WHERE p."CategoryId" = ?0
+                WHERE p."CategoryId" = @p1
                 """
             ]
         ),
