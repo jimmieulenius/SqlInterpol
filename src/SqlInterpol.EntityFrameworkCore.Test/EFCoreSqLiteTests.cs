@@ -200,8 +200,8 @@ public class EFCoreSqLiteTests
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            modelBuilder.MapEntity<TestProduct>()
-                .MapEntity<AppUser>()
+            modelBuilder.MapSqlEntity<TestProduct>()
+                .MapSqlEntity<AppUser>()
                 .Entity<AppUser>().Ignore(x => x.Profile);
         }
     }

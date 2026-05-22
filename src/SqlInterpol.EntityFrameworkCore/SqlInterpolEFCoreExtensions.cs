@@ -8,25 +8,62 @@ namespace SqlInterpol.EFCore;
 public static class SqlInterpolEFCoreExtensions
 {
     public static SqlBuilder CreateSqlBuilder(this DbContext context, SqlInterpolOptions? options = null)
+        => new(DetectDialect(context), options);
+
+    // Prefers EF Core's ProviderName (immune to connection wrappers), then falls back
+    // to walking the connection type hierarchy for non-standard or unconfigured providers.
+    private static ISqlDialect DetectDialect(DbContext context)
     {
-        var connection = context.Database.GetDbConnection();
-        string typeName = connection.GetType().Name;
+        var dialect = TryMatchProviderName(context.Database.ProviderName)
+                   ?? TryMatchConnection(context.Database.GetDbConnection());
 
-        ISqlDialect dialect = typeName switch
-        {
-            "SqlConnection" => new SqlServerSqlDialect(),
-            "NpgsqlConnection" => new PostgreSqlSqlDialect(),
-            "SqliteConnection" => new SqLiteSqlDialect(),
-            "MySqlConnection" => new MySqlSqlDialect(),
-            "OracleConnection" => new OracleSqlDialect(),
-            "FbConnection" => new FirebirdSqlDialect(),
-            _ => throw new NotSupportedException(
-                $"The connection type '{typeName}' is not automatically mapped to a known SQL Dialect. " +
-                "Please instantiate the SqlBuilder manually.")
-        };
+        if (dialect != null) return dialect;
 
-        return new SqlBuilder(dialect, options);
+        throw new NotSupportedException(
+            $"The EF Core provider '{context.Database.ProviderName}' is not automatically mapped to a known SQL dialect. " +
+            "Instantiate SqlBuilder manually and provide a custom ISqlDialect.");
     }
+
+    // EF Core provider names are stable, versioned package identifiers — the most reliable signal.
+    private static ISqlDialect? TryMatchProviderName(string? providerName) => providerName switch
+    {
+        "Microsoft.EntityFrameworkCore.SqlServer"   => new SqlServerSqlDialect(),
+        "Npgsql.EntityFrameworkCore.PostgreSQL"     => new PostgreSqlSqlDialect(),
+        "Microsoft.EntityFrameworkCore.Sqlite"      => new SqLiteSqlDialect(),
+        // Both Pomelo (community) and Oracle's official MySQL provider are supported
+        "Pomelo.EntityFrameworkCore.MySql"
+        or "MySql.EntityFrameworkCore"
+        or "MySql.Data.EntityFrameworkCore"         => new MySqlSqlDialect(),
+        "Oracle.EntityFrameworkCore"                => new OracleSqlDialect(),
+        "FirebirdSql.EntityFrameworkCore.Firebird"  => new FirebirdSqlDialect(),
+        _ => null
+    };
+
+    // Fallback: walk the connection type hierarchy so wrappers (MiniProfiler, OpenTelemetry, etc.) are handled.
+    private static ISqlDialect? TryMatchConnection(DbConnection connection)
+    {
+        var type = connection.GetType();
+        while (type != null && type != typeof(object))
+        {
+            var dialect = TryMatchConnectionType(type);
+            if (dialect != null) return dialect;
+            type = type.BaseType;
+        }
+        return null;
+    }
+
+    // Namespace-guarded for SqlConnection: both Microsoft.Data.SqlClient and System.Data.SqlClient use that name.
+    private static ISqlDialect? TryMatchConnectionType(Type type) => type.Name switch
+    {
+        "SqlConnection" when type.Namespace is "Microsoft.Data.SqlClient" or "System.Data.SqlClient"
+            => new SqlServerSqlDialect(),
+        "NpgsqlConnection"  => new PostgreSqlSqlDialect(),
+        "SqliteConnection"  => new SqLiteSqlDialect(),
+        "MySqlConnection"   => new MySqlSqlDialect(),
+        "OracleConnection"  => new OracleSqlDialect(),
+        "FbConnection"      => new FirebirdSqlDialect(),
+        _ => null
+    };
 
     public static DbParameter[] ToDbParameters(this SqlQueryResult result, DbContext context)
     {
@@ -63,16 +100,19 @@ public static class SqlInterpolEFCoreExtensions
         return context.Database.ExecuteSqlRawAsync(result.Sql, result.ToDbParameters(context), cancellationToken);
     }
 
-    public static ModelBuilder MapEntity<T>(this ModelBuilder modelBuilder, SqlInterpolOptions? options = null) where T : class
+    public static ModelBuilder MapSqlEntity<T>(this ModelBuilder modelBuilder, SqlInterpolOptions? options = null) where T : class
     {
         var meta = SqlMetadataRegistry.GetMetadata<T>();
-        options ??= new SqlInterpolOptions(); 
-        
-        modelBuilder.Entity<T>().ToTable(meta.Name);
+        options ??= new SqlInterpolOptions();
+
+        // Respect [SqlView] vs [SqlTable] — views must not be treated as tables by EF Core migrations.
+        if (meta.Type == SqlEntityType.View)
+            modelBuilder.Entity<T>().ToView(meta.Name, meta.Schema);
+        else
+            modelBuilder.Entity<T>().ToTable(meta.Name, meta.Schema);
 
         foreach (var kvp in meta.Columns)
         {
-            // FIX: Cast the MemberInfo back to PropertyInfo
             if (kvp.Key is not PropertyInfo propertyInfo) continue;
 
             var columnName = kvp.Value;
@@ -81,7 +121,6 @@ public static class SqlInterpolEFCoreExtensions
                 .Property(propertyInfo.Name)
                 .HasColumnName(columnName);
 
-            // SYNC ENUMS WITH EF CORE!
             if (SqlMetadataRegistry.IsScalarType(propertyInfo.PropertyType))
             {
                 var underlyingType = Nullable.GetUnderlyingType(propertyInfo.PropertyType) ?? propertyInfo.PropertyType;

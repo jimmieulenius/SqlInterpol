@@ -7,24 +7,36 @@ namespace SqlInterpol.Dapper;
 public static class SqlInterpolDapperExtensions
 {
     public static SqlBuilder CreateSqlBuilder(this IDbConnection connection, SqlInterpolOptions? options = null)
+        => new(DetectDialect(connection), options);
+
+    // Walks the full type hierarchy so connection wrappers (MiniProfiler, OpenTelemetry, etc.) are handled.
+    private static ISqlDialect DetectDialect(IDbConnection connection)
     {
-        string typeName = connection.GetType().Name;
-
-        ISqlDialect dialect = typeName switch
+        var type = connection.GetType();
+        while (type != null && type != typeof(object))
         {
-            "SqlConnection" => new SqlServerSqlDialect(),
-            "NpgsqlConnection" => new PostgreSqlSqlDialect(),
-            "SqliteConnection" => new SqLiteSqlDialect(),
-            "MySqlConnection" => new MySqlSqlDialect(),
-            "OracleConnection" => new OracleSqlDialect(),
-            "FbConnection" => new FirebirdSqlDialect(),
-            _ => throw new NotSupportedException(
-                $"The connection type '{typeName}' is not automatically mapped to a known SQL Dialect. " +
-                "Please instantiate the SqlBuilder manually and provide a custom ISqlDialect.")
-        };
+            var dialect = TryMatchType(type);
+            if (dialect != null) return dialect;
+            type = type.BaseType;
+        }
 
-        return new SqlBuilder(dialect, options);
+        throw new NotSupportedException(
+            $"The connection type '{connection.GetType().Name}' is not automatically mapped to a known SQL dialect. " +
+            "Instantiate SqlBuilder manually and provide a custom ISqlDialect.");
     }
+
+    // Namespace-guarded for SqlConnection: both Microsoft.Data.SqlClient and System.Data.SqlClient use that name.
+    private static ISqlDialect? TryMatchType(Type type) => type.Name switch
+    {
+        "SqlConnection" when type.Namespace is "Microsoft.Data.SqlClient" or "System.Data.SqlClient"
+            => new SqlServerSqlDialect(),
+        "NpgsqlConnection"  => new PostgreSqlSqlDialect(),
+        "SqliteConnection"  => new SqLiteSqlDialect(),
+        "MySqlConnection"   => new MySqlSqlDialect(),
+        "OracleConnection"  => new OracleSqlDialect(),
+        "FbConnection"      => new FirebirdSqlDialect(),
+        _ => null
+    };
 
     // Extends IDbConnection to match native Dapper syntax perfectly
     public static Task<IEnumerable<T>> QueryAsync<T>(
@@ -42,7 +54,7 @@ public static class SqlInterpolDapperExtensions
             commandType);
     }
 
-    public static Task<T?> QueryFirstOrDefaultAsync<T>(
+    public static Task<T> QueryFirstOrDefaultAsync<T>(
         this IDbConnection connection,
         SqlQueryResult result, 
         IDbTransaction? transaction = null,
@@ -72,7 +84,7 @@ public static class SqlInterpolDapperExtensions
             commandType);
     }
 
-    public static Task<T?> QuerySingleOrDefaultAsync<T>(
+    public static Task<T> QuerySingleOrDefaultAsync<T>(
         this IDbConnection connection,
         SqlQueryResult result,
         IDbTransaction? transaction = null,
