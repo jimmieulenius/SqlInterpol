@@ -27,7 +27,7 @@ public class SqlKeywordTypoAnalyzer : DiagnosticAnalyzer
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true);
 
-    // Expanded ANSI SQL + Major Dialects (Postgres, T-SQL, MySQL, Oracle, Snowflake, etc.)
+    // Expanded ANSI SQL + Major Dialects (Postgres, T-SQL, MySQL, Oracle, Snowflake, SQLite, etc.)
     private static readonly string[] KnownKeywords =
     [
         // DML / Query Structure
@@ -39,13 +39,28 @@ public class SqlKeywordTypoAnalyzer : DiagnosticAnalyzer
         "CAST", "COALESCE", "NULLIF", "OVER", "PARTITION", "BY",
         "COUNT", "SUM", "AVG", "MIN", "MAX",
         "LIMIT", "OFFSET", "FETCH", "ROWS", "ONLY", "FIRST", "NEXT",
-        "RETURNING", "CONFLICT", "EXCLUDED", "OUTPUT", "TOP", // Postgres/T-SQL
-        "FOR", "SHARE", "LOCK", "UPDATE", "NOCHECK", "CHECK",
+        "RETURNING", "CONFLICT", "EXCLUDED", "OUTPUT", "TOP",
+        "FOR", "SHARE", "LOCK", "NOCHECK", "CHECK",
         "ROW_NUMBER", "RANK", "DENSE_RANK", "LEAD", "LAG", "NTILE",
-        "ASC", "DESC", "NULLS", "LAST", "FIRST",
-        "ROLLUP", "CUBE", "GROUPING", "SETS",
+        "ASC", "DESC", "NULLS", "LAST", "ROLLUP", "CUBE", "GROUPING", "SETS",
         "TRUNCATE", "MERGE", "USING", "MATCHED",
         
+        // DDL & Schema Objects
+        "CREATE", "ALTER", "DROP", "RENAME", "COMMENT", "INDEX", "VIEW", "TABLE", 
+        "DATABASE", "SCHEMA", "PROCEDURE", "FUNCTION", "TRIGGER", "SEQUENCE", 
+        "TYPE", "DOMAIN", "ROLE", "USER", "GRANT", "REVOKE", "CASCADE", "RESTRICT",
+        "PRIMARY", "FOREIGN", "UNIQUE", "DEFAULT", "CONSTRAINT", "REFERENCES", 
+        "TEMPORARY", "TEMP", "UNLOGGED", "IF",
+        
+        // Transaction & Session Control
+        "DECLARE", "BEGIN", "COMMIT", "ROLLBACK", "SAVEPOINT", "CALL", "EXECUTE", "EXEC", 
+        "PREPARE", "DEALLOCATE", "ISOLATION", "LEVEL", "READ", "WRITE", "COMMITTED", 
+        "UNCOMMITTED", "REPEATABLE", "SERIALIZABLE",
+        
+        // Database Management & Utilities
+        "EXPLAIN", "ANALYZE", "SHOW", "DESCRIBE", "PRAGMA", "COPY", "UNLOAD", 
+        "VACUUM", "CLUSTER", "OPTIMIZE", "ATTACH", "DETACH",
+
         // Extended Dialect Keywords
         "APPLY", "PIVOT", "UNPIVOT", "TRY_CAST", "TRY_CONVERT", // T-SQL
         "REPLACE", "IGNORE", "STRAIGHT_JOIN", "DUPLICATE", "KEY", // MySQL
@@ -53,7 +68,15 @@ public class SqlKeywordTypoAnalyzer : DiagnosticAnalyzer
         "WINDOW", "FILTER", "WITHIN", "TABLESAMPLE", "MATERIALIZED", // Postgres/ANSI
         "FLATTEN", "UNNEST", "STRUCT", "ARRAY", "QUALIFY", "EXCLUDE", // Snowflake/BigQuery
         
-        // Common Data types
+        // Advanced Analytics & Aggregates
+        "CUME_DIST", "PERCENT_RANK", "PERCENTILE_CONT", "PERCENTILE_DISC", "NTH_VALUE", 
+        "ANY_VALUE", "APPROX_COUNT_DISTINCT", "LISTAGG", "STRING_AGG", "GROUP_CONCAT",
+
+        // Control Flow & Procedural (T-SQL, PL/pgSQL, PL/SQL)
+        "WHILE", "LOOP", "CURSOR", "BREAK", "CONTINUE", "RETURN", "GOTO", 
+        "PRINT", "RAISE", "EXCEPTION", "TRY", "CATCH", "THROW", "EXIT", "LEAVE",
+        
+        // Common & Dialect-Specific Data types
         "INT", "INTEGER", "BIGINT", "SMALLINT", "TINYINT",
         "DECIMAL", "NUMERIC", "FLOAT", "REAL", "DOUBLE", "MONEY",
         "CHAR", "VARCHAR", "NCHAR", "NVARCHAR", "TEXT", "STRING",
@@ -61,7 +84,10 @@ public class SqlKeywordTypoAnalyzer : DiagnosticAnalyzer
         "BOOLEAN", "BOOL", "BIT",
         "BLOB", "BINARY", "VARBINARY", "BYTEA",
         "JSON", "JSONB", "XML", "UUID", "UNIQUEIDENTIFIER",
-        "SERIAL", "IDENTITY", "AUTO_INCREMENT"
+        "SERIAL", "IDENTITY", "AUTO_INCREMENT", "AUTOINCREMENT",
+        "VARCHAR2", "NVARCHAR2", "CLOB", "NCLOB", "BFILE", "RAW", "LONG", // Oracle
+        "ROWID", "UROWID", "SQL_VARIANT", "HIERARCHYID", "GEOMETRY", "GEOGRAPHY", // T-SQL/Oracle
+        "INET", "CIDR", "MACADDR", "MACADDR8", "TSVECTOR", "TSQUERY", "ENUM", "YEAR" // Postgres/MySQL
     ];
 
     private static readonly HashSet<string> KeywordSet = new(KnownKeywords, StringComparer.Ordinal);
@@ -72,7 +98,7 @@ public class SqlKeywordTypoAnalyzer : DiagnosticAnalyzer
             // Upgraded FOR valid successors to support Postgres and T-SQL
             // Postgres: FOR UPDATE, FOR SHARE, FOR KEY SHARE, FOR NO KEY UPDATE
             // T-SQL: FOR XML, FOR JSON, FOR SYSTEM_TIME
-            ["FOR"] = new HashSet<string>(StringComparer.Ordinal) { "KEY", "NO", "XML", "JSON", "SYSTEM_TIME", "PATH", "AUTO" },
+            ["FOR"] = new HashSet<string>(StringComparer.Ordinal) { "KEY", "NO", "XML", "JSON", "SYSTEM_TIME", "PATH", "AUTO", "UPDATE", "SHARE" },
         };
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
