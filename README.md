@@ -116,7 +116,7 @@ var newProduct = new Product { Name = "Mechanical Keyboard", Price = 120m };
 
 var query = db.Query<Product>(p => db.Append($$"""
     INSERT INTO {{p}}
-    {{newProduct}}
+    VALUES {{newProduct}}
     """)).Build();
 ```
 
