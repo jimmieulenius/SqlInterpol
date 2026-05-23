@@ -1,3 +1,2 @@
-* Implement ISqlFragment interface for all components that return raw SQL (indexers, joins, etc.) to distinguish them from parameter values in the InterpolatedStringHandler.
-* Ensure AppendFormatted in the string handler correctly handles the distinction between 'SQL Identifiers' (columns/tables) and 'Values' (constants/variables) to prevent accidental parameterization of identifiers.
-* Verify that Table[p => p.Property] indexers return a type that signals the handler to treat the output as a raw identifier.
+* Support RETURNING for UPDATE, DELETE.
+* For SQL Server, use $"MERGE INTO {target} WITH (HOLDLOCK) AS target{nl}{usingClause}..." in SqlServerMergeFragment class

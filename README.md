@@ -1,8 +1,4 @@
-# SqlInterpol
-
-<p align="center">
-  <img src="docs/Images/SqlInterpol.svg" alt="SqlInterpol" width="200"/>
-</p>
+# ![logo][] SqlInterpol
 
 ![CI](https://github.com/jimmieulenius/SqlInterpol/actions/workflows/ci.yml/badge.svg) ![NuGet Version](https://img.shields.io/nuget/v/SqlInterpol?style=flat-square) ![NuGet Downloads](https://img.shields.io/nuget/dt/SqlInterpol?style=flat-square) ![License](https://img.shields.io/github/license/jimmieulenius/SqlInterpol?style=flat-square)
 
@@ -14,8 +10,10 @@ Stop writing clumsy `SelectBuilder` chains. Write real SQL, and let C# do the he
 
 > **Prerequisites:** .NET 8+ and C# 12+ (Visual Studio 2022 17.8+, JetBrains Rider 2023.3+, VS Code with C# Dev Kit, or `dotnet` CLI 8.0+).
 
+[logo]: assets/sqlinterpol_64.svg?sanitize=true
+
 ## Table of Contents
-- [SqlInterpol](#sqlinterpol)
+- [ SqlInterpol](#-sqlinterpol)
   - [Table of Contents](#table-of-contents)
   - [Features](#features)
   - [Installation](#installation)
