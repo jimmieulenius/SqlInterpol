@@ -214,6 +214,24 @@ public class InsertTests
         Assert.Equal("Electronics", parameters[3]);
     }
 
+    [Theory]
+    [MemberData(nameof(InsertTemplateData))]
+    public void AppendInsert_Template(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        var user = new TestUser { Id = 1, Name = "Alice", Age = 30 };
+        
+        // Act
+        var result = db.Query<TestUser>(u =>
+            db.AppendInsert(u, user)
+        ).Build();
+        
+        // Assert
+        testCase.AssertSql(result.Sql);
+        Assert.Equal(3, result.Parameters.Count);
+    }
+
     public static TheoryData<SqlTestCase> InsertData =>
     [
         new SqlTestCase(
@@ -686,6 +704,80 @@ public class InsertTests
                 INSERT INTO [tbl_complex_products]
                 ([Id], [Name], [Status], [Category])
                 VALUES (@p0, @p1, @p2, @p3);
+                """
+            ]
+        )
+    ];
+
+    public static TheoryData<SqlTestCase> InsertTemplateData =>
+    [
+        new SqlTestCase(
+            SqlDialectKind.CustomDb,
+            [
+                """
+                INSERT INTO <<Users>>
+                (<<Age>>, <<Id>>, <<Name>>)
+                VALUES (!!100, !!101, !!102)
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                INSERT INTO "Users"
+                ("Age", "Id", "Name")
+                VALUES (@p0, @p1, @p2)
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.MySql,
+            [
+                """
+                INSERT INTO `Users`
+                (`Age`, `Id`, `Name`)
+                VALUES (@p0, @p1, @p2)
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Oracle,
+            [
+                """
+                INSERT INTO "Users"
+                ("Age", "Id", "Name")
+                VALUES (:0, :1, :2)
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.PostgreSql,
+            [
+                """
+                INSERT INTO "Users"
+                ("Age", "Id", "Name")
+                VALUES ($1, $2, $3)
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqLite,
+            [
+                """
+                INSERT INTO "Users"
+                ("Age", "Id", "Name")
+                VALUES (@p1, @p2, @p3)
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqlServer,
+            [
+                """
+                INSERT INTO [Users]
+                ([Age], [Id], [Name])
+                VALUES (@p0, @p1, @p2)
                 """
             ]
         )

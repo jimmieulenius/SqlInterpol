@@ -17,5 +17,7 @@ public enum SqlSegmentType
     /// <summary>A parameterized value that will be extracted as a <c>DbParameter</c>.</summary>
     Parameter,
     /// <summary>A raw, unescaped SQL string inserted directly into the output without parameterization.</summary>
-    Raw
+    Raw,
+    /// <summary>A placeholder for a runtime parameter in a pre-compiled SQL template that must be resolved before rendering.</summary>
+    Argument
 }

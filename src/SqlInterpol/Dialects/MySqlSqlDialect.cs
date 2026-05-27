@@ -19,6 +19,7 @@ public class MySqlSqlDialect : SqlDialectBase
         SqlFeature.OnConflict, // Emulated via ON DUPLICATE KEY UPDATE
         SqlFeature.SelectInto
     };
+    public override int QueryParametersMaxCount => 65535;
 
     /// <inheritdoc />
     public override IEnumerable<SqlSegment> RewriteSegments(IReadOnlyList<SqlSegment> segments)

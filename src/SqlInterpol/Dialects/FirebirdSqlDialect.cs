@@ -17,6 +17,7 @@ public class FirebirdSqlDialect : SqlDialectBase
         SqlFeature.ForUpdate,
         SqlFeature.Returning,
     };
+    public override int QueryParametersMaxCount => 1499;
 
     /// <inheritdoc />
     public override string RenderFragment(ISqlFragment fragment, ISqlContext context)

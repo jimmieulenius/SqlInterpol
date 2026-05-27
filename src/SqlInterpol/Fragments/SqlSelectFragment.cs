@@ -4,7 +4,7 @@ namespace SqlInterpol;
 /// Renders a SELECT (or SELECT DISTINCT) clause, joining projected columns with
 /// layout-aware formatting.
 /// </summary>
-public class SqlSelectFragment : ISqlFragment
+public class SqlSelectFragment : ISqlFragment, ISqlSwappableFragment
 {
     private readonly SqlCollectionFragment _collection;
     private readonly string _keyword;
@@ -35,5 +35,35 @@ public class SqlSelectFragment : ISqlFragment
         }
 
         return $"{_keyword} {columnsSql}"; 
+    }
+
+    /// <inheritdoc />
+    public ISqlFragment Swap(
+        Dictionary<ISqlReference, ISqlEntityBase> entityMap, 
+        IReadOnlyDictionary<string, Func<object, object?>>? argumentGetters, 
+        object? arguments)
+    {
+        var mappedColumns = new List<ISqlFragment>(Columns.Count);
+        
+        foreach (var col in Columns)
+        {
+            if (col is SqlColumnReferenceBase colRef && entityMap.TryGetValue(colRef.SourceReference, out var realEntity))
+            {
+                mappedColumns.Add(colRef is SqlRawColumnReference 
+                    ? (SqlColumnReferenceBase)new SqlRawColumnReference(realEntity.Reference, colRef.ColumnName)
+                    : new SqlColumnReference(realEntity.Reference, colRef.ColumnName, colRef.PropertyName));
+            }
+            else if (col is ISqlSwappableFragment swappable)
+            {
+                mappedColumns.Add(swappable.Swap(entityMap, argumentGetters, arguments));
+            }
+            else
+            {
+                mappedColumns.Add(col);
+            }
+        }
+
+        bool isDistinct = _keyword != SqlKeyword.Select;
+        return new SqlSelectFragment(mappedColumns, isDistinct);
     }
 }

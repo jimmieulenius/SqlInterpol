@@ -20,6 +20,7 @@ public class SqlServerSqlDialect : SqlDialectBase
         SqlFeature.OnConflict, // Emulated via MERGE
         SqlFeature.SelectInto // Supported natively
     };
+    public override int QueryParametersMaxCount => 2099;
 
     /// <inheritdoc />
     public override string RenderFragment(ISqlFragment fragment, ISqlContext context)

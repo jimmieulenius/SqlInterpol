@@ -33,6 +33,13 @@ public class SqlContext(SqlBuilder builder, ISqlDialect dialect, ISqlInterpolati
     /// <inheritdoc />
     public string AddParameter(object? value)
     {
+        int maxParams = Options.QueryParametersMaxCount ?? Dialect.QueryParametersMaxCount;
+
+        if (ParserState.ParameterCount >= maxParams)
+        {
+            throw new SqlParameterLimitException(maxParams, ParserState.ParameterCount + 1);
+        }
+
         int index = Options.ParameterIndexStart + ParserState.ParameterCount;
         string prefix = Options.ParameterPrefixOverride ?? Dialect.ParameterPrefix;
         string paramKey = $"{prefix}{index}";

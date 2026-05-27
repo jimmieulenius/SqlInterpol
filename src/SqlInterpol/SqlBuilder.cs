@@ -41,6 +41,7 @@ public partial class SqlBuilder : ISqlEntityRegistry
     public SqlContext Context { get; }
     private ISqlInterpolationParser Parser => Context.Parser;
     private ISqlSegmentRenderer Renderer => Context.Renderer;
+    internal IReadOnlyList<SqlSegment> Segments => _segments;
 
     /// <summary>
     /// Initializes a new <see cref="SqlBuilder"/> for the specified dialect.
@@ -144,19 +145,17 @@ public partial class SqlBuilder : ISqlEntityRegistry
     /// Builds all accumulated segments into a <see cref="SqlQueryResult"/> containing the rendered SQL string
     /// and the dictionary of extracted parameters.
     /// </summary>
-    /// <remarks>
-    /// Before rendering, the build phase validates that all used SQL features are supported by the active dialect
-    /// and throws <see cref="SqlDialectException"/> with a full list of violations if any are found.
-    /// </remarks>
+    /// <param name="arguments">An optional anonymous object containing global template arguments (e.g., <c>new { tenantId = 5 }</c>).</param>
     /// <param name="clear">
     /// When <see langword="true"/> (default), <see cref="Clear"/> is called after building so the builder
     /// is immediately ready for the next query.
     /// </param>
     /// <returns>The <see cref="SqlQueryResult"/> ready for execution via Dapper, EF Core, or raw ADO.NET.</returns>
     /// <exception cref="SqlDialectException">Thrown when the query uses features not supported by the active dialect.</exception>
-    public SqlQueryResult Build(bool clear = true)
+    /// <exception cref="ArgumentException">Thrown when a template argument is not provided.</exception>
+    public SqlQueryResult Build(object? arguments = null, bool clear = true)
     {
-        var result = BuildSegments(_segments);
+        var result = BuildSegments(_segments, arguments);
 
         if (clear)
         {
@@ -171,14 +170,59 @@ public partial class SqlBuilder : ISqlEntityRegistry
     /// The builder's own accumulated segments are not affected.
     /// </summary>
     /// <param name="query">The captured query to render.</param>
+    /// <param name="arguments">An optional anonymous object containing global template arguments.</param>
     /// <returns>The <see cref="SqlQueryResult"/> ready for execution.</returns>
     /// <exception cref="SqlDialectException">Thrown when the query uses features not supported by the active dialect.</exception>
-    public SqlQueryResult Build(ISqlQuery query) => BuildSegments(query.Segments);
+    public SqlQueryResult Build(ISqlQuery query, object? arguments = null) 
+        => BuildSegments(query.Segments, arguments);
 
-    private SqlQueryResult BuildSegments(IReadOnlyList<SqlSegment> segmentsToBuild)
+    private SqlQueryResult BuildSegments(IReadOnlyList<SqlSegment> segmentsToBuild, object? arguments)
     {
+        // 1. GLOBAL TEMPLATE ARGUMENT RESOLUTION (Pre-pass)
+        List<SqlSegment>? resolvedSegments = null;
+        IReadOnlyDictionary<string, Func<object, object?>>? getters = null;
+
+        if (arguments != null)
+        {
+            getters = SqlMetadataRegistry.GetArgumentGetters(arguments.GetType());
+        }
+
+        for (int i = 0; i < segmentsToBuild.Count; i++)
+        {
+            var segment = segmentsToBuild[i];
+            
+            if (segment.Type == SqlSegmentType.Raw && segment.Value is SqlArgumentFragment argFragment)
+            {
+                // Lazy clone on first argument encountered
+                resolvedSegments ??= [.. segmentsToBuild];
+
+                string argName = argFragment.Name;
+                bool resolved = false;
+
+                if (getters != null && getters.TryGetValue(argName, out var getter))
+                {
+                    object? val = getter(arguments!);
+                    string paramKey = Context.AddParameter(val);
+                    
+                    // Replace in the mutable copy
+                    resolvedSegments[i] = new SqlSegment(SqlSegmentType.Raw, paramKey);
+                    resolved = true;
+                }
+
+                if (!resolved)
+                {
+                    throw new ArgumentException(
+                        $"The SQL template requires an argument named '{argName}', but it was not provided globally or locally.");
+                }
+            }
+        }
+
+        // If we resolved any arguments, use the mutable copy for the rest of the pipeline
+        var finalInputSegments = resolvedSegments != null ? (IReadOnlyList<SqlSegment>)resolvedSegments : segmentsToBuild;
+
+        // 2. DIALECT FEATURE VALIDATION
         var errors = new List<string>();
-        foreach (var segment in segmentsToBuild)
+        foreach (var segment in finalInputSegments)
         {
             SqlFeature? requiredFeature = null;
             string? featureName = null;
@@ -220,8 +264,8 @@ public partial class SqlBuilder : ISqlEntityRegistry
             throw new SqlDialectException($"Dialect capabilities validation failed:{Environment.NewLine}- " + string.Join($"{Environment.NewLine}- ", errors));
         }
 
-        var finalSegments = Context.Dialect.RewriteSegments(segmentsToBuild).ToList();
-
+        // 3. REWRITE & RENDER
+        var finalSegments = Context.Dialect.RewriteSegments(finalInputSegments).ToList();
         var vsb = new ValueStringBuilder(stackalloc char[2048]);
 
         try
@@ -245,6 +289,11 @@ public partial class SqlBuilder : ISqlEntityRegistry
     }
 
     internal SqlSegment ProcessValue(object? value) => Parser.ProcessValue(Context, value);
+
+    internal void AppendSegment(SqlSegment segment)
+    {
+        _segments.Add(segment);
+    }
 
     ISqlEntity<T> ISqlEntityRegistry.RegisterEntity<T>(string? name, string? schema, string? alias)
     {

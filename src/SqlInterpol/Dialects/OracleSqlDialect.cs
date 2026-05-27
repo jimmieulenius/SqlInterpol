@@ -18,6 +18,7 @@ public class OracleSqlDialect : SqlDialectBase
         SqlFeature.Returning,
         SqlFeature.SelectInto
     };
+    public override int QueryParametersMaxCount => 65535;
 
     /// <inheritdoc />
     public override string RenderFragment(ISqlFragment fragment, ISqlContext context)

@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using SqlInterpol.Parsing;
 
 namespace SqlInterpol;
 
@@ -47,7 +48,7 @@ public abstract class SqlEntityBase<T> : ISqlEntityBase<T>
     {
         get
         {
-            string propertyName = SqlMetadataRegistry.GetPropertyName(propertySelector);
+            string propertyName = SqlExpressionHelper.GetPropertyName(propertySelector);
             string columnName = SqlMetadataRegistry.GetColumnName(propertySelector);
 
             return new SqlColumnReference(

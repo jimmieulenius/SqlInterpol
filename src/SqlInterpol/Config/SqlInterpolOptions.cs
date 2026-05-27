@@ -50,6 +50,12 @@ public record SqlInterpolOptions
     public SqlEnumFormat EnumFormat { get; set; } = SqlEnumFormat.Integer;
 
     /// <summary>
+    /// Gets or sets a global override for the maximum number of parameters allowed per query.
+    /// If left null, the engine defaults to the dialect's native maximum limit.
+    /// </summary>
+    public int? QueryParametersMaxCount { get; init; }
+
+    /// <summary>
     /// Gets the active dialect kind. Set automatically by <see cref="SqlBuilder"/> when constructing the context.
     /// </summary>
     public SqlDialectKind Dialect { get; init; } = SqlDialectKind.SqlServer;

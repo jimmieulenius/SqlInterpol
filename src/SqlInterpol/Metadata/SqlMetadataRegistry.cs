@@ -24,6 +24,7 @@ public static class SqlMetadataRegistry
     private static readonly ConcurrentDictionary<Type, SqlEntityMetadata> _runtimeCache = new();
     private static readonly ConcurrentDictionary<Type, PropertyInfo[]> _typePropertyCache = new();
     private static readonly ConcurrentDictionary<Type, Type> _entityModelTypeCache = new();
+    private static readonly ConcurrentDictionary<Type, IReadOnlyDictionary<string, Func<object, object?>>> _argumentGettersCache = new();
 
     /// <summary>Gets the cached <see cref="SqlEntityMetadata"/> for <typeparamref name="T"/>.</summary>
     /// <typeparam name="T">The CLR type to retrieve metadata for.</typeparam>
@@ -93,7 +94,7 @@ public static class SqlMetadataRegistry
     /// <exception cref="ArgumentException">Thrown when the selected property is not found in the cached metadata.</exception>
     public static string GetColumnName<T>(Expression<Func<T, object>> propertySelector)
     {
-        var member = SqlExpressionHelper.GetMember(propertySelector);
+        var member = SqlExpressionHelper.GetProperty(propertySelector);
         var meta = GetMetadata<T>();
 
         if (meta.Columns.TryGetValue(member, out var columnName))
@@ -104,15 +105,33 @@ public static class SqlMetadataRegistry
         throw new ArgumentException($"Property '{member.Name}' not found on {typeof(T).Name}");
     }
 
-    /// <summary>Gets the CLR property name from the property selector expression.</summary>
-    /// <typeparam name="T">The entity type.</typeparam>
-    /// <param name="propertySelector">A lambda expression selecting a property of <typeparamref name="T"/>.</param>
-    /// <returns>The CLR property name (not the column name override).</returns>
-    public static string GetPropertyName<T>(Expression<Func<T, object>> propertySelector)
+    /// <summary>
+    /// Gets a dictionary of highly-optimized, compiled property getters for the specified type.
+    /// Used for O(1) reflection-free access to anonymous object arguments.
+    /// </summary>
+    /// <param name="type">The type of the arguments object.</param>
+    /// <returns>A dictionary of compiled delegates keyed by property name (case-insensitive).</returns>
+    public static IReadOnlyDictionary<string, Func<object, object?>> GetArgumentGetters(Type type)
     {
-        var member = GetMemberInfo(propertySelector);
+        return _argumentGettersCache.GetOrAdd(type, t => 
+        {
+            var properties = t.GetProperties(BindingFlags.Public | BindingFlags.Instance);
+            var getters = new Dictionary<string, Func<object, object?>>(StringComparer.OrdinalIgnoreCase);
 
-        return member.Name;
+            foreach (var prop in properties)
+            {
+                // Create a compiled lambda: (object obj) => (object?)((T)obj).Property
+                var objParam = Expression.Parameter(typeof(object), "obj");
+                var castObj = Expression.Convert(objParam, t);
+                var propAccess = Expression.Property(castObj, prop);
+                var castResult = Expression.Convert(propAccess, typeof(object));
+
+                var lambda = Expression.Lambda<Func<object, object?>>(castResult, objParam);
+                getters[prop.Name] = lambda.Compile();
+            }
+
+            return getters;
+        });
     }
 
     private static SqlEntityMetadata InitializeMetadata(Type type)
@@ -146,23 +165,6 @@ public static class SqlMetadataRegistry
         }
 
         return new SqlEntityMetadata(name, schema, entityType, columns);
-    }
-
-    private static MemberInfo GetMemberInfo(LambdaExpression expression)
-    {
-        Expression body = expression.Body;
-
-        if (body is UnaryExpression unary && unary.NodeType == ExpressionType.Convert)
-        {
-            body = unary.Operand;
-        }
-
-        if (body is MemberExpression member)
-        {
-            return member.Member;
-        }
-
-        throw new ArgumentException("Expression must be a simple property access (e.g., x => x.Name).");
     }
 
     /// <summary>

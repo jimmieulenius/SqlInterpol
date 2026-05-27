@@ -20,6 +20,7 @@ public class PostgreSqlSqlDialect : SqlDialectBase
         SqlFeature.OnConflict,
         SqlFeature.SelectInto
     };
+    public override int QueryParametersMaxCount => 65535;
 
     /// <inheritdoc />
     public override bool IsExpressionContext(string textBeforeParen)

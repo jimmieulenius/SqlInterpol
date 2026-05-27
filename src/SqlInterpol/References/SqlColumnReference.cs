@@ -13,6 +13,6 @@ public class SqlColumnReference(ISqlReference sourceReference, string columnName
     /// <summary>Gets the CLR property name (e.g. <c>Id</c>).</summary>
     public override string PropertyName => propertyName;
 
-    /// <summary>Returns the physical database column name (e.g. <c>PROD_ID</c>).</summary>
-    protected override string GetColumnName(ISqlContext context) => columnName;
+    /// <summary>Gets the physical database column name (e.g. <c>PROD_ID</c>).</summary>
+    internal override string ColumnName => columnName;
 }

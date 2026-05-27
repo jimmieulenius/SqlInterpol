@@ -69,7 +69,7 @@ public static class SqlEntityExtensions
         Expression<Func<T, object?>> expression, 
         SqlOrderDirection? direction = null)
     {
-        var memberInfo = SqlExpressionHelper.GetMember(expression);
+        var memberInfo = SqlExpressionHelper.GetProperty(expression);
         var meta = SqlMetadataRegistry.GetMetadata<T>();
 
         if (!meta.Columns.TryGetValue(memberInfo, out string? physicalName))

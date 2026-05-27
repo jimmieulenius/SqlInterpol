@@ -1,7 +1,5 @@
-using System;
 using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
-using Xunit;
 
 namespace SqlInterpol.Test;
 
@@ -20,11 +18,6 @@ public class MetadataTests
             {
                 // Triggers internal SqlExpressionHelper.GetMember validation implicitly via GetColumnName
                 SqlMetadataRegistry.GetColumnName<Product>(x => x.Id.ToString());
-            }
-            else if (matchingMsg.Contains("simple property access"))
-            {
-                // Triggers private SqlMetadataRegistry.GetMemberInfo validation implicitly via GetPropertyName
-                SqlMetadataRegistry.GetPropertyName<Product>(x => x.Id + 1);
             }
             else if (string.IsNullOrEmpty(matchingMsg))
             {
@@ -47,7 +40,6 @@ public class MetadataTests
     public static TheoryData<SqlErrorTestCase> MetadataErrorData =>
     [
         new SqlErrorTestCase(SqlDialectKind.CustomDb, typeof(ArgumentException), "is not a valid property selector"),
-        new SqlErrorTestCase(SqlDialectKind.CustomDb, typeof(ArgumentException), "Expression must be a simple property access"),
         new SqlErrorTestCase(SqlDialectKind.CustomDb, typeof(ArgumentNullException), ""),
         new SqlErrorTestCase(SqlDialectKind.CustomDb, typeof(ArgumentException), "must implement ISqlEntityBase<T>"),
         new SqlErrorTestCase(SqlDialectKind.CustomDb, typeof(ArgumentException), "Property 'UnmappedProperty' not found on MetadataErrorModel")

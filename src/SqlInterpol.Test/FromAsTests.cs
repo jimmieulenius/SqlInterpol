@@ -483,7 +483,7 @@ public class FromAsTests
             SqlDialectKind.CustomDb,
             [
                 """
-                SELECT <<Product>>.<<Id>>, <<Product>>.<<PROD_NAME>>, <<Product>>.<<IsActive>>, <<Product>>.<<CategoryId>>, <<Product>>.<<Price>>
+                SELECT <<Product>>.<<CategoryId>>, <<Product>>.<<Id>>, <<Product>>.<<IsActive>>, <<Product>>.<<Price>>, <<Product>>.<<PROD_NAME>>
                 FROM <<dbo>>.<<Products>> AS <<Product>>
                 """
             ]
@@ -492,7 +492,7 @@ public class FromAsTests
             SqlDialectKind.Firebird,
             [
                 """
-                SELECT "Product"."Id", "Product"."PROD_NAME", "Product"."IsActive", "Product"."CategoryId", "Product"."Price"
+                SELECT "Product"."CategoryId", "Product"."Id", "Product"."IsActive", "Product"."Price", "Product"."PROD_NAME"
                 FROM "dbo"."Products" AS "Product"
                 """
             ]
@@ -501,7 +501,7 @@ public class FromAsTests
             SqlDialectKind.MySql,
             [
                 """
-                SELECT `Product`.`Id`, `Product`.`PROD_NAME`, `Product`.`IsActive`, `Product`.`CategoryId`, `Product`.`Price`
+                SELECT `Product`.`CategoryId`, `Product`.`Id`, `Product`.`IsActive`, `Product`.`Price`, `Product`.`PROD_NAME`
                 FROM `dbo`.`Products` AS `Product`
                 """
             ]
@@ -510,7 +510,7 @@ public class FromAsTests
             SqlDialectKind.Oracle,
             [
                 """
-                SELECT "Product"."Id", "Product"."PROD_NAME", "Product"."IsActive", "Product"."CategoryId", "Product"."Price"
+                SELECT "Product"."CategoryId", "Product"."Id", "Product"."IsActive", "Product"."Price", "Product"."PROD_NAME"
                 FROM "dbo"."Products" AS "Product"
                 """
             ]
@@ -519,7 +519,7 @@ public class FromAsTests
             SqlDialectKind.PostgreSql,
             [
                 """
-                SELECT "Product"."Id", "Product"."PROD_NAME", "Product"."IsActive", "Product"."CategoryId", "Product"."Price"
+                SELECT "Product"."CategoryId", "Product"."Id", "Product"."IsActive", "Product"."Price", "Product"."PROD_NAME"
                 FROM "dbo"."Products" AS "Product"
                 """
             ]
@@ -528,7 +528,7 @@ public class FromAsTests
             SqlDialectKind.SqLite,
             [
                 """
-                SELECT "Product"."Id", "Product"."PROD_NAME", "Product"."IsActive", "Product"."CategoryId", "Product"."Price"
+                SELECT "Product"."CategoryId", "Product"."Id", "Product"."IsActive", "Product"."Price", "Product"."PROD_NAME"
                 FROM "dbo"."Products" AS "Product"
                 """
             ]
@@ -537,7 +537,7 @@ public class FromAsTests
             SqlDialectKind.SqlServer,
             [
                 """
-                SELECT [Product].[Id], [Product].[PROD_NAME], [Product].[IsActive], [Product].[CategoryId], [Product].[Price]
+                SELECT [Product].[CategoryId], [Product].[Id], [Product].[IsActive], [Product].[Price], [Product].[PROD_NAME]
                 FROM [dbo].[Products] AS [Product]
                 """
             ]

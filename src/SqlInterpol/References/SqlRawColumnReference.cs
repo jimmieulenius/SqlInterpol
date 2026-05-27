@@ -13,5 +13,5 @@ public class SqlRawColumnReference(ISqlReference sourceReference, string columnN
     public override string PropertyName => columnName;
 
     /// <inheritdoc />
-    protected override string GetColumnName(ISqlContext context) => columnName;
+    internal override string ColumnName => columnName;
 }

@@ -84,7 +84,7 @@ public class SqlQuery<T> : SqlEntityBase<T>, ISqlQuery<T>
     {
         get
         {
-            var member = SqlExpressionHelper.GetMember(expression);
+            var member = SqlExpressionHelper.GetProperty(expression);
             return new SqlRawColumnReference(Reference, member.Name);
         }
     }

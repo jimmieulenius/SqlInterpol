@@ -1,11 +1,10 @@
-
 namespace SqlInterpol;
 
 /// <summary>
 /// Represents a single ORDER BY expression, rendering a column reference optionally
 /// followed by <c>ASC</c> or <c>DESC</c>.
 /// </summary>
-public class SqlOrderFragment : ISqlOrderFragment
+public class SqlOrderFragment : ISqlOrderFragment, ISqlSwappableFragment
 {
     private readonly ISqlReference? _reference;
     private readonly ISqlEntityBase? _entity;
@@ -70,5 +69,34 @@ public class SqlOrderFragment : ISqlOrderFragment
         };
             
         return $"{columnSql}{dirSql}";
+    }
+
+    /// <inheritdoc />
+    public ISqlFragment Swap(
+        Dictionary<ISqlReference, ISqlEntityBase> entityMap, 
+        IReadOnlyDictionary<string, Func<object, object?>>? argumentGetters, 
+        object? arguments)
+    {
+        if (_reference != null)
+        {
+            ISqlReference mappedRef = _reference;
+            if (_reference is SqlColumnReference colRef && entityMap.TryGetValue(colRef.SourceReference, out var realEntity))
+            {
+                mappedRef = new SqlColumnReference(realEntity.Reference, colRef.ColumnName, colRef.PropertyName);
+            }
+            return new SqlOrderFragment(mappedRef, _direction);
+        }
+
+        if (_entity != null && _physicalColumnName != null)
+        {
+            ISqlEntityBase mappedEntity = _entity;
+            if (entityMap.TryGetValue(_entity.Reference, out var realEntity))
+            {
+                mappedEntity = realEntity;
+            }
+            return new SqlOrderFragment(mappedEntity, _physicalColumnName, _direction);
+        }
+
+        return this;
     }
 }

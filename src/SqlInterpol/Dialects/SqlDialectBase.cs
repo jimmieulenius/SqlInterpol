@@ -44,6 +44,9 @@ public abstract class SqlDialectBase : ISqlDialect
     public virtual IReadOnlySet<SqlFeature> SupportedFeatures { get; } = new HashSet<SqlFeature>();
 
     /// <inheritdoc />
+    public virtual int QueryParametersMaxCount => 999;
+
+    /// <inheritdoc />
     public virtual string QuoteIdentifier(string name)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -175,6 +178,7 @@ public abstract class SqlDialectBase : ISqlDialect
                 }
 
                 rewritten.Add(new SqlSegment(SqlSegmentType.Literal, " "));
+
                 return true; 
             }
             return false;
@@ -348,6 +352,7 @@ public abstract class SqlDialectBase : ISqlDialect
         }
 
         int intoIdx = -1;
+        
         for (int i = 0; i < rewritten.Count; i++)
         {
             if (rewritten[i].Tag == SqlSegmentTag.SelectIntoKeyword)

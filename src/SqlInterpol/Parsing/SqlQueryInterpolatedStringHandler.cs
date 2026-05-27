@@ -46,6 +46,20 @@ public ref struct SqlQueryInterpolatedStringHandler
         AddSegment(_builder.ProcessValue(value));
     }
 
+    // /// <summary>
+    // /// Natively unwraps a captured query scope (sub-query) and injects its segments directly into the current stream.
+    // /// </summary>
+    // public void AppendFormatted(ISqlQuery query)
+    // {
+    //     if (query == null) return;
+
+    //     var subSegments = query.Segments;
+    //     for (int i = 0; i < subSegments.Count; i++)
+    //     {
+    //         AddSegment(subSegments[i]);
+    //     }
+    // }
+
     private void AddSegment(SqlSegment segment)
     {
         if (_segmentCount >= _segments.Length) GrowBuffer();
@@ -66,6 +80,7 @@ public ref struct SqlQueryInterpolatedStringHandler
     internal void TransferSegments(List<SqlSegment> destination)
     {
         for (int i = 0; i < _segmentCount; i++) destination.Add(_segments[i]);
+
         if (_arrayToReturn != null)
         {
             ArrayPool<SqlSegment>.Shared.Return(_arrayToReturn);

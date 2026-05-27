@@ -140,6 +140,24 @@ public class UpdateTests
         testCase.AssertSql(result.Sql);
     }
 
+    [Theory]
+    [MemberData(nameof(UpdateTemplateData))]
+    public void AppendUpdate_Template(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        var user = new TestUser { Id = 1, Name = "Bob", Age = 31 };
+
+        // Act
+        var result = db.Query<TestUser>(u => 
+            db.AppendUpdate(u, user, x => x.Id)
+        ).Build();
+
+        // Assert
+        testCase.AssertSql(result.Sql);
+        Assert.Equal(3, result.Parameters.Count);
+    }
+
     public static TheoryData<SqlTestCase> UpdateData =>
     [
         new SqlTestCase(
@@ -406,5 +424,79 @@ public class UpdateTests
                 """
             ]
         ),
+    ];
+
+    public static TheoryData<SqlTestCase> UpdateTemplateData =>
+    [
+        new SqlTestCase(
+            SqlDialectKind.CustomDb,
+            [
+                """
+                UPDATE <<Users>>
+                SET <<Age>> = !!100, <<Name>> = !!101
+                WHERE <<Users>>.<<Id>> = !!102
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                UPDATE "Users"
+                SET "Age" = @p0, "Name" = @p1
+                WHERE "Users"."Id" = @p2
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.MySql,
+            [
+                """
+                UPDATE `Users`
+                SET `Age` = @p0, `Name` = @p1
+                WHERE `Users`.`Id` = @p2
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Oracle,
+            [
+                """
+                UPDATE "Users"
+                SET "Age" = :0, "Name" = :1
+                WHERE "Users"."Id" = :2
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.PostgreSql,
+            [
+                """
+                UPDATE "Users"
+                SET "Age" = $1, "Name" = $2
+                WHERE "Users"."Id" = $3
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqLite,
+            [
+                """
+                UPDATE "Users"
+                SET "Age" = @p1, "Name" = @p2
+                WHERE "Users"."Id" = @p3
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqlServer,
+            [
+                """
+                UPDATE [Users]
+                SET [Age] = @p0, [Name] = @p1
+                WHERE [Users].[Id] = @p2
+                """
+            ]
+        )
     ];
 }

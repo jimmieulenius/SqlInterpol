@@ -23,6 +23,11 @@ public interface ISqlDialect
     /// <summary>Gets the prefix character for parameter names (e.g. <c>@</c> for SQL Server/PostgreSQL, <c>:</c> for Oracle).</summary>
     string ParameterPrefix { get; }
 
+    /// <summary>
+    /// Gets the maximum number of parameters allowed in a single query by this dialect.
+    /// </summary>
+    int QueryParametersMaxCount { get; }
+
     /// <summary>Gets the set of optional SQL features supported by this dialect.</summary>
     /// <seealso cref="SqlFeature"/>
     IReadOnlySet<SqlFeature> SupportedFeatures { get; }

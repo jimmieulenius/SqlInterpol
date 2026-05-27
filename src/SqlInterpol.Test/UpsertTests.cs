@@ -1,3 +1,4 @@
+using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
 
 namespace SqlInterpol.Test;
@@ -26,7 +27,7 @@ public class UpsertTests
 
     [Theory]
     [MemberData(nameof(OnDuplicateKeyData))]
-    public void Upsert_OnDuplicateKey_PassesThrough(SqlTestCase testCase)
+    public void Upsert_OnDuplicateKey(SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
@@ -47,7 +48,7 @@ public class UpsertTests
 
     [Theory]
     [MemberData(nameof(OnConflictData))]
-    public void Upsert_OnConflictDoNothing_PassesThrough(SqlTestCase testCase)
+    public void Upsert_OnConflictDoNothing(SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
@@ -63,6 +64,24 @@ public class UpsertTests
         // Assert
         testCase.AssertSql(result.Sql);
         Assert.Single(result.Parameters);
+    }
+
+    [Theory]
+    [MemberData(nameof(UpsertTemplateData))]
+    public void AppendUpsert_Template(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        var user = new TestUser { Id = 1, Name = "Charlie", Age = 32 };
+
+        // Act
+        var result = db.Query<TestUser>(u =>
+            db.AppendUpsert(db.AddEntity<TestUser>(), user, x => x.Id)
+        ).Build();
+
+        // Assert
+        testCase.AssertSql(result.Sql);
+        Assert.Equal(5, result.Parameters.Count);
     }
 
     public static TheoryData<SqlTestCase> UpsertData =>
@@ -141,6 +160,61 @@ public class UpsertTests
                 INSERT INTO "dbo"."Products" (Id) 
                 VALUES (@p1) 
                 ON CONFLICT DO NOTHING
+                """
+            ]
+        )
+    ];
+
+    public static TheoryData<SqlTestCase> UpsertTemplateData =>
+    [
+        new SqlTestCase(
+            SqlDialectKind.MySql,
+            [
+                // Transpiled to MySQL ON DUPLICATE KEY
+                """
+                INSERT INTO `Users`
+                (`Age`, `Id`, `Name`)
+                VALUES (@p0, @p1, @p2)
+                ON DUPLICATE KEY UPDATE `Age` = @p3, `Name` = @p4
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.PostgreSql,
+            [
+                """
+                INSERT INTO "Users"
+                ("Age", "Id", "Name")
+                VALUES ($1, $2, $3)
+                ON CONFLICT ("Id")
+                DO UPDATE SET "Age" = $4, "Name" = $5
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqLite,
+            [
+                """
+                INSERT INTO "Users"
+                ("Age", "Id", "Name")
+                VALUES (@p1, @p2, @p3)
+                ON CONFLICT ("Id")
+                DO UPDATE SET "Age" = @p4, "Name" = @p5
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqlServer,
+            [
+                """
+                MERGE INTO [Users] AS target
+                USING (VALUES (@p0, @p1, @p2)) AS source([Age], [Id], [Name])
+                ON target.[Id] = source.[Id]
+                WHEN MATCHED THEN
+                  UPDATE SET target.[Age] = @p3, target.[Name] = @p4
+                WHEN NOT MATCHED THEN
+                  INSERT ([Age], [Id], [Name])
+                  VALUES (source.[Age], source.[Id], source.[Name]);
                 """
             ]
         )

@@ -1,4 +1,3 @@
-
 namespace SqlInterpol;
 
 /// <summary>
@@ -8,7 +7,7 @@ namespace SqlInterpol;
 /// <param name="entity">The entity whose table is used as the INSERT target.</param>
 /// <param name="assignments">The column-value assignments to insert.</param>
 public class SqlInsertFragment(ISqlEntityBase entity, IEnumerable<ISqlAssignmentFragment> assignments) 
-    : ISqlFragment, ISqlParameterGenerator
+    : ISqlFragment, ISqlParameterGenerator, ISqlSwappableFragment
 {
     /// <inheritdoc />
     public void GenerateParameters(ISqlContext context)
@@ -27,5 +26,28 @@ public class SqlInsertFragment(ISqlEntityBase entity, IEnumerable<ISqlAssignment
         var valuesFragment = new SqlInsertValuesFragment(assignments);
         
         return $"{intoSql}{Environment.NewLine}{valuesFragment.ToSql(context)}";
+    }
+
+    /// <inheritdoc />
+    public ISqlFragment Swap(
+        Dictionary<ISqlReference, ISqlEntityBase> entityMap, 
+        IReadOnlyDictionary<string, Func<object, object?>>? argumentGetters, 
+        object? arguments)
+    {
+        // 1. Swap the entity (Target Table)
+        ISqlEntityBase mappedEntity = entity;
+        if (entityMap.TryGetValue(entity.Reference, out var realEntity))
+        {
+            mappedEntity = realEntity;
+        }
+
+        // 2. Swap the assignments
+        var mappedAssignments = new List<ISqlAssignmentFragment>();
+        foreach (var assignment in assignments)
+        {
+            mappedAssignments.Add(SqlTemplateMapper.MapAssignment(assignment, entityMap, argumentGetters, arguments));
+        }
+
+        return new SqlInsertFragment(mappedEntity, mappedAssignments);
     }
 }

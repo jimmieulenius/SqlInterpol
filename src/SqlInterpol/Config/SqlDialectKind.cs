@@ -32,6 +32,15 @@ public readonly record struct SqlDialectKind(string Value)
     /// <summary>Microsoft SQL Server dialect.</summary>
     public static SqlDialectKind SqlServer { get; } = new("SqlServer");
 
+    /// <summary>ANSI SQL dialect.</summary>
+    public static SqlDialectKind Ansi { get; } = new("Ansi");
+
+    /// <summary>A generic dialect that uses square brackets for identifiers.</summary>
+    public static SqlDialectKind GenericBracket { get; } = new("GenericBracket");
+
+    /// <summary>A generic dialect that uses backticks for identifiers.</summary>
+    public static SqlDialectKind GenericBacktick { get; } = new("GenericBacktick");
+
     /// <summary>Returns the string value of this dialect kind.</summary>
     public override string ToString() => Value;
 

@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using System.Reflection;
 using SqlInterpol.Parsing;
 
@@ -33,6 +34,21 @@ public static class Sql
     /// </summary>
     public static ISqlFragment CloseQuote { get; } = 
         new SqlDeferredFragment(ctx => ctx.Dialect.CloseQuote);
+
+    /// <summary>Emits a single argument placeholder for a template.</summary>
+    /// <param name="name">The exact name of the property or parameter to bind at runtime.</param>
+    public static SqlArgumentFragment Arg(string name) => new(name);
+
+    /// <summary>Emits a single strongly-typed argument placeholder for a template.</summary>
+    /// <typeparam name="T">The model type containing the target property.</typeparam>
+    /// <param name="selector">A lambda expression targeting the property to use as the argument name.</param>
+    public static SqlArgumentFragment Arg<T>(Expression<Func<T, object>> selector) => 
+        new(SqlExpressionHelper.GetPropertyName(selector));
+
+    /// <summary>Emits a macro that the parser expands into structural AST fragments.</summary>
+    /// <typeparam name="TDto">The data transfer object type to expand into SQL columns and assignments.</typeparam>
+    /// <param name="keys">An optional list of property names representing primary keys. The parser uses this context to automatically route properties (e.g., excluding these keys from SET clauses).</param>
+    public static SqlExpandable<TDto> Expand<TDto>(params string[] keys) => new(keys);
 
     /// <summary>
     /// Creates a fragment that wraps <paramref name="value"/> in the dialect's identifier quotes at render time.

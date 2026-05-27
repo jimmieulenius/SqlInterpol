@@ -22,7 +22,7 @@ public abstract class SqlEntity<T> : SqlEntityBase<T>, ISqlEntity<T>
     /// The SQL alias for this entity in query clauses. When provided, it is quoted by default.
     /// When <see langword="null"/>, the CLR type name is used as the fallback alias.
     /// </param>
-    protected SqlEntity(string name, string? schema, string? alias = null)
+    protected SqlEntity(string name, string? schema = null, string? alias = null)
     {
         Name = name;
         Schema = schema;

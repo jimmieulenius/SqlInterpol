@@ -48,6 +48,24 @@ public class DeleteTests
         testCase.AssertSql(result.Sql);
     }
 
+    [Theory]
+    [MemberData(nameof(DeleteTemplateData))]
+    public void AppendDelete_Template(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        var user = new TestUser { Id = 1, Name = "Bob", Age = 31 };
+
+        // Act
+        var result = db.Query<TestUser>(u => 
+            db.AppendDelete(u, user, x => x.Id)
+        ).Build();
+
+        // Assert
+        testCase.AssertSql(result.Sql);
+        Assert.Single(result.Parameters);
+    }
+
     public static TheoryData<SqlTestCase> DeletePureManualData =>
     [
         new SqlTestCase(
@@ -171,6 +189,73 @@ public class DeleteTests
                 DELETE FROM [dbo].[Products]
                 FROM [Category] AS c1
                 WHERE [dbo].[Products].[CategoryId] = c1.Id
+                """
+            ]
+        )
+    ];
+
+    public static TheoryData<SqlTestCase> DeleteTemplateData =>
+    [
+        new SqlTestCase(
+            SqlDialectKind.CustomDb,
+            [
+                """
+                DELETE FROM <<Users>>
+                WHERE <<Users>>.<<Id>> = !!100
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                DELETE FROM "Users"
+                WHERE "Users"."Id" = @p0
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.MySql,
+            [
+                """
+                DELETE FROM `Users`
+                WHERE `Users`.`Id` = @p0
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Oracle,
+            [
+                """
+                DELETE FROM "Users"
+                WHERE "Users"."Id" = :0
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.PostgreSql,
+            [
+                """
+                DELETE FROM "Users"
+                WHERE "Users"."Id" = $1
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqLite,
+            [
+                """
+                DELETE FROM "Users"
+                WHERE "Users"."Id" = @p1
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqlServer,
+            [
+                """
+                DELETE FROM [Users]
+                WHERE [Users].[Id] = @p0
                 """
             ]
         )
