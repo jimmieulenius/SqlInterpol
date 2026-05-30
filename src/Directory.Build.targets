@@ -1,0 +1,20 @@
+<!--
+  Roslyn's AssemblyLoadContext isolation requires all dependencies of an analyzer to be
+  explicitly registered as <Analyzer> items. When SqlInterpol.Analyzers is referenced as a
+  project (OutputItemType="Analyzer"), only its own DLL is registered — not its dependency
+  on Antlr4.Runtime.Standard. This target finds the ANTLR DLL sitting next to the analyzer
+  DLL and registers it so Roslyn can load it when SqlSyntaxAnalyzer (SQLI004) runs.
+-->
+<Project>
+  <Target Name="RegisterSqlInterpolAnalyzerDependencies" BeforeTargets="CoreCompile">
+    <!-- Build a list of ANTLR DLL paths, one per SqlInterpol.Analyzers analyzer item. -->
+    <ItemGroup>
+      <_SqlInterpolAntlrDep Include="@(Analyzer->'%(RootDir)%(Directory)Antlr4.Runtime.Standard.dll')"
+                            Condition="'%(Analyzer.Filename)' == 'SqlInterpol.Analyzers'" />
+    </ItemGroup>
+    <!-- Register existing ones as Analyzer items so Roslyn adds them to its dependency resolver. -->
+    <ItemGroup>
+      <Analyzer Include="@(_SqlInterpolAntlrDep)" Condition="Exists('%(Identity)')" />
+    </ItemGroup>
+  </Target>
+</Project>

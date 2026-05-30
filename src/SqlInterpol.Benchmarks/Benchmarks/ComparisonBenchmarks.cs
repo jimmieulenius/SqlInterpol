@@ -1,17 +1,17 @@
 using BenchmarkDotNet.Attributes;
 using DapperSB = Dapper.SqlBuilder;
 using SqlInterpol.Benchmarks.Models;
+using SqlKata;
+using SqlKata.Compilers;
 using System.Text;
 
 namespace SqlInterpol.Benchmarks;
 
 /// <summary>
-/// Compares SqlInterpol against raw strings and Dapper.SqlBuilder across three scenarios:
+/// Compares SqlInterpol against raw strings, Dapper.SqlBuilder, and SqlKata across three scenarios:
 /// 1. Simple filtered SELECT (baseline)
 /// 2. IN (...) clause with a variable-size collection (parameter expansion)
 /// 3. Aliased multi-table JOIN (alias resolution)
-/// Dialect rewriting (e.g. FOR UPDATE → WITH(UPDLOCK), EXCEPT → MINUS) has no raw equivalent
-/// and is covered separately in MultiDialectBenchmarks.
 /// </summary>
 [MemoryDiagnoser]
 [MarkdownExporter]
@@ -23,22 +23,24 @@ public class ComparisonBenchmarks
     private readonly int _customerId = 42;
     private readonly int[] _filterIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
+    // Static Pre-Compiled Templates
+    private static readonly SqlTemplate<Product> _filteredSelectTemplate = SqlTemplate.Create<Product>((db, p) =>
+        db.Append($"SELECT {p[x => x.Id]}, {p[x => x.Name]}, {p[x => x.Price]} FROM {p} WHERE {p[x => x.CategoryId]} = {Sql.Arg("CategoryId")} AND {p[x => x.Price]} >= {Sql.Arg("MinPrice")} AND {p[x => x.IsActive]} = {Sql.Arg("IsActive")}"));
+
+    private static readonly SqlTemplate<Order, OrderLine> _aliasedJoinTemplate = SqlTemplate.Create<Order, OrderLine>((db, o, ol) =>
+        db.Append($"SELECT {o[x => x.Id]}, {o[x => x.CustomerId]}, {ol[x => x.Price]}, {ol[x => x.Quantity]} FROM {o} JOIN {ol} ON {o[x => x.Id]} = {ol[x => x.OrderId]} WHERE {o[x => x.CustomerId]} = {Sql.Arg("CustomerId")}"));
+
+    // SqlKata Compiler (Instantiated once to match fairness with static caches)
+    private static readonly PostgresCompiler _postgresCompiler = new PostgresCompiler();
+
     // -------------------------------------------------------------------------
     // Scenario 1: Simple filtered SELECT
     // -------------------------------------------------------------------------
 
-    /// <summary>
-    /// Hand-written SQL string constant — absolute minimum overhead floor.
-    /// No type safety, no dialect switching, identifiers and schema hardcoded.
-    /// </summary>
     [Benchmark(Baseline = true)]
     public string RawString() =>
         "SELECT \"Id\", \"PROD_NAME\", \"Price\" FROM \"dbo\".\"Products\" WHERE \"CategoryId\" = @p0 AND \"Price\" >= @p1 AND \"IsActive\" = @p2";
 
-    /// <summary>
-    /// Dapper.SqlBuilder — clause-based template substitution.
-    /// No identifier quoting, no dialect support, parameters are caller-managed.
-    /// </summary>
     [Benchmark]
     public string DapperSqlBuilder()
     {
@@ -52,8 +54,21 @@ public class ComparisonBenchmarks
     }
 
     /// <summary>
-    /// SqlInterpol (PostgreSQL) — typed entity, auto identifier quoting, auto parameterization.
+    /// SqlKata — Fluent API building an AST, then compiled by PostgresCompiler.
+    /// Does not use reflection for column names (requires magic strings).
     /// </summary>
+    [Benchmark]
+    public string SqlKata_PostgreSql()
+    {
+        var query = new Query("dbo.Products")
+            .Select("Id", "PROD_NAME", "Price")
+            .Where("CategoryId", _categoryId)
+            .Where("Price", ">=", _minPrice)
+            .Where("IsActive", _isActive);
+
+        return _postgresCompiler.Compile(query).Sql;
+    }
+
     [Benchmark]
     public string SqlInterpol_PostgreSql()
     {
@@ -63,15 +78,12 @@ public class ComparisonBenchmarks
         return db.Build().Sql;
     }
 
-    /// <summary>
-    /// SqlInterpol (SQL Server) — same code, different dialect, no changes needed.
-    /// </summary>
     [Benchmark]
-    public string SqlInterpol_SqlServer()
+    public string SqlInterpolTemplate_PostgreSql()
     {
-        var db = SqlBuilder.SqlServer();
+        var db = SqlBuilder.PostgreSql();
         var p = db.AddEntity<Product>();
-        db.Append($"SELECT {p[x => x.Id]}, {p[x => x.Name]}, {p[x => x.Price]} FROM {p} WHERE {p[x => x.CategoryId]} = {_categoryId} AND {p[x => x.Price]} >= {_minPrice} AND {p[x => x.IsActive]} = {_isActive}");
+        db.Append(_filteredSelectTemplate, p, new { CategoryId = _categoryId, MinPrice = _minPrice, IsActive = _isActive });
         return db.Build().Sql;
     }
 
@@ -79,9 +91,6 @@ public class ComparisonBenchmarks
     // Scenario 2: IN (...) clause — collection parameter expansion
     // -------------------------------------------------------------------------
 
-    /// <summary>
-    /// Raw: must manually loop to build @p0,@p1,...,@pN placeholders.
-    /// </summary>
     [Benchmark]
     public string RawString_InClause()
     {
@@ -96,8 +105,19 @@ public class ComparisonBenchmarks
     }
 
     /// <summary>
-    /// SqlInterpol: pass the array directly — parameters are expanded and registered automatically.
+    /// SqlKata: Uses .WhereIn() to expand collections dynamically.
     /// </summary>
+    [Benchmark]
+    public string SqlKata_InClause()
+    {
+        var query = new Query("dbo.Products")
+            .Select("Id", "PROD_NAME")
+            .Where("CategoryId", _categoryId)
+            .WhereIn("Id", _filterIds);
+
+        return _postgresCompiler.Compile(query).Sql;
+    }
+
     [Benchmark]
     public string SqlInterpol_InClause()
     {
@@ -111,18 +131,25 @@ public class ComparisonBenchmarks
     // Scenario 3: Aliased multi-table JOIN — alias resolution
     // -------------------------------------------------------------------------
 
-    /// <summary>
-    /// Raw: alias prefix, quoted identifiers, and schema all hardcoded.
-    /// Any rename requires updating every SQL string manually.
-    /// </summary>
     [Benchmark]
     public string RawString_AliasedJoin() =>
         "SELECT o.\"Id\", o.\"CustomerId\", ol.\"Price\", ol.\"Quantity\" FROM \"dbo\".\"Orders\" AS o JOIN \"dbo\".\"OrderLines\" AS ol ON o.\"Id\" = ol.\"OrderId\" WHERE o.\"CustomerId\" = @p0";
 
     /// <summary>
-    /// SqlInterpol: aliases declared once on the entity; all column refs resolve automatically.
-    /// Rename a property → the SQL updates everywhere.
+    /// SqlKata: Aliases must be typed explicitly as magic strings in the From/Join definitions 
+    /// and prefixed manually in the Select statements.
     /// </summary>
+    [Benchmark]
+    public string SqlKata_AliasedJoin()
+    {
+        var query = new Query("dbo.Orders AS o")
+            .Select("o.Id", "o.CustomerId", "ol.Price", "ol.Quantity")
+            .Join("dbo.OrderLines AS ol", "o.Id", "ol.OrderId")
+            .Where("o.CustomerId", _customerId);
+
+        return _postgresCompiler.Compile(query).Sql;
+    }
+
     [Benchmark]
     public string SqlInterpol_AliasedJoin()
     {
@@ -130,6 +157,16 @@ public class ComparisonBenchmarks
         var o = db.AddEntity<Order>(alias: "o");
         var ol = db.AddEntity<OrderLine>(alias: "ol");
         db.Append($"SELECT {o[x => x.Id]}, {o[x => x.CustomerId]}, {ol[x => x.Price]}, {ol[x => x.Quantity]} FROM {o} JOIN {ol} ON {o[x => x.Id]} = {ol[x => x.OrderId]} WHERE {o[x => x.CustomerId]} = {_customerId}");
+        return db.Build().Sql;
+    }
+
+    [Benchmark]
+    public string SqlInterpolTemplate_AliasedJoin()
+    {
+        var db = SqlBuilder.PostgreSql();
+        var o = db.AddEntity<Order>(alias: "o");
+        var ol = db.AddEntity<OrderLine>(alias: "ol");
+        db.Append(_aliasedJoinTemplate, o, ol, new { CustomerId = _customerId });
         return db.Build().Sql;
     }
 }

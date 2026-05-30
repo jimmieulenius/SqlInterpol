@@ -42,6 +42,92 @@ public abstract class SqlTemplate(Lazy<IReadOnlyList<SqlSegment>> segments)
         return new SqlTemplate<T>(entity, lazySegments);
     }
 
+    public static SqlTemplate<T1, T2> Create<T1, T2>(Action<SqlBuilder, ISqlEntityBase<T1>, ISqlEntityBase<T2>> definition)
+    {
+        var entity1 = new SqlTable<T1>($"__dummy_{Guid.NewGuid():N}");
+        var entity2 = new SqlTable<T2>($"__dummy_{Guid.NewGuid():N}");
+        var lazySegments = new Lazy<IReadOnlyList<SqlSegment>>(() =>
+        {
+            var db = new SqlBuilder(new Dialects.AnsiSqlDialect()); 
+            
+            // Pre-seed the active entity target context so that structural macro expansions 
+            // like Sql.Expand can resolve property structures even if they appear before 
+            // the entity token (such as in SELECT projections).
+            db.Context.ParserState.ActiveEntityTarget = entity1;
+            
+            definition(db, entity1, entity2);
+            return db.Segments;
+        });
+
+        return new SqlTemplate<T1, T2>(entity1, entity2, lazySegments);
+    }
+
+    public static SqlTemplate<T1, T2, T3> Create<T1, T2, T3>(Action<SqlBuilder, ISqlEntityBase<T1>, ISqlEntityBase<T2>, ISqlEntityBase<T3>> definition)
+    {
+        var entity1 = new SqlTable<T1>($"__dummy_{Guid.NewGuid():N}");
+        var entity2 = new SqlTable<T2>($"__dummy_{Guid.NewGuid():N}");
+        var entity3 = new SqlTable<T3>($"__dummy_{Guid.NewGuid():N}");
+        var lazySegments = new Lazy<IReadOnlyList<SqlSegment>>(() =>
+        {
+            var db = new SqlBuilder(new Dialects.AnsiSqlDialect()); 
+            
+            // Pre-seed the active entity target context so that structural macro expansions 
+            // like Sql.Expand can resolve property structures even if they appear before 
+            // the entity token (such as in SELECT projections).
+            db.Context.ParserState.ActiveEntityTarget = entity1;
+            
+            definition(db, entity1, entity2, entity3);
+            return db.Segments;
+        });
+
+        return new SqlTemplate<T1, T2, T3>(entity1, entity2, entity3, lazySegments);
+    }
+
+    public static SqlTemplate<T1, T2, T3, T4> Create<T1, T2, T3, T4>(Action<SqlBuilder, ISqlEntityBase<T1>, ISqlEntityBase<T2>, ISqlEntityBase<T3>, ISqlEntityBase<T4>> definition)
+    {
+        var entity1 = new SqlTable<T1>($"__dummy_{Guid.NewGuid():N}");
+        var entity2 = new SqlTable<T2>($"__dummy_{Guid.NewGuid():N}");
+        var entity3 = new SqlTable<T3>($"__dummy_{Guid.NewGuid():N}");
+        var entity4 = new SqlTable<T4>($"__dummy_{Guid.NewGuid():N}");
+        var lazySegments = new Lazy<IReadOnlyList<SqlSegment>>(() =>
+        {
+            var db = new SqlBuilder(new Dialects.AnsiSqlDialect()); 
+            
+            // Pre-seed the active entity target context so that structural macro expansions 
+            // like Sql.Expand can resolve property structures even if they appear before 
+            // the entity token (such as in SELECT projections).
+            db.Context.ParserState.ActiveEntityTarget = entity1;
+            
+            definition(db, entity1, entity2, entity3, entity4);
+            return db.Segments;
+        });
+
+        return new SqlTemplate<T1, T2, T3, T4>(entity1, entity2, entity3, entity4, lazySegments);
+    }
+
+    public static SqlTemplate<T1, T2, T3, T4, T5> Create<T1, T2, T3, T4, T5>(Action<SqlBuilder, ISqlEntityBase<T1>, ISqlEntityBase<T2>, ISqlEntityBase<T3>, ISqlEntityBase<T4>, ISqlEntityBase<T5>> definition)
+    {
+        var entity1 = new SqlTable<T1>($"__dummy_{Guid.NewGuid():N}");
+        var entity2 = new SqlTable<T2>($"__dummy_{Guid.NewGuid():N}");
+        var entity3 = new SqlTable<T3>($"__dummy_{Guid.NewGuid():N}");
+        var entity4 = new SqlTable<T4>($"__dummy_{Guid.NewGuid():N}");
+        var entity5 = new SqlTable<T5>($"__dummy_{Guid.NewGuid():N}");
+        var lazySegments = new Lazy<IReadOnlyList<SqlSegment>>(() =>
+        {
+            var db = new SqlBuilder(new Dialects.AnsiSqlDialect()); 
+            
+            // Pre-seed the active entity target context so that structural macro expansions 
+            // like Sql.Expand can resolve property structures even if they appear before 
+            // the entity token (such as in SELECT projections).
+            db.Context.ParserState.ActiveEntityTarget = entity1;
+            
+            definition(db, entity1, entity2, entity3, entity4, entity5);
+            return db.Segments;
+        });
+
+        return new SqlTemplate<T1, T2, T3, T4, T5>(entity1, entity2, entity3, entity4, entity5, lazySegments);
+    }
+
     /// <summary>Gets a fully cached INSERT template restricted to the DTO's properties.</summary>
     /// <typeparam name="TEntity">The target table model type.</typeparam>
     /// <typeparam name="TDto">The data transfer object type defining properties to persist.</typeparam>
