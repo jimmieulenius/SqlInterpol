@@ -40,25 +40,73 @@ public ref struct SqlQueryInterpolatedStringHandler
         AddSegment(_builder.ProcessLiteral(value));
     }
 
-    /// <summary>Appends an interpolated value as a processed segment.</summary>
-    public void AppendFormatted(object? value)
+    /// <summary>
+    /// Appends an interpolated value as a processed segment, capturing the C# expression string
+    /// to automatically map lambda variables to SQL entities and columns without string allocations.
+    /// </summary>
+    public void AppendFormatted<T>(T value, string? format = null, [CallerArgumentExpression("value")] string? expression = null)
     {
+        // 1. PRESERVE OLD SYNTAX: Process explicit SQL fragments normally
+        if (value is ISqlFragment frag)
+        {
+            AddSegment(_builder.ProcessValue(frag));
+            return;
+        }
+
+        // 2. NEW SYNTAX: AST Routing via CallerArgumentExpression
+        if (!string.IsNullOrEmpty(expression))
+        {
+            int dotIndex = expression.IndexOf('.');
+
+            // Scenario A: Direct POCO access (e.g., FROM {p} or {stats:decl})
+            if (dotIndex == -1)
+            {
+                if (_builder.ScopedVariables.TryGetValue(expression, out var tableEntity))
+                {
+                    SqlRenderMode? mode = format switch
+                    {
+                        "decl"  => SqlRenderMode.Declaration,
+                        "alias" => SqlRenderMode.AliasOnly,
+                        "base"  => SqlRenderMode.BaseName,
+                        _       => null
+                    };
+
+                    AddSegment(new SqlSegment(SqlSegmentType.Reference, tableEntity, mode));
+                    return;
+                }
+            }
+            // Scenario B: Column projection (e.g., SELECT {p.Id} or {stats.TotalPrice:col})
+            else if (dotIndex > 0 && expression.LastIndexOf('.') == dotIndex)
+            {
+                var varName = expression[..dotIndex];
+                var propertyName = expression[(dotIndex + 1)..];
+
+                if (_builder.ScopedVariables.TryGetValue(varName, out var entity))
+                {
+                    var entityModelType = entity.GetType().GetGenericArguments()[0];
+                    var meta = SqlMetadataRegistry.GetMetadata(entityModelType);
+                    
+                    var columnMap = meta.Columns.FirstOrDefault(c => c.Key.Name == propertyName);
+                    string physicalColumnName = columnMap.Key != null ? columnMap.Value : propertyName;
+
+                    var columnRef = new SqlColumnReference(entity.Reference, physicalColumnName, propertyName);
+                    
+                    SqlRenderMode? mode = format switch
+                    {
+                        "col"   => SqlRenderMode.BaseName,
+                        "alias" => SqlRenderMode.AliasOnly,
+                        _       => null
+                    };
+
+                    AddSegment(new SqlSegment(SqlSegmentType.Projection, columnRef, mode));
+                    return;
+                }
+            }
+        }
+
+        // 3. Fallback for standard parameters and iterables (Parser handles SqlCollectionFragment)
         AddSegment(_builder.ProcessValue(value));
     }
-
-    // /// <summary>
-    // /// Natively unwraps a captured query scope (sub-query) and injects its segments directly into the current stream.
-    // /// </summary>
-    // public void AppendFormatted(ISqlQuery query)
-    // {
-    //     if (query == null) return;
-
-    //     var subSegments = query.Segments;
-    //     for (int i = 0; i < subSegments.Count; i++)
-    //     {
-    //         AddSegment(subSegments[i]);
-    //     }
-    // }
 
     private void AddSegment(SqlSegment segment)
     {

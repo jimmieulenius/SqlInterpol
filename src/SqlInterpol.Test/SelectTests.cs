@@ -158,7 +158,7 @@ public class SelectTests
 
         // Act
         var result = db.Query<Product>(p => db.Append($$"""
-            SELECTAAA TOPZZZ 10 {{p[x => x.Id]}}
+            SELECT TOP 10 {{p[x => x.Id]}}
             FROM {{p}}
             """)).Build();
 

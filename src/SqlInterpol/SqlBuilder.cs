@@ -20,12 +20,17 @@ namespace SqlInterpol;
 /// <example>
 /// <code>
 /// var db = SqlBuilder.PostgreSql();
-/// var query = db.Query&lt;Product&gt;((p) => db.Append($"""
-///     SELECT {p[x => x.Id]}, {p[x => x.Name]}
-///     FROM {p}
-///     WHERE {p[x => x.IsActive]} = {true}
-///       AND {p[x => x.Price]} > {minPrice}
-/// """)).Build();
+/// 
+/// // 1. Register the entity and extract the zero-allocation dummy POCO
+/// db.Entity&lt;Product&gt;(out var p);
+/// 
+/// // 2. Build the query natively
+/// var query = db.Append($"""
+///     SELECT {p.Id}, {p.Name}
+///     FROM {p:decl}
+///     WHERE {p.IsActive} = {true}
+///       AND {p.Price} > {minPrice}
+/// """).Build();
 ///
 /// // query.Sql        => SELECT "p"."Id", "p"."Name" FROM "Products" AS "p" WHERE "p"."IsActive" = @p0 AND "p"."Price" > @p1
 /// // query.Parameters => { "@p0": true, "@p1": 42 }
@@ -36,6 +41,11 @@ public partial class SqlBuilder : ISqlEntityRegistry
 {
     private List<SqlSegment> _segments = [];
     private readonly List<ISqlEntity> _entities = [];
+
+    /// <summary>
+    /// Tracks variable names mapped from [CallerArgumentExpression] for zero-allocation property routing.
+    /// </summary>
+    internal Dictionary<string, ISqlEntityBase> ScopedVariables { get; } = new(StringComparer.Ordinal);
 
     /// <summary>Gets the <see cref="SqlContext"/> holding the dialect, parser, renderer, and options for this builder.</summary>
     public SqlContext Context { get; }
@@ -105,12 +115,14 @@ public partial class SqlBuilder : ISqlEntityRegistry
     }
 
     /// <summary>
-    /// Clears all accumulated segments and resets the builder's internal state, making it ready for a new query.
+    /// Clears all accumulated segments, variables, and resets the builder's internal state, making it ready for a new query.
     /// </summary>
     /// <returns>The current <see cref="SqlBuilder"/> instance for method chaining.</returns>
     public virtual SqlBuilder Clear()
     {
         _segments.Clear();
+        _entities.Clear();       // Clear registered entities
+        ScopedVariables.Clear(); // Clear captured C# variables to prevent cross-query contamination
         Context.Reset();
 
         return this;
@@ -266,7 +278,7 @@ public partial class SqlBuilder : ISqlEntityRegistry
 
         // 3. REWRITE & RENDER
         var finalSegments = Context.Dialect.RewriteSegments(finalInputSegments).ToList();
-        var vsb = new ValueStringBuilder(stackalloc char[2048]);
+        var vsb = new SqlInterpol.Parsing.ValueStringBuilder(stackalloc char[2048]);
 
         try
         {

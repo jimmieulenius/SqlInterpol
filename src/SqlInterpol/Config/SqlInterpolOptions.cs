@@ -56,6 +56,13 @@ public record SqlInterpolOptions
     public int? QueryParametersMaxCount { get; init; }
 
     /// <summary>
+    /// Gets or sets a value indicating whether [CallerArgumentExpression] variable names 
+    /// (e.g., `out var p`) should automatically be applied as SQL aliases for the generated entities.
+    /// Defaults to false to ensure backward compatibility.
+    /// </summary>
+    public bool AutoAliasing { get; init; } = false;
+
+    /// <summary>
     /// Gets the active dialect kind. Set automatically by <see cref="SqlBuilder"/> when constructing the context.
     /// </summary>
     public SqlDialectKind Dialect { get; init; } = SqlDialectKind.SqlServer;
