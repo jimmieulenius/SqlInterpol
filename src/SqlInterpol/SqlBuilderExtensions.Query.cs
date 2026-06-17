@@ -56,16 +56,21 @@ public static partial class SqlBuilderExtensions
     }
 
     /// <summary>
-    /// Imports an externally passed entity reference into the current method's local scope.
-    /// This seamlessly maps the existing AST node across method boundaries without registering a new table.
+    /// Looks up an existing entity by its key and binds it to a local dummy variable.
     /// </summary>
     public static SqlBuilder Entity<T>(
         this SqlBuilder builder,
-        T passedVariable,
+        string? sourceKey,
         out T localDummy,
-        [CallerArgumentExpression(nameof(passedVariable))] string? passedName = null,
-        [CallerArgumentExpression(nameof(localDummy))] string? localName = null)
+        [CallerArgumentExpression(nameof(localDummy))] string? localKey = null)
     {
+        static string? CleanKey(string? key)
+        {
+            if (string.IsNullOrWhiteSpace(key)) return null;
+            var parts = key.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            return parts[^1]; // Modern index-from-end syntax
+        }
+
         // 1. Safely initialize the local dummy token
         if (typeof(T).IsValueType)
         {
@@ -73,19 +78,33 @@ public static partial class SqlBuilderExtensions
         }
         else
         {
-            localDummy = (T)RuntimeHelpers.GetUninitializedObject(typeof(T));
+            localDummy = (T)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(T));
         }
 
-        // 2. Extract the clean variable names
-        string? cleanPassedName = ExtractVariableName(passedName);
-        string? cleanLocalName = ExtractVariableName(localName);
+        // 2. Aggressively strip "out var" so "out var p1", "out p1", and "p1" all become "p1"
+        var cleanSource = CleanKey(sourceKey);
+        var cleanLocal = CleanKey(localKey);
 
-        // 3. Map the underlying AST node from the passed name to the new local name
-        if (!string.IsNullOrEmpty(cleanPassedName) && !string.IsNullOrEmpty(cleanLocalName))
+        // 3. Map the variable using robust matching
+        if (!string.IsNullOrEmpty(cleanSource) && !string.IsNullOrEmpty(cleanLocal))
         {
-            if (builder.ScopedVariables.TryGetValue(cleanPassedName, out var entityNode))
+            // First try exact match or clean match
+            if (builder.ScopedVariables.TryGetValue(sourceKey!, out var node) ||
+                builder.ScopedVariables.TryGetValue(cleanSource, out node))
             {
-                builder.ScopedVariables[cleanLocalName] = entityNode;
+                builder.ScopedVariables[cleanLocal] = node;
+            }
+            else
+            {
+                // Fallback: If the dictionary saved "out var p1" but we only have "p1"
+                foreach (var kvp in builder.ScopedVariables)
+                {
+                    if (kvp.Key.EndsWith(cleanSource))
+                    {
+                        builder.ScopedVariables[cleanLocal] = kvp.Value;
+                        break;
+                    }
+                }
             }
         }
 

@@ -18,4 +18,10 @@
       OutputItemType="Analyzer" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\SqlInterpol.Generators\SqlInterpol.Generators.csproj" 
+      ReferenceOutputAssembly="false"  
+      OutputItemType="Analyzer" />
+  </ItemGroup>
+
 </Project>

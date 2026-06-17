@@ -295,15 +295,21 @@ public class SelectSubqueryTests
     ];
 }
 
-internal static class SelectSubqueryTestExtensions
+internal partial class SelectSubqueryTestHelper
 {
-    public static ISqlQuery<Category> BuildCategorySubquery(this SqlBuilder db, Product pOuter, int activeStatus) => 
-        db.Entity(pOuter, out var p) // Imports the outer entity!
-          .Entity<Category>(out var c) // Registers the inner entity!
-          .Subquery(c, sub => sub.Append($$"""
-            SELECT
-                {{c.Name}}
-            FROM {{c}}
-            WHERE {{c.Id}} = {{p.CategoryId}} AND {{c.IsActive}} = {{activeStatus}}
-            """));
+    [SqlFragment]
+    private static ISqlQuery<Category> BuildCategorySubquery(
+        SqlBuilder db,
+        Product p,
+        int activeStatus)
+    {
+        return db
+            .Entity<Category>(out var c)
+            .Subquery(c, sub => sub.Append($$"""
+                SELECT
+                    {{c.Name}}
+                FROM {{c}}
+                WHERE {{c.Id}} = {{p.CategoryId}} AND {{c.IsActive}} = {{activeStatus}}
+                """));
+    }
 }
