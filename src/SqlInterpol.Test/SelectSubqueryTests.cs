@@ -1,7 +1,5 @@
-using System.Runtime.CompilerServices;
 using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
-using Xunit;
 
 namespace SqlInterpol.Test;
 
@@ -295,7 +293,7 @@ public class SelectSubqueryTests
     ];
 }
 
-internal partial class SelectSubqueryTestHelper
+internal static partial class SelectSubqueryTestHelper
 {
     [SqlFragment]
     private static ISqlQuery<Category> BuildCategorySubquery(

@@ -1,4 +1,3 @@
-using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -27,6 +26,25 @@ public class SqlFragmentGenerator : IIncrementalGenerator
     private static void GenerateWrapperMethod(SourceProductionContext spc, IMethodSymbol method)
     {
         var containingClass = method.ContainingType;
+
+        // --- DIAGNOSTIC CHECK: Ensure the class is static ---
+        if (!containingClass.IsStatic)
+        {
+            var diagnostic = Diagnostic.Create(
+                new DiagnosticDescriptor(
+                    id: "SQLGEN001",
+                    title: "Invalid SqlFragment Container",
+                    messageFormat: "The class '{0}' must be static to contain a [SqlFragment] method",
+                    category: "Usage",
+                    defaultSeverity: DiagnosticSeverity.Error,
+                    isEnabledByDefault: true),
+                method.Locations.FirstOrDefault(),
+                containingClass.Name);
+
+            spc.ReportDiagnostic(diagnostic);
+            return; // Stop generation if not static
+        }
+
         var namespaceName = containingClass.ContainingNamespace.ToDisplayString();
         var className = containingClass.Name;
         var methodName = method.Name;
