@@ -1,7 +1,63 @@
+using System;
 using System.Buffers;
+using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.CompilerServices;
 
 namespace SqlInterpol.Parsing;
+
+internal class SqlSubqueryDeclarationFragment : ISqlFragment
+{
+    private readonly ISqlQuery _query;
+
+    public SqlSubqueryDeclarationFragment(ISqlQuery query)
+    {
+        _query = query;
+    }
+
+    public string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
+    {
+        // 1. Extract the pristine inner SELECT statement layout
+        string innerSql = ((ISqlFragment)_query).ToSql(context, mode);
+        
+        // 2. Discover the baseline indent of the current line by looking backward 
+        // at the trailing text of the preceding literal segment relative to the active rendering cursor.
+        string baseIndent = "";
+        if (context is SqlBuilder builder)
+        {
+            int currentIndex = ((ISqlParserState)context).CurrentSegmentIndex;
+            
+            if (currentIndex > 0 && currentIndex - 1 < builder.Segments.Count)
+            {
+                var lastSeg = builder.Segments[currentIndex - 1];
+                if (lastSeg.Value is string lastLiteral)
+                {
+                    int lastNewLine = lastLiteral.LastIndexOf('\n');
+                    string currentLinePrefix = lastNewLine >= 0 ? lastLiteral[(lastNewLine + 1)..] : lastLiteral;
+                    
+                    // Capture all preceding spaces/tabs on the current active line
+                    baseIndent = new string(currentLinePrefix.TakeWhile(char.IsWhiteSpace).ToArray());
+                }
+            }
+        }
+
+        // 3. Apply the golden layout rule: Inner Level Indent = Current Baseline + Configured Indent Size
+        string extraIndent = new string(' ', context.Options.IndentSize);
+        string totalBodyIndent = baseIndent + extraIndent;
+
+        // 4. Shift all lines of the inner body cleanly into the calculated indentation track
+        string[] lines = innerSql.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+        string formattedInnerSql = string.Join("\n", lines.Select(l => string.IsNullOrWhiteSpace(l) ? l : totalBodyIndent + l));
+        
+        // 5. Resolve and cleanly quote the auto-captured C# variable name as the SQL alias
+        var entityRef = ((ISqlEntityBase)_query).Reference;
+        string alias = entityRef.Alias ?? entityRef.FallbackAlias ?? "stats";
+        string quotedAlias = context.Dialect.QuoteIdentifier(alias);
+        
+        // 6. Package it up, aligning the closing parenthesis perfectly back with the parent line's baseline!
+        return $"(\n{formattedInnerSql}\n{baseIndent}) AS {quotedAlias}";
+    }
+}
 
 [InterpolatedStringHandler]
 /// <summary>
@@ -18,10 +74,6 @@ public ref struct SqlQueryInterpolatedStringHandler
     /// <summary>
     /// Initializes the handler with a pooled segment buffer sized to the estimated number of segments.
     /// </summary>
-    /// <param name="literalLength">Estimated total length of raw SQL literal characters (used for sizing).</param>
-    /// <param name="formattedCount">Number of interpolated expression holes in the string.</param>
-    /// <param name="builder">The <see cref="SqlBuilder"/> that owns this handler.</param>
-    /// <param name="shouldAppend">Always set to <see langword="true"/>.</param>
     public SqlQueryInterpolatedStringHandler(int literalLength, int formattedCount, SqlBuilder builder, out bool shouldAppend)
     {
         _builder = builder;
@@ -58,11 +110,45 @@ public ref struct SqlQueryInterpolatedStringHandler
         {
             int dotIndex = expression.IndexOf('.');
 
-            // Scenario A: Direct POCO access (e.g., FROM {p} or {stats:decl})
+            // Scenario A: Direct POCO or Query access (e.g., FROM {p} or {stats})
             if (dotIndex == -1)
             {
                 if (_builder.ScopedVariables.TryGetValue(expression, out var tableEntity))
                 {
+                    // SPECIALIZED SUBQUERY ROUTING
+                    if (tableEntity is ISqlQuery queryEntity)
+                    {
+                        SqlSegment segment;
+                        var entityBase = (ISqlEntityBase)queryEntity;
+
+                        if (format == "alias")
+                        {
+                            segment = _builder.ProcessValue(entityBase.Reference);
+                            segment = new SqlSegment(segment.Type, segment.Value, SqlRenderMode.AliasOnly, segment.Tag);
+                        }
+                        else if (format == "base")
+                        {
+                            segment = _builder.ProcessValue(entityBase.Reference);
+                            segment = new SqlSegment(segment.Type, segment.Value, SqlRenderMode.BaseName, segment.Tag);
+                        }
+                        // Handle explicit :decl OR naked variable invocation when EntityAutoAliasing is true
+                        else if (format == "decl" || (format == null && _builder.Context.Options.EntityAutoAliasing))
+                        {
+                            var declFragment = new SqlSubqueryDeclarationFragment(queryEntity);
+                            segment = _builder.ProcessValue(declFragment);
+                        }
+                        else
+                        {
+                            // Manual formatting fallback: User wrote the parenthesis themselves.
+                            // Cast directly to ISqlFragment to bypass auto-indentation and print raw layouts.
+                            segment = _builder.ProcessValue((ISqlFragment)queryEntity);
+                        }
+
+                        AddSegment(segment);
+                        return;
+                    }
+
+                    // STANDARD PHYSICAL TABLE ROUTING
                     SqlRenderMode? mode = format switch
                     {
                         "decl"  => SqlRenderMode.Declaration,
@@ -71,7 +157,14 @@ public ref struct SqlQueryInterpolatedStringHandler
                         _       => null
                     };
 
-                    AddSegment(new SqlSegment(SqlSegmentType.Reference, tableEntity, mode));
+                    var segmentResult = _builder.ProcessValue(tableEntity);
+                    
+                    if (mode != null)
+                    {
+                        segmentResult = new SqlSegment(segmentResult.Type, segmentResult.Value, mode, segmentResult.Tag);
+                    }
+                    
+                    AddSegment(segmentResult);
                     return;
                 }
             }
@@ -98,13 +191,18 @@ public ref struct SqlQueryInterpolatedStringHandler
                         _       => null
                     };
 
-                    AddSegment(new SqlSegment(SqlSegmentType.Projection, columnRef, mode));
+                    var segmentResult = _builder.ProcessValue(columnRef);
+                    if (mode != null)
+                    {
+                        segmentResult = new SqlSegment(segmentResult.Type, segmentResult.Value, mode, segmentResult.Tag);
+                    }
+                    AddSegment(segmentResult);
                     return;
                 }
             }
         }
 
-        // 3. Fallback for standard parameters and iterables (Parser handles SqlCollectionFragment)
+        // 3. Fallback for standard parameters and iterables
         AddSegment(_builder.ProcessValue(value));
     }
 

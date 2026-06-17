@@ -1,4 +1,3 @@
-
 namespace SqlInterpol.Parsing;
 
 /// <summary>
@@ -28,6 +27,9 @@ public interface ISqlParserState
     bool InLineComment { get; set; }
     /// <summary>Gets or sets the current parenthesis nesting depth.</summary>
     int ParenDepth { get; set; }
+    
+    /// <summary>Gets or sets the zero-based index of the segment currently being evaluated or rendered.</summary>
+    int CurrentSegmentIndex { get; set; }
 
     /// <summary>Resets all parser state to its initial values for reuse.</summary>
     void Reset();

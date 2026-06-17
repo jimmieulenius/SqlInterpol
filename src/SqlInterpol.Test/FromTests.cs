@@ -13,11 +13,12 @@ public class FromTests
         var db = testCase.CreateBuilder();
         
         // Act
-        var result = db.Query<OrderLine>(ol =>
-            db.Append($$"""
+        var result = db
+            .Entity<OrderLine>(out var ol)
+            .Append($$"""
             SELECT *
             FROM {{ol}}
-            """))
+            """)
             .Build();
 
         // Assert
@@ -32,11 +33,12 @@ public class FromTests
         var db = testCase.CreateBuilder();
         
         // Act
-        var result = db.Query<TableOnlyModel>(m =>
-            db.Append($$"""
+        var result = db
+            .Entity<TableOnlyModel>(out var m)
+            .Append($$"""
             SELECT *
             FROM {{m}}
-            """))
+            """)
             .Build();
 
         // Assert
@@ -51,11 +53,12 @@ public class FromTests
         var db = testCase.CreateBuilder();
 
         // Act
-        var result = db.Query<TableAndSchemaModel>(m =>
-            db.Append($$"""
+        var result = db
+            .Entity<TableAndSchemaModel>(out var m)
+            .Append($$"""
             SELECT *
             FROM {{m}}
-            """))
+            """)
             .Build();
 
         // Assert
@@ -208,20 +211,20 @@ public class FromTests
             ]
         ),
         new SqlTestCase(
-            SqlDialectKind.MySql,
-            [
-                """
-                SELECT *
-                FROM `MySchema`.`MyTable`
-                """
-            ]
-        ),
-        new SqlTestCase(
             SqlDialectKind.Firebird,
             [
                 """
                 SELECT *
                 FROM "MySchema"."MyTable"
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.MySql,
+            [
+                """
+                SELECT *
+                FROM `MySchema`.`MyTable`
                 """
             ]
         ),

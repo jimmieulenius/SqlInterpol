@@ -9,16 +9,20 @@ public class FromAsTests
     [MemberData(nameof(From_EntityManualAliasData))]
     public void From_EntityManualAlias(SqlTestCase testCase)
     {
+        // Arrange
         var db = testCase.CreateBuilder();
 
-        var result = db.Query<Product>(p =>
-            db.Append($$"""
-            SELECT
-                {{p[x => x.Id]}}
-            FROM {{p}} AS p
-            """))
+        // Act
+        var result = db
+            .Entity<Product>(out var p)
+            .Append($$"""
+                SELECT
+                    {{p.Id}}
+                FROM {{p}} AS p
+                """)
             .Build();
 
+        // Assert
         testCase.AssertSql(result.Sql);
     }
 
@@ -26,16 +30,20 @@ public class FromAsTests
     [MemberData(nameof(From_EntitySqlTableAttributeData))]
     public void From_EntitySqlTableAttribute(SqlTestCase testCase)
     {
+        // Arrange
         var db = testCase.CreateBuilder();
         
-        var result = db.Query<Product>(p =>
-            db.Append($$"""
-            SELECT
-                {{p[x => x.Id]}}
-            FROM {{p}} AS prod
-            """))
+        // Act
+        var result = db
+            .Entity<Product>(out var p)
+            .Append($$"""
+                SELECT
+                    {{p.Id}}
+                FROM {{p}} AS prod
+                """)
             .Build();
 
+        // Assert
         testCase.AssertSql(result.Sql);
     }
 
@@ -43,16 +51,20 @@ public class FromAsTests
     [MemberData(nameof(From_LiteralTableAsEntityWithoutAttributeData))]
     public void From_LiteralTableAsEntityWithoutAttribute(SqlTestCase testCase)
     {
+        // Arrange
         var db = testCase.CreateBuilder();
 
-        var result = db.Query<OrderLine>(ol =>
-            db.Append($$"""
-            SELECT
-                {{ol[x => x.OrderId]}}
-            FROM ORDER_LINES AS {{ol}}
-            """))
+        // Act
+        var result = db
+            .Entity<OrderLine>(out var ol)
+            .Append($$"""
+                SELECT
+                    {{ol.OrderId}}
+                FROM ORDER_LINES AS {{ol:alias}}
+                """)
             .Build();
 
+        // Assert
         testCase.AssertSql(result.Sql);
     }
 
@@ -60,16 +72,20 @@ public class FromAsTests
     [MemberData(nameof(From_LiteralTableAsExplicitAliasedEntityData))]
     public void From_LiteralTableAsExplicitAliasedEntity(SqlTestCase testCase)
     {
+        // Arrange
         var db = testCase.CreateBuilder();
 
-        var result = db.Query<Product>(p =>
-            db.Append($$"""
-            SELECT
-                {{p[x => x.Id]}}
-            FROM products AS {{p.As("prod")}}
-            """))
+        // Act
+        var result = db
+            .Entity<Product>(out var p, "prod")
+            .Append($$"""
+                SELECT
+                    {{p.Id}}
+                FROM products AS {{p:alias}}
+                """)
             .Build();
 
+        // Assert
         testCase.AssertSql(result.Sql);
     }
 
@@ -77,16 +93,20 @@ public class FromAsTests
     [MemberData(nameof(From_EntityAsEntityWithSchemaData))]
     public void From_EntityAsEntityWithSchema(SqlTestCase testCase)
     {
+        // Arrange
         var db = testCase.CreateBuilder();
 
-        var result = db.Query<Product>(p =>
-            db.Append($$"""
-            SELECT
-                {{p[x => x.Id]}}
-            FROM {{p}} AS {{p}}
-            """))
+        // Act
+        var result = db
+            .Entity<Product>(out var p, "Product")
+            .Append($$"""
+                SELECT
+                    {{p.Id}}
+                FROM {{p:base}} AS {{p:alias}}
+                """)
             .Build();
 
+        // Assert
         testCase.AssertSql(result.Sql);
     }
 
@@ -98,12 +118,58 @@ public class FromAsTests
         var db = testCase.CreateBuilder();
 
         // Act
-        var result = db.Query<Product>(p => db.Append($$"""
-            SELECT {{p}}
-            FROM {{p}} AS {{p}}
-            """)).Build();
+        var result = db
+            .Entity<Product>(out var p)
+            .Append($$"""
+                SELECT {{p}}
+                FROM {{p:base}} AS {{p:alias}}
+                """)
+            .Build();
 
-        // Assert SQL
+        // Assert
+        testCase.AssertSql(result.Sql);
+    }
+
+    [Theory]
+    [MemberData(nameof(From_EntityAutoAliasingData))]
+    public void From_EntityAutoAliasing(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        db.Context.Options.EntityAutoAliasing = true;
+
+        // Act
+        var result = db
+            .Entity<Product>(out var prod)
+            .Append($$"""
+                SELECT
+                    {{prod.Id}}
+                FROM {{prod}}
+                """)
+            .Build();
+
+        // Assert
+        testCase.AssertSql(result.Sql);
+    }
+
+    [Theory]
+    [MemberData(nameof(From_AutoAliasingInceptionData))]
+    public void From_AutoAliasing_Inception(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        db.Context.Options.EntityAutoAliasing = true;
+
+        // Act
+        var result = db
+            .Entity<Product>(out var myProd)
+            .Append($$"""
+                SELECT {{myProd}}
+                FROM {{myProd:decl}}
+                """)
+            .Build();
+
+        // Assert
         testCase.AssertSql(result.Sql);
     }
 
@@ -539,6 +605,147 @@ public class FromAsTests
                 """
                 SELECT [Product].[CategoryId], [Product].[Id], [Product].[IsActive], [Product].[Price], [Product].[PROD_NAME]
                 FROM [dbo].[Products] AS [Product]
+                """
+            ]
+        )
+    ];
+
+    public static TheoryData<SqlTestCase> From_EntityAutoAliasingData =>
+    [
+        new SqlTestCase(
+            SqlDialectKind.CustomDb,
+            [
+                """
+                SELECT
+                    <<prod>>.<<Id>>
+                FROM <<dbo>>.<<Products>> AS <<prod>>
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT
+                    "prod"."Id"
+                FROM "dbo"."Products" AS "prod"
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.MySql, 
+            [
+                """
+                SELECT
+                    `prod`.`Id`
+                FROM `dbo`.`Products` AS `prod`
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Oracle, 
+            [
+                """
+                SELECT
+                    "prod"."Id"
+                FROM "dbo"."Products" AS "prod"
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.PostgreSql, 
+            [
+                """
+                SELECT
+                    "prod"."Id"
+                FROM "dbo"."Products" AS "prod"
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqLite,
+            [
+                """
+                SELECT
+                    "prod"."Id"
+                FROM "dbo"."Products" AS "prod"
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqlServer,
+            [
+                """
+                SELECT
+                    [prod].[Id]
+                FROM [dbo].[Products] AS [prod]
+                """
+            ]
+        )
+    ];
+
+    public static TheoryData<SqlTestCase> From_AutoAliasingInceptionData =>
+    [
+        new SqlTestCase(
+            SqlDialectKind.CustomDb,
+            [
+                """
+                SELECT <<myProd>>.<<CategoryId>>, <<myProd>>.<<Id>>, <<myProd>>.<<IsActive>>, <<myProd>>.<<Price>>, <<myProd>>.<<PROD_NAME>>
+                FROM <<dbo>>.<<Products>> AS <<myProd>>
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT "myProd"."CategoryId", "myProd"."Id", "myProd"."IsActive", "myProd"."Price", "myProd"."PROD_NAME"
+                FROM "dbo"."Products" AS "myProd"
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.MySql,
+            [
+                """
+                SELECT `myProd`.`CategoryId`, `myProd`.`Id`, `myProd`.`IsActive`, `myProd`.`Price`, `myProd`.`PROD_NAME`
+                FROM `dbo`.`Products` AS `myProd`
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Oracle,
+            [
+                """
+                SELECT "myProd"."CategoryId", "myProd"."Id", "myProd"."IsActive", "myProd"."Price", "myProd"."PROD_NAME"
+                FROM "dbo"."Products" AS "myProd"
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.PostgreSql,
+            [
+                """
+                SELECT "myProd"."CategoryId", "myProd"."Id", "myProd"."IsActive", "myProd"."Price", "myProd"."PROD_NAME"
+                FROM "dbo"."Products" AS "myProd"
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqLite,
+            [
+                """
+                SELECT "myProd"."CategoryId", "myProd"."Id", "myProd"."IsActive", "myProd"."Price", "myProd"."PROD_NAME"
+                FROM "dbo"."Products" AS "myProd"
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqlServer,
+            [
+                """
+                SELECT [myProd].[CategoryId], [myProd].[Id], [myProd].[IsActive], [myProd].[Price], [myProd].[PROD_NAME]
+                FROM [dbo].[Products] AS [myProd]
                 """
             ]
         )

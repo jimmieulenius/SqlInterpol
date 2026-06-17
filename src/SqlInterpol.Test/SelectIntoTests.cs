@@ -13,11 +13,14 @@ public class SelectIntoTests
         var db = testCase.CreateBuilder();
 
         // Act
-        var result = db.Query<Product>(p => db.Append($$"""
-            SELECT {{p[x => x.Id]}}, {{p[x => x.Name]}}
+        var result = db
+            .Entity<Product>(out var p)
+            .Append($$"""
+            SELECT {{p.Id}}, {{p.Name}}
             INTO #TempProducts
             FROM {{p}}
-            """)).Build();
+            """)
+            .Build();
 
         // Assert
         testCase.AssertSql(result.Sql);
@@ -33,11 +36,14 @@ public class SelectIntoTests
         var target = Sql.Raw("#TempProducts");
 
         // Act
-        var result = db.Query<Product>(p => db.Append($$"""
-            SELECT {{p[x => x.Id]}}, {{p[x => x.Name]}}
+        var result = db
+            .Entity<Product>(out var p)
+            .Append($$"""
+            SELECT {{p.Id}}, {{p.Name}}
             INTO {{target}}
             FROM {{p}}
-            """)).Build();
+            """)
+            .Build();
 
         // Assert
         testCase.AssertSql(result.Sql);
@@ -57,18 +63,18 @@ public class SelectIntoTests
         // Act
         var exception = Record.Exception(() => 
         {
-            db.Query<Product>(p => db.Append($$"""
-                SELECT {{p[x => x.Id]}}
+            db.Entity<Product>(out var p)
+              .Append($$"""
+                SELECT {{p.Id}}
                 INTO #TempProducts
                 FROM {{p}}
-                """)).Build();
+                """)
+              .Build();
         });
 
         // Assert
         testCase.AssertException(exception);
     }
-
-    // --- TEST DATA ---
 
     public static TheoryData<SqlTestCase> SelectIntoData =>
     [

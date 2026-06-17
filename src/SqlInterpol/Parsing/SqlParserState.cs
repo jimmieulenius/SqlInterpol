@@ -18,6 +18,8 @@ internal class SqlParserState : ISqlParserState
     public int ParenDepth { get; set; }
     private Dictionary<string, object?>? _properties;
     public IDictionary<string, object?> Properties => _properties ??= [];
+    public int CurrentSegmentIndex { get; set; }
+
 
     /// <inheritdoc />
     public void Reset()

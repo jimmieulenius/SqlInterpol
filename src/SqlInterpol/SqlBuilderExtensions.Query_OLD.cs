@@ -1,3 +1,8 @@
+// =========================================================================
+// TODO (v2.0): ENTIRE FILE IS DEAD CODE. 
+// Remove this file completely once the legacy lambda syntax is fully deprecated.
+// =========================================================================
+
 namespace SqlInterpol;
 
 /// <summary>

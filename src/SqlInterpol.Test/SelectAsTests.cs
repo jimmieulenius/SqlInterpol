@@ -13,12 +13,13 @@ public class SelectAsTests
         var db = testCase.CreateBuilder();
         
         // Act
-        var result = db.Query<Product>(p =>
-            db.Append($$"""
+        var result = db
+            .Entity<Product>(out var p)
+            .Append($$"""
             SELECT
-                {{p[x => x.Id]}} AS ProductId
+                {{p.Id}} AS ProductId
             FROM {{p}}
-            """))
+            """)
             .Build();
 
         // Assert
@@ -33,6 +34,7 @@ public class SelectAsTests
         var db = testCase.CreateBuilder();
         
         // Act
+        // TODO: Migrate string indexer lookup and lambda mapping to new syntax
         #pragma warning disable SQLI003
         var result = db.Query<Product>(p =>
             db.Append($$"""
@@ -55,12 +57,13 @@ public class SelectAsTests
         var db = testCase.CreateBuilder();
         
         // Act
-        var result = db.Query<Product>(p =>
-            db.Append($$"""
+        var result = db
+            .Entity<Product>(out var p)
+            .Append($$"""
             SELECT
-                {{p[x => x.Name]}} AS {{p[x => x.Name]}}
+                {{p.Name}} AS {{p.Name}}
             FROM {{p}}
-            """))
+            """)
             .Build();
 
         // Assert

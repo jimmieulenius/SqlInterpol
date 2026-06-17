@@ -28,15 +28,8 @@ public static class SqlEntityExtensions
         return entity;
     }
 
-    /// <summary>
-    /// Creates an <c>ORDER BY</c> fragment for the column mapped to <paramref name="propertyName"/> on <typeparamref name="T"/>.
-    /// </summary>
-    /// <typeparam name="T">The CLR model type mapped to this entity.</typeparam>
-    /// <param name="entity">The entity that owns the column.</param>
-    /// <param name="propertyName">The case-insensitive CLR property name to order by.</param>
-    /// <param name="direction">The sort direction; defaults to the database default (<c>ASC</c>) when <see langword="null"/>.</param>
-    /// <returns>An <see cref="ISqlOrderFragment"/> that can be interpolated into an <c>ORDER BY</c> clause.</returns>
-    /// <exception cref="ArgumentException">Thrown when <paramref name="propertyName"/> is not mapped on <typeparamref name="T"/>.</exception>
+    // TODO (v2.0): Remove when deleting old lambda syntax
+    [Obsolete("Use standard SQL syntax with the new zero-allocation variables (e.g., ORDER BY {p.Id} ASC)")]
     public static ISqlOrderFragment OrderBy<T>(
         this ISqlEntityBase<T> entity,
         string propertyName, 
@@ -55,15 +48,8 @@ public static class SqlEntityExtensions
         return new SqlOrderFragment(entity, columnMap.Value, direction);
     }
 
-    /// <summary>
-    /// Creates an <c>ORDER BY</c> fragment for the column mapped to the property selected by <paramref name="expression"/>.
-    /// </summary>
-    /// <typeparam name="T">The CLR model type mapped to this entity.</typeparam>
-    /// <param name="entity">The entity that owns the column.</param>
-    /// <param name="expression">A lambda expression that selects the property to order by (e.g. <c>x =&gt; x.Name</c>).</param>
-    /// <param name="direction">The sort direction; defaults to the database default (<c>ASC</c>) when <see langword="null"/>.</param>
-    /// <returns>An <see cref="ISqlOrderFragment"/> that can be interpolated into an <c>ORDER BY</c> clause.</returns>
-    /// <exception cref="ArgumentException">Thrown when the selected property is not mapped on <typeparamref name="T"/>.</exception>
+    // TODO (v2.0): Remove when deleting old lambda syntax
+    [Obsolete("Use standard SQL syntax with the new zero-allocation variables (e.g., ORDER BY {p.Id} ASC)")]
     public static ISqlOrderFragment OrderBy<T>(
         this ISqlEntityBase<T> entity,
         Expression<Func<T, object?>> expression, 

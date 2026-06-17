@@ -74,12 +74,8 @@ public class SqlQuery<T> : SqlEntityBase<T>, ISqlQuery<T>
         Declaration = new SqlDeclaration(this);
     }
 
-    /// <summary>
-    /// Returns a column projection from this subquery for the property selected by <paramref name="expression"/>.
-    /// The projection is bound to this subquery's alias, ensuring correct scoping in the outer query.
-    /// </summary>
-    /// <param name="expression">A lambda expression selecting the property (e.g. <c>x =&gt; x.Name</c>).</param>
-    /// <returns>An <see cref="ISqlProjection"/> scoped to this subquery.</returns>
+    // TODO (v2.0): Remove when deleting old lambda syntax
+    [Obsolete("Use the zero-allocation out var syntax and direct POCO property access.")]
     public new ISqlProjection this[Expression<Func<T, object?>> expression]
     {
         get

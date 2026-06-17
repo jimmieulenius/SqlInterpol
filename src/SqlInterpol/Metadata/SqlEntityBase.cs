@@ -39,11 +39,8 @@ public abstract class SqlEntityBase<T> : ISqlEntityBase<T>
         });
     }
 
-    /// <summary>
-    /// Gets a typed column reference for the property selected by the expression.
-    /// </summary>
-    /// <param name="propertySelector">A lambda expression selecting a property of <typeparamref name="T"/>.</param>
-    /// <returns>An <see cref="ISqlReference"/> representing the qualified column (e.g. <c>"p"."Name"</c>).</returns>
+    // TODO (v2.0): Remove when deleting old lambda syntax
+    [Obsolete("Use the zero-allocation out var syntax and direct POCO property access (e.g., {p.Id}).")]
     public ISqlReference this[Expression<Func<T, object>> propertySelector]
     {
         get

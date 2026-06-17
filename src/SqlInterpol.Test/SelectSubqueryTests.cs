@@ -1,5 +1,7 @@
+using System.Runtime.CompilerServices;
 using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
+using Xunit;
 
 namespace SqlInterpol.Test;
 
@@ -10,34 +12,33 @@ public class SelectSubqueryTests
     public void Select_WithInlineSubquery(SqlTestCase testCase)
     {
         // Arrange
-        var activeStatus = true;
-        var minPrice = 100;
+        var activeStatus = 100;
+        var minPrice = 101;
 
         var db = testCase.CreateBuilder();
         
         // Act
-        var result = db.Entity<Product>().Query(p =>
-        {
-            // 1. Define subquery inline. It securely captures the 'p' reference!
-            var categorySubquery = db.Entity<Category>().Query(c => 
-                db.Append($$"""
-                SELECT
-                    {{c[x => x.Name]}}
-                FROM {{c}}
-                WHERE {{c[x => x.Id]}} = {{p[x => x.CategoryId]}} AND {{c[x => x.IsActive]}} = {{activeStatus}}
-                """));
+        db.Entity<Product>(out var p);
 
-            // 2. Main query safely correlates the alias
-            db.Append($$"""
+        // 1. Define subquery inline. It securely captures the 'p' reference!
+        var categorySubquery = db.Entity<Category>(out var c).Subquery(c, sub => 
+            sub.Append($$"""
+            SELECT
+                {{c.Name}}
+            FROM {{c}}
+            WHERE {{c.Id}} = {{p.CategoryId}} AND {{c.IsActive}} = {{activeStatus}}
+            """));
+
+        // 2. Main query safely correlates the alias
+        var result = db.Append($$"""
             SELECT 
-                {{p[x => x.Id]}},
+                {{p.Id}},
                 (
                     {{categorySubquery}}
                 ) AS CategoryName
             FROM {{p}} AS prod
-            WHERE {{p[x => x.Price]}} > {{minPrice}}
-            """);
-        }).Build();
+            WHERE {{p.Price}} > {{minPrice}}
+            """).Build();
 
         // Assert
         testCase.AssertSql(result.Sql, 0); // Assert against the first expected string
@@ -49,54 +50,42 @@ public class SelectSubqueryTests
     public void Select_WithFunctionSubquery(SqlTestCase testCase)
     {
         // Arrange
-        var activeStatus = true;
-        var minPrice = 100;
+        var activeStatus = 100;
+        var minPrice = 101;
 
         // Act
         // First alias: 'prod'
         var db1 = testCase.CreateBuilder();     
-        var result1 = db1.Entity<Product>().Query(p =>
-        {
-            db1.Append($$"""
+        db1.Entity<Product>(out var p1);
+        
+        var result1 = db1.Append($$"""
             SELECT 
-                {{p[x => x.Id]}},
+                {{p1.Id}},
                 (
-                    {{BuildCategorySubquery(db1, p, activeStatus)}}
+                    {{db1.BuildCategorySubquery(p1, activeStatus)}}
                 ) AS CategoryName
-            FROM {{p}} AS prod
-            WHERE {{p[x => x.Price]}} > {{minPrice}}
-            """);
-        }).Build();
+            FROM {{p1}} AS prod
+            WHERE {{p1.Price}} > {{minPrice}}
+            """).Build();
 
         // Second alias: 'second_prod' - ensures no state bleed between queries
         var db2 = testCase.CreateBuilder();
-        var result2 = db2.Entity<Product>().Query(p =>
-        {
-            db2.Append($$"""
+        db2.Entity<Product>(out var p2);
+        
+        var result2 = db2.Append($$"""
             SELECT 
-                {{p[x => x.Id]}},
+                {{p2.Id}},
                 (
-                    {{BuildCategorySubquery(db2, p, activeStatus)}}
+                    {{db2.BuildCategorySubquery(p2, activeStatus)}}
                 ) AS CategoryName
-            FROM {{p}} AS second_prod
-            WHERE {{p[x => x.Price]}} > {{minPrice}}
-            """);
-        }).Build();
+            FROM {{p2}} AS second_prod
+            WHERE {{p2.Price}} > {{minPrice}}
+            """).Build();
 
         // Assert
         testCase.AssertSql(result1.Sql, 0); // Assert against the first expected string
         testCase.AssertSql(result2.Sql, 1); // Assert against the second expected string
     }
-
-    // Helper method used by the function test
-    private ISqlQuery BuildCategorySubquery(SqlBuilder db, ISqlEntity<Product> p, bool activeStatus) => 
-        db.Entity<Category>().Query(c => 
-            db.Append($$"""
-            SELECT
-                {{c[x => x.Name]}}
-            FROM {{c}}
-            WHERE {{c[x => x.Id]}} = {{p[x => x.CategoryId]}} AND {{c[x => x.IsActive]}} = {{activeStatus}}
-            """));
 
     public static TheoryData<SqlTestCase> SelectSubqueryData =>
     [
@@ -304,4 +293,17 @@ public class SelectSubqueryTests
             ]
         )
     ];
+}
+
+internal static class SelectSubqueryTestExtensions
+{
+    public static ISqlQuery<Category> BuildCategorySubquery(this SqlBuilder db, Product pOuter, int activeStatus) => 
+        db.Entity(pOuter, out var p) // Imports the outer entity!
+          .Entity<Category>(out var c) // Registers the inner entity!
+          .Subquery(c, sub => sub.Append($$"""
+            SELECT
+                {{c.Name}}
+            FROM {{c}}
+            WHERE {{c.Id}} = {{p.CategoryId}} AND {{c.IsActive}} = {{activeStatus}}
+            """));
 }

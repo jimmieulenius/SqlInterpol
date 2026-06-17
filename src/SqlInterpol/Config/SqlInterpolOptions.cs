@@ -60,7 +60,7 @@ public record SqlInterpolOptions
     /// (e.g., `out var p`) should automatically be applied as SQL aliases for the generated entities.
     /// Defaults to false to ensure backward compatibility.
     /// </summary>
-    public bool AutoAliasing { get; init; } = false;
+    public bool EntityAutoAliasing { get; set; } = false;
 
     /// <summary>
     /// Gets the active dialect kind. Set automatically by <see cref="SqlBuilder"/> when constructing the context.
