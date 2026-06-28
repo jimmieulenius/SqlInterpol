@@ -1,75 +1,147 @@
+using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
 
 namespace SqlInterpol.Test;
 
 public class DeleteAsTests
 {
+    private const int TargetId = 42;
+
     [Theory]
-    [MemberData(nameof(SqlServerDeleteAsData))]
-    public void SqlServerDeleteAs(SqlTestCase testCase)
+    [MemberData(nameof(DeleteWithExplicitAliasData))]
+    public void Delete_WithExplicitAlias(SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
-        var targetId = 42;
 
         // Act
-        // SQL Server requires: DELETE [alias] FROM [table] AS [alias]
-        var result = db.Query<OrderModel>(o => 
-            db.Append($$""" 
-            DELETE {{o.Reference}}
-            FROM {{o}} AS {{Sql.Quote("o")}}
-            WHERE {{o[x => x.Id]}} = {{targetId}}
-            """)) 
-            .Build();
+        testCase.Action(() => db.Entity<OrderModel>(out var o)
+            .Append($$""" 
+                DELETE FROM {{o}} AS {{"o"}}
+                WHERE {{o.Id}} = {{TargetId}}
+                """)
+            .Build()
+        );
 
         // Assert
-        testCase.AssertSql(result.Sql);
-        Assert.Equal(targetId, result.Parameters.ElementAt(0).Value);
+        testCase.Assert();
     }
 
-    // We only test SqlServerDialect here because this is specific SQL Server syntax
-    public static TheoryData<SqlTestCase> SqlServerDeleteAsData =>
-    [
-        new SqlTestCase(SqlDialectKind.SqlServer, [
-            """
-            DELETE FROM [o]
-            FROM [dbo].[Orders] AS [o]
-            WHERE [o].[Id] = @p0
-            """
-        ])
-    ];
-
     [Theory]
-    [MemberData(nameof(PostgresDeleteAsData))]
-    public void PostgresDeleteAs(SqlTestCase testCase)
+    [MemberData(nameof(DeleteWithoutAliasData))]
+    public void Delete_WithoutAlias_StripsAutoAlias(SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
-        var targetId = 42;
+        db.Context.Options.EntityAutoAliasing = true; // Even with auto-aliasing enabled, it strips safely!
 
         // Act
-        // Postgres allows: DELETE FROM [table] AS [alias]
-        var result = db.Entity<OrderModel>(alias: "o").Query(o =>
-            db.Append($$"""
-            DELETE FROM {{o.Declaration}}
-            WHERE {{o[x => x.Id]}} = {{targetId}}
-            """
-            ))
-            .Build();
+        testCase.Action(() => db.Entity<OrderModel>(out var o)
+            .Append($$""" 
+                DELETE FROM {{o}}
+                WHERE {{o.Id}} = {{TargetId}}
+                """)
+            .Build()
+        );
 
         // Assert
-        testCase.AssertSql(result.Sql);
-        Assert.Equal(targetId, result.Parameters.ElementAt(0).Value);
+        testCase.Assert();
     }
 
-    // We only test PostgresDialect here because this is specific Postgres syntax
-    public static TheoryData<SqlTestCase> PostgresDeleteAsData =>
-    [
-        new SqlTestCase(SqlDialectKind.PostgreSql, [
-            """
-            DELETE FROM "dbo"."Orders" AS "o"
-            WHERE "o"."Id" = $1
-            """
-        ])
-    ];
+    public static TheoryData<SqlTestCase> DeleteWithExplicitAliasData
+    {
+        get
+        {
+            object?[] parameters = [TargetId];
+
+            return
+            [
+                new SqlTestCase(SqlDialectKind.CustomDb, typeof(SqlDialectException)),
+                new SqlTestCase(SqlDialectKind.Firebird, typeof(SqlDialectException)),
+                new SqlTestCase(SqlDialectKind.MySql, 
+                    expectedSql: [
+                        """
+                        DELETE `o` FROM `dbo`.`Orders` AS `o`
+                        WHERE `o`.`Id` = @p0
+                        """
+                    ],
+                    expectedParameters: parameters
+                ),
+                new SqlTestCase(SqlDialectKind.Oracle, typeof(SqlDialectException)),
+                new SqlTestCase(SqlDialectKind.PostgreSql, 
+                    expectedSql: [
+                        """
+                        DELETE FROM "dbo"."Orders" AS "o"
+                        WHERE "o"."Id" = $1
+                        """
+                    ],
+                    expectedParameters: parameters
+                ),
+                new SqlTestCase(SqlDialectKind.SqLite, typeof(SqlDialectException)),
+                new SqlTestCase(SqlDialectKind.SqlServer, 
+                    expectedSql: [
+                        """
+                        DELETE [o] FROM [dbo].[Orders] AS [o]
+                        WHERE [o].[Id] = @p0
+                        """
+                    ],
+                    expectedParameters: parameters
+                )
+            ];
+        }
+    }
+
+    public static TheoryData<SqlTestCase> DeleteWithoutAliasData
+    {
+        get
+        {
+            object?[] parameters = [TargetId];
+
+            return
+            [
+                // ALL Dialects safely strip the alias because the user didn't explicitly ask for it!
+                new SqlTestCase(SqlDialectKind.CustomDb, [
+                    """
+                    DELETE FROM <<dbo>>.<<Orders>>
+                    WHERE <<dbo>>.<<Orders>>.<<Id>> = !!100
+                    """], expectedParameters: parameters),
+
+                new SqlTestCase(SqlDialectKind.Firebird, [
+                    """
+                    DELETE FROM "dbo"."Orders"
+                    WHERE "dbo"."Orders"."Id" = @p0
+                    """], expectedParameters: parameters),
+                
+                new SqlTestCase(SqlDialectKind.MySql, [
+                    """
+                    DELETE FROM `dbo`.`Orders`
+                    WHERE `dbo`.`Orders`.`Id` = @p0
+                    """], expectedParameters: parameters),
+
+                new SqlTestCase(SqlDialectKind.Oracle, [
+                    """
+                    DELETE FROM "dbo"."Orders"
+                    WHERE "dbo"."Orders"."Id" = :0
+                    """], expectedParameters: parameters),
+
+                new SqlTestCase(SqlDialectKind.PostgreSql, [
+                    """
+                    DELETE FROM "dbo"."Orders"
+                    WHERE "dbo"."Orders"."Id" = $1
+                    """], expectedParameters: parameters),
+
+                new SqlTestCase(SqlDialectKind.SqLite, [
+                    """
+                    DELETE FROM "dbo"."Orders"
+                    WHERE "dbo"."Orders"."Id" = @p1
+                    """], expectedParameters: parameters),
+
+                new SqlTestCase(SqlDialectKind.SqlServer, [
+                    """
+                    DELETE FROM [dbo].[Orders]
+                    WHERE [dbo].[Orders].[Id] = @p0
+                    """], expectedParameters: parameters),
+            ];
+        }
+    }
 }

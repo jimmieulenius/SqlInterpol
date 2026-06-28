@@ -5,29 +5,33 @@ namespace SqlInterpol.Test;
 
 public class UpdateSubqueryTests
 {
+    private const decimal TargetMaxPrice = 99.99m;
+
     [Theory]
     [MemberData(nameof(UpdateSubqueryData))]
     public void Update_AgainstRawSubquery(SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
-        var updateDto = new { MaxPrice = 99.99m };
+        var updateDto = new { MaxPrice = TargetMaxPrice };
         
         // Act
-        var result = db.Query<OrderStatsModel>(sq =>
-            db.Append($$"""
-            UPDATE (
-                SELECT CategoryId, MAX(Price) AS max_price FROM Products GROUP BY CategoryId
-            ) AS {{sq.As("stats")}}
-            SET {{updateDto}}
-            WHERE {{sq[x => x.CategoryId]}} = 5
-            """))
-            .Build();
+        testCase.Action(() => db
+            .Entity<OrderStatsModel>(out var stats)
+            .Append($$"""
+                UPDATE (
+                    {{db.Subquery(stats, () => db.Append($$"""
+                        SELECT CategoryId, MAX(Price) AS max_price FROM Products GROUP BY CategoryId
+                        """))}}
+                ) AS {{"stats"}}
+                SET {{updateDto}}
+                WHERE {{stats.CategoryId}} = 5
+                """)
+            .Build()
+        );
 
         // Assert
-        testCase.AssertSql(result.Sql);
-        
-        Assert.Equal(99.99m, result.Parameters.ElementAt(0).Value);
+        testCase.Assert();
     }
 
     [Theory]
@@ -36,204 +40,215 @@ public class UpdateSubqueryTests
     {
         // Arrange
         var db = testCase.CreateBuilder();
-        var updateDto = new { MaxPrice = 99.99m };
+        var updateDto = new { MaxPrice = TargetMaxPrice };
 
         // Act
-        var result = db
-            .Entity<OrderStatsModel>()
-            .Entity<Product>(alias: "p")
-            .Query((stats, p) =>
-            db.Append($$"""
-            UPDATE (
-                SELECT 
-                    {{p[x => x.CategoryId]}} AS {{stats[x => x.CategoryId]}}, 
-                    MAX({{p[x => x.Price]}}) AS {{stats[x => x.MaxPrice]}} 
-                FROM {{p}} 
-                GROUP BY {{p[x => x.CategoryId]}}
-            ) AS {{stats.As("stats")}}
-            SET {{updateDto}}
-            WHERE {{stats[x => x.CategoryId]}} = 5
-            """))
-            .Build();
+        testCase.Action(() => db
+            .Entity<OrderStatsModel>(out var stats)
+            .Entity<Product>(out var p)
+            .Append($$"""
+                UPDATE (
+                    {{db.Subquery(stats, () => db.Append($$"""
+                        SELECT
+                            {{p.CategoryId}} AS {{stats.CategoryId}},
+                            MAX({{p.Price}}) AS {{stats.MaxPrice}}
+                        FROM {{p}} AS {{"p"}}
+                        GROUP BY {{p.CategoryId}}
+                        """))}}
+                ) AS {{"stats"}}
+                SET {{updateDto}}
+                WHERE {{stats.CategoryId}} = 5
+                """)
+            .Build()
+        );
 
         // Assert
-        testCase.AssertSql(result.Sql);
-        Assert.Equal(99.99m, result.Parameters.ElementAt(0).Value);
+        testCase.Assert();
     }
 
-    public static TheoryData<SqlTestCase> UpdateSubqueryData =>
-    [
-        new SqlTestCase(
-            SqlDialectKind.CustomDb, 
-            [
-                """
-                UPDATE (
-                    SELECT CategoryId, MAX(Price) AS max_price FROM Products GROUP BY CategoryId
-                ) AS <<stats>>
-                SET <<max_price>> = !!100
-                WHERE <<stats>>.<<CategoryId>> = 5
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.MySql, 
-            [
-                """
-                UPDATE (
-                    SELECT CategoryId, MAX(Price) AS max_price FROM Products GROUP BY CategoryId
-                ) AS `stats`
-                SET `max_price` = @p0
-                WHERE `stats`.`CategoryId` = 5
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.Oracle, 
-            [
-                """
-                UPDATE (
-                    SELECT CategoryId, MAX(Price) AS max_price FROM Products GROUP BY CategoryId
-                ) AS "stats"
-                SET "max_price" = :0
-                WHERE "stats"."CategoryId" = 5
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.PostgreSql, 
-            [
-                """
-                UPDATE (
-                    SELECT CategoryId, MAX(Price) AS max_price FROM Products GROUP BY CategoryId
-                ) AS "stats"
-                SET "max_price" = $1
-                WHERE "stats"."CategoryId" = 5
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.SqLite, 
-            [
-                """
-                UPDATE (
-                    SELECT CategoryId, MAX(Price) AS max_price FROM Products GROUP BY CategoryId
-                ) AS "stats"
-                SET "max_price" = @p1
-                WHERE "stats"."CategoryId" = 5
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.SqlServer, 
-            [
-                """
-                UPDATE (
-                    SELECT CategoryId, MAX(Price) AS max_price FROM Products GROUP BY CategoryId
-                ) AS [stats]
-                SET [max_price] = @p0
-                WHERE [stats].[CategoryId] = 5
-                """
-            ]
-        )
-    ];
+    public static TheoryData<SqlTestCase> UpdateSubqueryData
+    {
+        get
+        {
+            object?[] expectedParams = [TargetMaxPrice];
 
-    public static TheoryData<SqlTestCase> UpdateTypeSafeSubqueryData =>
-    [
-        new SqlTestCase(
-            SqlDialectKind.CustomDb, 
+            return
             [
-                """
-                UPDATE (
-                    SELECT 
-                        <<p>>.<<CategoryId>> AS <<CategoryId>>, 
-                        MAX(<<p>>.<<Price>>) AS <<MaxPrice>> 
-                    FROM <<dbo>>.<<Products>> AS <<p>> 
-                    GROUP BY <<p>>.<<CategoryId>>
-                ) AS <<stats>>
-                SET <<max_price>> = !!100
-                WHERE <<stats>>.<<CategoryId>> = 5
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.MySql, 
+                new SqlTestCase(
+                    SqlDialectKind.CustomDb,
+                    [
+                        """
+                        UPDATE (SELECT CategoryId, MAX(Price) AS max_price FROM Products GROUP BY CategoryId) AS <<stats>>
+                        SET <<max_price>> = !!100
+                        WHERE <<stats>>.<<CategoryId>> = 5
+                        """
+                    ],
+                    expectedParameters: expectedParams
+                ),
+                new SqlTestCase(
+                    SqlDialectKind.MySql,
+                    [
+                        """
+                        UPDATE (SELECT CategoryId, MAX(Price) AS max_price FROM Products GROUP BY CategoryId) AS `stats`
+                        SET `max_price` = @p0
+                        WHERE `stats`.`CategoryId` = 5
+                        """
+                    ],
+                    expectedParameters: expectedParams
+                ),
+                new SqlTestCase(
+                    SqlDialectKind.Oracle,
+                    [
+                        """
+                        UPDATE (SELECT CategoryId, MAX(Price) AS max_price FROM Products GROUP BY CategoryId) "stats"
+                        SET "max_price" = :0
+                        WHERE "stats"."CategoryId" = 5
+                        """
+                    ],
+                    expectedParameters: expectedParams
+                ),
+                new SqlTestCase(
+                    SqlDialectKind.PostgreSql,
+                    [
+                        """
+                        WITH "stats" AS (
+                            SELECT CategoryId, MAX(Price) AS max_price FROM Products GROUP BY CategoryId
+                        )
+                        UPDATE "stats"
+                        SET "max_price" = $1
+                        WHERE "stats"."CategoryId" = 5
+                        """
+                    ],
+                    expectedParameters: expectedParams
+                ),
+                new SqlTestCase(
+                    SqlDialectKind.SqLite,
+                    [
+                        """
+                        WITH "stats" AS (
+                            SELECT CategoryId, MAX(Price) AS max_price FROM Products GROUP BY CategoryId
+                        )
+                        UPDATE "stats"
+                        SET "max_price" = @p1
+                        WHERE "stats"."CategoryId" = 5
+                        """
+                    ],
+                    expectedParameters: expectedParams
+                ),
+                new SqlTestCase(
+                    SqlDialectKind.SqlServer,
+                    [
+                        """
+                        WITH [stats] AS (
+                            SELECT CategoryId, MAX(Price) AS max_price FROM Products GROUP BY CategoryId
+                        )
+                        UPDATE [stats]
+                        SET [max_price] = @p0
+                        WHERE [stats].[CategoryId] = 5
+                        """
+                    ],
+                    expectedParameters: expectedParams
+                )
+            ];
+        }
+    }
+
+    public static TheoryData<SqlTestCase> UpdateTypeSafeSubqueryData
+    {
+        get
+        {
+            object?[] expectedParams = [TargetMaxPrice];
+
+            return
             [
-                """
-                UPDATE (
-                    SELECT 
-                        `p`.`CategoryId` AS `CategoryId`, 
-                        MAX(`p`.`Price`) AS `MaxPrice` 
-                    FROM `dbo`.`Products` AS `p` 
-                    GROUP BY `p`.`CategoryId`
-                ) AS `stats`
-                SET `max_price` = @p0
-                WHERE `stats`.`CategoryId` = 5
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.Oracle, 
-            [
-                """
-                UPDATE (
-                    SELECT 
-                        "p"."CategoryId" AS "CategoryId", 
-                        MAX("p"."Price") AS "MaxPrice" 
-                    FROM "dbo"."Products" AS "p" 
-                    GROUP BY "p"."CategoryId"
-                ) AS "stats"
-                SET "max_price" = :0
-                WHERE "stats"."CategoryId" = 5
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.PostgreSql, 
-            [
-                """
-                UPDATE (
-                    SELECT 
-                        "p"."CategoryId" AS "CategoryId", 
-                        MAX("p"."Price") AS "MaxPrice" 
-                    FROM "dbo"."Products" AS "p" 
-                    GROUP BY "p"."CategoryId"
-                ) AS "stats"
-                SET "max_price" = $1
-                WHERE "stats"."CategoryId" = 5
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.SqLite, 
-            [
-                """
-                UPDATE (
-                    SELECT 
-                        "p"."CategoryId" AS "CategoryId", 
-                        MAX("p"."Price") AS "MaxPrice" 
-                    FROM "dbo"."Products" AS "p" 
-                    GROUP BY "p"."CategoryId"
-                ) AS "stats"
-                SET "max_price" = @p1
-                WHERE "stats"."CategoryId" = 5
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.SqlServer, 
-            [
-                """
-                UPDATE (
-                    SELECT 
-                        [p].[CategoryId] AS [CategoryId], 
-                        MAX([p].[Price]) AS [MaxPrice] 
-                    FROM [dbo].[Products] AS [p] 
-                    GROUP BY [p].[CategoryId]
-                ) AS [stats]
-                SET [max_price] = @p0
-                WHERE [stats].[CategoryId] = 5
-                """
-            ]
-        )
-    ];
+                new SqlTestCase(
+                    SqlDialectKind.CustomDb,
+                    [
+                        """
+                        UPDATE (SELECT <<p>>.<<CategoryId>> AS <<CategoryId>>, MAX(<<p>>.<<Price>>) AS <<MaxPrice>> FROM <<dbo>>.<<Products>> AS <<p>> GROUP BY <<p>>.<<CategoryId>>) AS <<stats>>
+                        SET <<max_price>> = !!100
+                        WHERE <<stats>>.<<CategoryId>> = 5
+                        """
+                    ],
+                    expectedParameters: expectedParams
+                ),
+                new SqlTestCase(
+                    SqlDialectKind.MySql,
+                    [
+                        """
+                        UPDATE (SELECT `p`.`CategoryId` AS `CategoryId`, MAX(`p`.`Price`) AS `MaxPrice` FROM `dbo`.`Products` AS `p` GROUP BY `p`.`CategoryId`) AS `stats`
+                        SET `max_price` = @p0
+                        WHERE `stats`.`CategoryId` = 5
+                        """
+                    ],
+                    expectedParameters: expectedParams
+                ),
+                new SqlTestCase(
+                    SqlDialectKind.Oracle,
+                    [
+                        """
+                        UPDATE (SELECT "p"."CategoryId" AS "CategoryId", MAX("p"."Price") AS "MaxPrice" FROM "dbo"."Products" "p" GROUP BY "p"."CategoryId") "stats"
+                        SET "max_price" = :0
+                        WHERE "stats"."CategoryId" = 5
+                        """
+                    ],
+                    expectedParameters: expectedParams
+                ),
+                new SqlTestCase(
+                    SqlDialectKind.PostgreSql,
+                    [
+                        """
+                        WITH "stats" AS (
+                            SELECT
+                                "p"."CategoryId" AS "CategoryId",
+                                MAX("p"."Price") AS "MaxPrice"
+                            FROM "dbo"."Products" AS "p"
+                            GROUP BY "p"."CategoryId"
+                        )
+                        UPDATE "stats"
+                        SET "max_price" = $1
+                        WHERE "stats"."CategoryId" = 5
+                        """
+                    ],
+                    expectedParameters: expectedParams
+                ),
+                new SqlTestCase(
+                    SqlDialectKind.SqLite,
+                    [
+                        """
+                        WITH "stats" AS (
+                            SELECT
+                                "p"."CategoryId" AS "CategoryId",
+                                MAX("p"."Price") AS "MaxPrice"
+                            FROM "dbo"."Products" AS "p"
+                            GROUP BY "p"."CategoryId"
+                        )
+                        UPDATE "stats"
+                        SET "max_price" = @p1
+                        WHERE "stats"."CategoryId" = 5
+                        """
+                    ],
+                    expectedParameters: expectedParams
+                ),
+                new SqlTestCase(
+                    SqlDialectKind.SqlServer,
+                    [
+                        """
+                        WITH [stats] AS (
+                            SELECT
+                                [p].[CategoryId] AS [CategoryId],
+                                MAX([p].[Price]) AS [MaxPrice]
+                            FROM [dbo].[Products] AS [p]
+                            GROUP BY [p].[CategoryId]
+                        )
+                        UPDATE [stats]
+                        SET [max_price] = @p0
+                        WHERE [stats].[CategoryId] = 5
+                        """
+                    ],
+                    expectedParameters: expectedParams
+                )
+            ];
+        }
+    }
 }

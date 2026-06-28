@@ -5,7 +5,7 @@ namespace SqlInterpol;
 /// when one is set, or delegating to the parent entity fragment otherwise.
 /// </summary>
 /// <param name="parent">The entity fragment this reference belongs to.</param>
-public class SqlEntityReference(ISqlFragment parent) : ISqlReference
+public class SqlEntityReference(ISqlFragment parent) : ISqlReference, ISqlAliasable
 {
     private readonly ISqlFragment _parent = parent;
     

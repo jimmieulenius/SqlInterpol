@@ -27,15 +27,15 @@ public static class SqlInterpolEFCoreExtensions
     // EF Core provider names are stable, versioned package identifiers — the most reliable signal.
     private static ISqlDialect? TryMatchProviderName(string? providerName) => providerName switch
     {
-        "Microsoft.EntityFrameworkCore.SqlServer"   => new SqlServerSqlDialect(),
-        "Npgsql.EntityFrameworkCore.PostgreSQL"     => new PostgreSqlSqlDialect(),
-        "Microsoft.EntityFrameworkCore.Sqlite"      => new SqLiteSqlDialect(),
+        "Microsoft.EntityFrameworkCore.SqlServer"   => new SqlServerDialect(),
+        "Npgsql.EntityFrameworkCore.PostgreSQL"     => new PostgreSqlDialect(),
+        "Microsoft.EntityFrameworkCore.Sqlite"      => new SqLiteDialect(),
         // Both Pomelo (community) and Oracle's official MySQL provider are supported
         "Pomelo.EntityFrameworkCore.MySql"
         or "MySql.EntityFrameworkCore"
-        or "MySql.Data.EntityFrameworkCore"         => new MySqlSqlDialect(),
-        "Oracle.EntityFrameworkCore"                => new OracleSqlDialect(),
-        "FirebirdSql.EntityFrameworkCore.Firebird"  => new FirebirdSqlDialect(),
+        or "MySql.Data.EntityFrameworkCore"         => new MySqlDialect(),
+        "Oracle.EntityFrameworkCore"                => new OracleDialect(),
+        "FirebirdSql.EntityFrameworkCore.Firebird"  => new FirebirdDialect(),
         _ => null
     };
 
@@ -56,12 +56,12 @@ public static class SqlInterpolEFCoreExtensions
     private static ISqlDialect? TryMatchConnectionType(Type type) => type.Name switch
     {
         "SqlConnection" when type.Namespace is "Microsoft.Data.SqlClient" or "System.Data.SqlClient"
-            => new SqlServerSqlDialect(),
-        "NpgsqlConnection"  => new PostgreSqlSqlDialect(),
-        "SqliteConnection"  => new SqLiteSqlDialect(),
-        "MySqlConnection"   => new MySqlSqlDialect(),
-        "OracleConnection"  => new OracleSqlDialect(),
-        "FbConnection"      => new FirebirdSqlDialect(),
+            => new SqlServerDialect(),
+        "NpgsqlConnection"  => new PostgreSqlDialect(),
+        "SqliteConnection"  => new SqLiteDialect(),
+        "MySqlConnection"   => new MySqlDialect(),
+        "OracleConnection"  => new OracleDialect(),
+        "FbConnection"      => new FirebirdDialect(),
         _ => null
     };
 

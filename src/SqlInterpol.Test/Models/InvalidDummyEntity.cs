@@ -9,6 +9,8 @@ public class InvalidDummyEntity : ISqlEntityBase
 
     public ISqlDeclaration Declaration => throw new NotImplementedException();
 
+    public Type ModelType => throw new NotImplementedException();
+
     public ISqlFragment Column(string name) => throw new NotImplementedException();
 
     public string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default) => throw new NotImplementedException();

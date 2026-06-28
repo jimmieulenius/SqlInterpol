@@ -20,7 +20,7 @@ public partial class SqlBuilder
     /// <param name="opt">Optional options; dialect-default settings are used when <see langword="null"/>.</param>
     /// <returns>A new <see cref="SqlBuilder"/> targeting the PostgreSQL dialect.</returns>
     public static SqlBuilder PostgreSql(SqlInterpolOptions? opt = null) 
-        => new(SqlDialectCache<PostgreSqlSqlDialect>.Instance, opt);
+        => new(SqlDialectCache<PostgreSqlDialect>.Instance, opt);
 
     /// <summary>
     /// Creates a <see cref="SqlBuilder"/> configured for MySQL / MariaDB.
@@ -28,7 +28,7 @@ public partial class SqlBuilder
     /// <param name="opt">Optional options; dialect-default settings are used when <see langword="null"/>.</param>
     /// <returns>A new <see cref="SqlBuilder"/> targeting the MySQL dialect.</returns>
     public static SqlBuilder MySql(SqlInterpolOptions? opt = null) 
-        => new(SqlDialectCache<MySqlSqlDialect>.Instance, opt);
+        => new(SqlDialectCache<MySqlDialect>.Instance, opt);
 
     /// <summary>
     /// Creates a <see cref="SqlBuilder"/> configured for Oracle.
@@ -36,7 +36,7 @@ public partial class SqlBuilder
     /// <param name="opt">Optional options; dialect-default settings are used when <see langword="null"/>.</param>
     /// <returns>A new <see cref="SqlBuilder"/> targeting the Oracle dialect.</returns>
     public static SqlBuilder Oracle(SqlInterpolOptions? opt = null) 
-        => new(SqlDialectCache<OracleSqlDialect>.Instance, opt);
+        => new(SqlDialectCache<OracleDialect>.Instance, opt);
 
     /// <summary>
     /// Creates a <see cref="SqlBuilder"/> configured for SQLite.
@@ -44,7 +44,7 @@ public partial class SqlBuilder
     /// <param name="opt">Optional options; dialect-default settings are used when <see langword="null"/>.</param>
     /// <returns>A new <see cref="SqlBuilder"/> targeting the SQLite dialect.</returns>
     public static SqlBuilder SqLite(SqlInterpolOptions? opt = null) 
-        => new(SqlDialectCache<SqLiteSqlDialect>.Instance, opt);
+        => new(SqlDialectCache<SqLiteDialect>.Instance, opt);
 
     /// <summary>
     /// Creates a <see cref="SqlBuilder"/> configured for Firebird.
@@ -52,7 +52,7 @@ public partial class SqlBuilder
     /// <param name="opt">Optional options; dialect-default settings are used when <see langword="null"/>.</param>
     /// <returns>A new <see cref="SqlBuilder"/> targeting the Firebird dialect.</returns>
     public static SqlBuilder Firebird(SqlInterpolOptions? opt = null)
-        => new(SqlDialectCache<FirebirdSqlDialect>.Instance, opt);
+        => new(SqlDialectCache<FirebirdDialect>.Instance, opt);
 
     /// <summary>
     /// Creates a <see cref="SqlBuilder"/> configured for SQL Server (T-SQL).
@@ -60,7 +60,7 @@ public partial class SqlBuilder
     /// <param name="opt">Optional options; dialect-default settings are used when <see langword="null"/>.</param>
     /// <returns>A new <see cref="SqlBuilder"/> targeting the SQL Server dialect.</returns>
     public static SqlBuilder SqlServer(SqlInterpolOptions? opt = null) 
-        => new(SqlDialectCache<SqlServerSqlDialect>.Instance, opt);
+        => new(SqlDialectCache<SqlServerDialect>.Instance, opt);
 
     /// <summary>
     /// Creates a <see cref="SqlBuilder"/> configured for a custom or third-party dialect.

@@ -1,10 +1,3 @@
-using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
-using System.Linq.Expressions;
-using SqlInterpol.Parsing;
-
 namespace SqlInterpol;
 
 /// <summary>
@@ -283,24 +276,18 @@ public static partial class SqlBuilderExtensions
 
         foreach (var segment in segments)
         {
-            // Update Contextual Keywords from the Cached Template to guide rendering
-            if (segment.Tag == SqlSegmentTag.InsertKeyword) builder.Context.ParserState.CurrentKeyword = SqlKeyword.Insert;
-            if (segment.Tag == SqlSegmentTag.UpdateKeyword) builder.Context.ParserState.CurrentKeyword = SqlKeyword.Update;
-            if (segment.Tag == SqlSegmentTag.SetKeyword) builder.Context.ParserState.CurrentKeyword = SqlKeyword.Set;
-            if (segment.Tag == SqlSegmentTag.SelectKeyword) builder.Context.ParserState.CurrentKeyword = SqlKeyword.Select;
-
             // 1. Branch Nodes
             if (segment.Value is ISqlSwappableFragment swappable)
             {
                 var swappedFragment = swappable.Swap(entityMap, argumentGetters, arguments);
                 
-                // FORCE: Proactively notify the runtime parser state that these parameters are tracked!
                 if (swappedFragment is ISqlParameterGenerator parameterGenerator)
                 {
                     parameterGenerator.GenerateParameters(builder.Context);
                 }
                 
-                builder.AppendSegment(new SqlSegment(segment.Type, swappedFragment, segment.RenderMode, segment.Tag));
+                // Fixed: Use .Tags array instead of obsolete .Tag
+                builder.AppendSegment(new SqlSegment(segment.Type, swappedFragment, segment.RenderMode, segment.Tags));
                 continue;
             }
 
@@ -314,15 +301,16 @@ public static partial class SqlBuilderExtensions
                 }
                 
                 string activeParamKey = builder.Context.AddParameter(val);
-                builder.AppendSegment(new SqlSegment(SqlSegmentType.Parameter, activeParamKey, segment.RenderMode, segment.Tag));
+                // Fixed: Use .Tags array instead of obsolete .Tag
+                builder.AppendSegment(new SqlSegment(SqlSegmentType.Parameter, activeParamKey, segment.RenderMode, segment.Tags));
                 continue;
             }
 
             // 3. Leaf Node: Entities
             if (segment.Value is ISqlEntityBase dummyEntity && entityMap.TryGetValue(dummyEntity.Reference, out var realEntity))
             {
-                builder.Context.ParserState.ActiveEntityTarget = realEntity;
-                builder.AppendSegment(new SqlSegment(segment.Type, realEntity, segment.RenderMode, segment.Tag));
+                // Fixed: Use .Tags array instead of obsolete .Tag
+                builder.AppendSegment(new SqlSegment(segment.Type, realEntity, segment.RenderMode, segment.Tags));
                 continue;
             }
 
@@ -333,7 +321,8 @@ public static partial class SqlBuilderExtensions
                     ? (SqlColumnReferenceBase)new SqlRawColumnReference(realSource.Reference, colRef.ColumnName)
                     : new SqlColumnReference(realSource.Reference, colRef.ColumnName, colRef.PropertyName);
                     
-                builder.AppendSegment(new SqlSegment(segment.Type, mappedColumn, segment.RenderMode, segment.Tag));
+                // Fixed: Use .Tags array instead of obsolete .Tag
+                builder.AppendSegment(new SqlSegment(segment.Type, mappedColumn, segment.RenderMode, segment.Tags));
                 continue;
             }
 

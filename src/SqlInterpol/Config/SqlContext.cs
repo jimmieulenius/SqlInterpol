@@ -1,21 +1,19 @@
-using SqlInterpol.Parsing;
+using System;
+using System.Collections.Generic;
 
 namespace SqlInterpol;
 
 /// <summary>
 /// Default implementation of <see cref="ISqlContext"/>, holding the runtime state for a
-/// <see cref="SqlBuilder"/> query build: dialect, parser, renderer, options, and parameters.
+/// <see cref="SqlBuilder"/> query build: dialect, renderer, options, and parameters.
 /// </summary>
-public class SqlContext(SqlBuilder builder, ISqlDialect dialect, ISqlInterpolationParser parser, ISqlSegmentRenderer renderer, SqlInterpolOptions? options = null) : ISqlParserContext
+public class SqlContext(SqlBuilder builder, ISqlDialect dialect, ISqlSegmentRenderer renderer, SqlInterpolOptions? options = null) : ISqlContext
 {
     /// <summary>Gets the <see cref="SqlBuilder"/> that owns this context.</summary>
     public SqlBuilder Builder { get; } = builder;
 
     /// <summary>Gets the active SQL dialect.</summary>
     public ISqlDialect Dialect { get; } = dialect;
-
-    /// <summary>Gets the parser used to process SQL literals and interpolated values.</summary>
-    public ISqlInterpolationParser Parser { get; } = parser;
 
     /// <summary>Gets the renderer used to convert segments to SQL strings.</summary>
     public ISqlSegmentRenderer Renderer { get; } = renderer;
@@ -26,26 +24,22 @@ public class SqlContext(SqlBuilder builder, ISqlDialect dialect, ISqlInterpolati
     /// <summary>Gets the accumulated dictionary of named parameters extracted from interpolated values.</summary>
     public IDictionary<string, object?> Parameters { get; private set; } = new Dictionary<string, object?>();
 
-    internal SqlParserState ParserState { get; } = new();
-
-    ISqlParserState ISqlParserContext.ParserState => ParserState;
-
     /// <inheritdoc />
     public string AddParameter(object? value)
     {
         int maxParams = Options.QueryParametersMaxCount ?? Dialect.QueryParametersMaxCount;
+        int currentCount = Parameters.Count; // Pure, zero-allocation tracking via the collection itself!
 
-        if (ParserState.ParameterCount >= maxParams)
+        if (currentCount >= maxParams)
         {
-            throw new SqlParameterLimitException(maxParams, ParserState.ParameterCount + 1);
+            throw new SqlParameterLimitException(maxParams, currentCount + 1);
         }
 
-        int index = Options.ParameterIndexStart + ParserState.ParameterCount;
+        int index = Options.ParameterIndexStart + currentCount;
         string prefix = Options.ParameterPrefixOverride ?? Dialect.ParameterPrefix;
         string paramKey = $"{prefix}{index}";
         
         Parameters[paramKey] = value ?? DBNull.Value;
-        ParserState.ParameterCount++;
         
         return paramKey;
     }
@@ -54,6 +48,5 @@ public class SqlContext(SqlBuilder builder, ISqlDialect dialect, ISqlInterpolati
     public void Reset()
     {
         Parameters = new Dictionary<string, object?>();
-        ParserState.Reset();
     }
 }

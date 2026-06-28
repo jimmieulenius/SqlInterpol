@@ -26,12 +26,6 @@ public abstract class SqlTemplate(Lazy<IReadOnlyList<SqlSegment>> segments)
         var lazySegments = new Lazy<IReadOnlyList<SqlSegment>>(() =>
         {
             var db = new SqlBuilder(new Dialects.AnsiSqlDialect()); 
-            
-            // Pre-seed the active entity target context so that structural macro expansions 
-            // like Sql.Expand can resolve property structures even if they appear before 
-            // the entity token (such as in SELECT projections).
-            db.Context.ParserState.ActiveEntityTarget = entity;
-            
             definition(db, entity);
             return db.Segments;
         });
@@ -46,12 +40,6 @@ public abstract class SqlTemplate(Lazy<IReadOnlyList<SqlSegment>> segments)
         var lazySegments = new Lazy<IReadOnlyList<SqlSegment>>(() =>
         {
             var db = new SqlBuilder(new Dialects.AnsiSqlDialect()); 
-            
-            // Pre-seed the active entity target context so that structural macro expansions 
-            // like Sql.Expand can resolve property structures even if they appear before 
-            // the entity token (such as in SELECT projections).
-            db.Context.ParserState.ActiveEntityTarget = entity1;
-            
             definition(db, entity1, entity2);
             return db.Segments;
         });
@@ -67,12 +55,6 @@ public abstract class SqlTemplate(Lazy<IReadOnlyList<SqlSegment>> segments)
         var lazySegments = new Lazy<IReadOnlyList<SqlSegment>>(() =>
         {
             var db = new SqlBuilder(new Dialects.AnsiSqlDialect()); 
-            
-            // Pre-seed the active entity target context so that structural macro expansions 
-            // like Sql.Expand can resolve property structures even if they appear before 
-            // the entity token (such as in SELECT projections).
-            db.Context.ParserState.ActiveEntityTarget = entity1;
-            
             definition(db, entity1, entity2, entity3);
             return db.Segments;
         });
@@ -89,12 +71,6 @@ public abstract class SqlTemplate(Lazy<IReadOnlyList<SqlSegment>> segments)
         var lazySegments = new Lazy<IReadOnlyList<SqlSegment>>(() =>
         {
             var db = new SqlBuilder(new Dialects.AnsiSqlDialect()); 
-            
-            // Pre-seed the active entity target context so that structural macro expansions 
-            // like Sql.Expand can resolve property structures even if they appear before 
-            // the entity token (such as in SELECT projections).
-            db.Context.ParserState.ActiveEntityTarget = entity1;
-            
             definition(db, entity1, entity2, entity3, entity4);
             return db.Segments;
         });
@@ -112,12 +88,6 @@ public abstract class SqlTemplate(Lazy<IReadOnlyList<SqlSegment>> segments)
         var lazySegments = new Lazy<IReadOnlyList<SqlSegment>>(() =>
         {
             var db = new SqlBuilder(new Dialects.AnsiSqlDialect()); 
-            
-            // Pre-seed the active entity target context so that structural macro expansions 
-            // like Sql.Expand can resolve property structures even if they appear before 
-            // the entity token (such as in SELECT projections).
-            db.Context.ParserState.ActiveEntityTarget = entity1;
-            
             definition(db, entity1, entity2, entity3, entity4, entity5);
             return db.Segments;
         });

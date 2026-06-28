@@ -19,5 +19,10 @@ public enum SqlSegmentType
     /// <summary>A raw, unescaped SQL string inserted directly into the output without parameterization.</summary>
     Raw,
     /// <summary>A placeholder for a runtime parameter in a pre-compiled SQL template that must be resolved before rendering.</summary>
-    Argument
+    Argument,
+    /// <summary>
+    /// A C# object from an interpolation hole that has not yet been 
+    /// evaluated or mapped by the SqlSegmentPreprocessor.
+    /// </summary>
+    Unresolved
 }

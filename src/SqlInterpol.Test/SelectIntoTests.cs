@@ -11,20 +11,25 @@ public class SelectIntoTests
     {
         // Arrange
         var db = testCase.CreateBuilder();
+        SqlQueryResult? result = null;
 
         // Act
-        var result = db
-            .Entity<Product>(out var p)
-            .Append($$"""
-            SELECT {{p.Id}}, {{p.Name}}
-            INTO #TempProducts
-            FROM {{p}}
-            """)
-            .Build();
+        testCase.Action(() => 
+        {
+            result = db
+                .Entity<Product>(out var p)
+                .Append($$"""
+                SELECT {{p.Id}}, {{p.Name}}
+                INTO #TempProducts
+                FROM {{p}}
+                """)
+                .Build();
+
+            return [result];
+        });
 
         // Assert
-        testCase.AssertSql(result.Sql);
-        Assert.Empty(result.Parameters);
+        testCase.Assert();
     }
 
     [Theory]
@@ -34,50 +39,39 @@ public class SelectIntoTests
         // Arrange
         var db = testCase.CreateBuilder();
         var target = Sql.Raw("#TempProducts");
+        SqlQueryResult? result = null;
 
         // Act
-        var result = db
-            .Entity<Product>(out var p)
-            .Append($$"""
-            SELECT {{p.Id}}, {{p.Name}}
-            INTO {{target}}
-            FROM {{p}}
-            """)
-            .Build();
-
-        // Assert
-        testCase.AssertSql(result.Sql);
-        
-        // Target table strings must be consumed structurally as literals by RewriteSegments, 
-        // leaving parameters empty.
-        Assert.Empty(result.Parameters);
-    }
-
-    [Theory]
-    [MemberData(nameof(UnsupportedSelectIntoData))]
-    public void Select_Into_ThrowsException_ForUnsupportedDialect(SqlErrorTestCase testCase)
-    {
-        // Arrange
-        var db = testCase.CreateBuilder();
-
-        // Act
-        var exception = Record.Exception(() => 
+        testCase.Action(() => 
         {
-            db.Entity<Product>(out var p)
-              .Append($$"""
-                SELECT {{p.Id}}
-                INTO #TempProducts
+            result = db
+                .Entity<Product>(out var p)
+                .Append($$"""
+                SELECT {{p.Id}}, {{p.Name}}
+                INTO {{target}}
                 FROM {{p}}
                 """)
-              .Build();
+                .Build();
+
+            return [result];
         });
 
         // Assert
-        testCase.AssertException(exception);
+        testCase.Assert();
     }
 
     public static TheoryData<SqlTestCase> SelectIntoData =>
     [
+        new SqlTestCase(
+            SqlDialectKind.CustomDb, 
+            typeof(SqlDialectException), 
+            "'SELECT INTO' is not supported"
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Firebird, 
+            typeof(SqlDialectException), 
+            "'SELECT INTO' is not supported"
+        ),
         new SqlTestCase(
             SqlDialectKind.MySql,
             [
@@ -103,7 +97,7 @@ public class SelectIntoTests
             [
                 """
                 SELECT "dbo"."Products"."Id", "dbo"."Products"."PROD_NAME"
-                INTO "#TempProducts"
+                INTO #TempProducts
                 FROM "dbo"."Products"
                 """
             ]
@@ -123,7 +117,7 @@ public class SelectIntoTests
             [
                 """
                 SELECT [dbo].[Products].[Id], [dbo].[Products].[PROD_NAME]
-                INTO [#TempProducts]
+                INTO #TempProducts
                 FROM [dbo].[Products]
                 """
             ]
@@ -132,6 +126,16 @@ public class SelectIntoTests
 
     public static TheoryData<SqlTestCase> SelectIntoParameterizedData =>
     [
+        new SqlTestCase(
+            SqlDialectKind.CustomDb, 
+            typeof(SqlDialectException), 
+            "'SELECT INTO' is not supported"
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Firebird, 
+            typeof(SqlDialectException), 
+            "'SELECT INTO' is not supported"
+        ),
         new SqlTestCase(
             SqlDialectKind.MySql,
             [
@@ -181,20 +185,6 @@ public class SelectIntoTests
                 FROM [dbo].[Products]
                 """
             ]
-        )
-    ];
-
-    public static TheoryData<SqlErrorTestCase> UnsupportedSelectIntoData =>
-    [
-        new SqlErrorTestCase(
-            SqlDialectKind.CustomDb, 
-            typeof(SqlDialectException), 
-            "'SELECT INTO' is not supported"
-        ),
-        new SqlErrorTestCase(
-            SqlDialectKind.Firebird, 
-            typeof(SqlDialectException), 
-            "'SELECT INTO' is not supported"
         )
     ];
 }

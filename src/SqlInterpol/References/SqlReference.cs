@@ -5,7 +5,7 @@ namespace SqlInterpol;
 /// alias-quoting flag, and fallback alias state.
 /// </summary>
 /// <param name="parent">The underlying SQL fragment this reference points to.</param>
-public abstract class SqlReference(ISqlFragment parent) : ISqlReference
+public abstract class SqlReference(ISqlFragment parent) : ISqlReference, ISqlAliasable
 {
     /// <summary>Gets the underlying SQL fragment this reference wraps (e.g. an entity or subquery).</summary>
     public ISqlFragment Source { get; } = parent;

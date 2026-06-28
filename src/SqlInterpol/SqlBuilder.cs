@@ -6,37 +6,6 @@ namespace SqlInterpol;
 /// <summary>
 /// The primary entry point for building parameterized, dialect-aware SQL queries using C# interpolated strings.
 /// </summary>
-/// <remarks>
-/// <para>
-/// A <see cref="SqlBuilder"/> is created once per dialect via one of the static factory methods
-/// (e.g. <see cref="PostgreSql"/>, <see cref="SqlServer"/>) and then reused to build multiple queries.
-/// Each call to <see cref="Build(bool)"/> renders the accumulated segments and, by default, resets
-/// the builder for the next query.
-/// </para>
-/// <para>
-/// SQL is written using standard C# interpolated string syntax. Every interpolated value is
-/// automatically extracted as a named <c>DbParameter</c> — no string concatenation, no SQL injection.
-/// </para>
-/// <example>
-/// <code>
-/// var db = SqlBuilder.PostgreSql();
-/// 
-/// // 1. Register the entity and extract the zero-allocation dummy POCO
-/// db.Entity&lt;Product&gt;(out var p);
-/// 
-/// // 2. Build the query natively
-/// var query = db.Append($"""
-///     SELECT {p.Id}, {p.Name}
-///     FROM {p:decl}
-///     WHERE {p.IsActive} = {true}
-///       AND {p.Price} > {minPrice}
-/// """).Build();
-///
-/// // query.Sql        => SELECT "p"."Id", "p"."Name" FROM "Products" AS "p" WHERE "p"."IsActive" = @p0 AND "p"."Price" > @p1
-/// // query.Parameters => { "@p0": true, "@p1": 42 }
-/// </code>
-/// </example>
-/// </remarks>
 public partial class SqlBuilder : ISqlEntityRegistry
 {
     private List<SqlSegment> _segments = [];
@@ -47,11 +16,19 @@ public partial class SqlBuilder : ISqlEntityRegistry
     /// </summary>
     internal Dictionary<string, ISqlEntityBase> ScopedVariables { get; } = new(StringComparer.Ordinal);
 
-    /// <summary>Gets the <see cref="SqlContext"/> holding the dialect, parser, renderer, and options for this builder.</summary>
+    /// <summary>
+    /// Gets the <see cref="SqlContext"/> holding the dialect, renderer, options, and parameters for this builder.
+    /// </summary>
     public SqlContext Context { get; }
-    private ISqlInterpolationParser Parser => Context.Parser;
+    
     private ISqlSegmentRenderer Renderer => Context.Renderer;
     internal IReadOnlyList<SqlSegment> Segments => _segments;
+    
+    /// <summary>
+    /// Gets the current index of the segment being rendered within the timeline. 
+    /// Used natively by dialects to calculate subquery and CTE declaration layouts.
+    /// </summary>
+    public int CurrentRenderIndex { get; internal set; }
 
     /// <summary>
     /// Initializes a new <see cref="SqlBuilder"/> for the specified dialect.
@@ -65,15 +42,17 @@ public partial class SqlBuilder : ISqlEntityRegistry
     {
         var baseOptions = options ?? SqlInterpolOptions.GetDefault(dialect);
         var finalOptions = baseOptions with { Dialect = dialect.Kind };
-        var parser = finalOptions.Parser ?? SqlInterpolationParser.Instance;
         var renderer = options?.Renderer ?? SqlSegmentRenderer.Instance;
-        Context = new SqlContext(this, dialect, parser, renderer, finalOptions);
+        
+        Context = new SqlContext(this, dialect, renderer, finalOptions);
     }
 
     private SqlBuilder Append(string? value)
     {
         if (string.IsNullOrEmpty(value)) return this;
-        _segments.Add(ProcessLiteral(value));
+        
+        // Pure, O(1) literal addition. No parser intercepting or text modification.
+        _segments.Add(new SqlSegment(SqlSegmentType.Literal, value));
 
         return this;
     }
@@ -84,7 +63,6 @@ public partial class SqlBuilder : ISqlEntityRegistry
     /// </summary>
     /// <param name="handler">
     /// The interpolated string handler that captures SQL text literals and typed interpolation holes.
-    /// C# constructs this automatically when you write <c>$"... {value} ..."</c>.
     /// </param>
     /// <returns>The current <see cref="SqlBuilder"/> instance for method chaining.</returns>
     public SqlBuilder Append([InterpolatedStringHandlerArgument("")] ref SqlQueryInterpolatedStringHandler handler)
@@ -115,26 +93,25 @@ public partial class SqlBuilder : ISqlEntityRegistry
     }
 
     /// <summary>
-    /// Clears all accumulated segments, variables, and resets the builder's internal state, making it ready for a new query.
+    /// Clears all accumulated segments, variables, and resets the builder's internal parameter state, making it ready for a new query.
     /// </summary>
     /// <returns>The current <see cref="SqlBuilder"/> instance for method chaining.</returns>
     public virtual SqlBuilder Clear()
     {
         _segments.Clear();
-        _entities.Clear();       // Clear registered entities
-        ScopedVariables.Clear(); // Clear captured C# variables to prevent cross-query contamination
+        _entities.Clear();       
+        ScopedVariables.Clear(); 
         Context.Reset();
 
         return this;
     }
 
     /// <summary>
-    /// Captures the SQL written by <paramref name="action"/> into an isolated <see cref="ISqlQuery"/> scope,
+    /// Captures the SQL written by <paramref name="action"/> into an isolated buildable <see cref="ISqlQuery"/> scope,
     /// without affecting the segments accumulated on the outer builder.
-    /// Use this to construct subqueries or reusable query fragments.
     /// </summary>
-    /// <param name="action">The action that appends SQL to the builder; its output is captured separately.</param>
-    /// <returns>An <see cref="ISqlQuery"/> holding the segments written inside <paramref name="action"/>.</returns>
+    /// <param name="action">The action that appends SQL to the builder.</param>
+    /// <returns>An executable <see cref="ISqlQuery"/> holding the segments written inside <paramref name="action"/>.</returns>
     public ISqlQuery Query(Action action)
     {
         var mainSegments = _segments;
@@ -157,14 +134,9 @@ public partial class SqlBuilder : ISqlEntityRegistry
     /// Builds all accumulated segments into a <see cref="SqlQueryResult"/> containing the rendered SQL string
     /// and the dictionary of extracted parameters.
     /// </summary>
-    /// <param name="arguments">An optional anonymous object containing global template arguments (e.g., <c>new { tenantId = 5 }</c>).</param>
-    /// <param name="clear">
-    /// When <see langword="true"/> (default), <see cref="Clear"/> is called after building so the builder
-    /// is immediately ready for the next query.
-    /// </param>
-    /// <returns>The <see cref="SqlQueryResult"/> ready for execution via Dapper, EF Core, or raw ADO.NET.</returns>
-    /// <exception cref="SqlDialectException">Thrown when the query uses features not supported by the active dialect.</exception>
-    /// <exception cref="ArgumentException">Thrown when a template argument is not provided.</exception>
+    /// <param name="arguments">An optional anonymous object containing global template arguments.</param>
+    /// <param name="clear">When <see langword="true"/> (default), <see cref="Clear"/> is called after building.</param>
+    /// <returns>The <see cref="SqlQueryResult"/> ready for execution.</returns>
     public SqlQueryResult Build(object? arguments = null, bool clear = true)
     {
         var result = BuildSegments(_segments, arguments);
@@ -178,19 +150,19 @@ public partial class SqlBuilder : ISqlEntityRegistry
     }
 
     /// <summary>
-    /// Builds a previously captured <see cref="ISqlQuery"/> into a <see cref="SqlQueryResult"/>.
-    /// The builder's own accumulated segments are not affected.
+    /// Builds a previously captured buildable <see cref="ISqlQuery"/> into a <see cref="SqlQueryResult"/>.
     /// </summary>
-    /// <param name="query">The captured query to render.</param>
+    /// <param name="query">The isolated query to build.</param>
     /// <param name="arguments">An optional anonymous object containing global template arguments.</param>
     /// <returns>The <see cref="SqlQueryResult"/> ready for execution.</returns>
-    /// <exception cref="SqlDialectException">Thrown when the query uses features not supported by the active dialect.</exception>
     public SqlQueryResult Build(ISqlQuery query, object? arguments = null) 
         => BuildSegments(query.Segments, arguments);
 
     private SqlQueryResult BuildSegments(IReadOnlyList<SqlSegment> segmentsToBuild, object? arguments)
     {
+        // ---------------------------------------------------------------------
         // 1. GLOBAL TEMPLATE ARGUMENT RESOLUTION (Pre-pass)
+        // ---------------------------------------------------------------------
         List<SqlSegment>? resolvedSegments = null;
         IReadOnlyDictionary<string, Func<object, object?>>? getters = null;
 
@@ -205,7 +177,6 @@ public partial class SqlBuilder : ISqlEntityRegistry
             
             if (segment.Type == SqlSegmentType.Raw && segment.Value is SqlArgumentFragment argFragment)
             {
-                // Lazy clone on first argument encountered
                 resolvedSegments ??= [.. segmentsToBuild];
 
                 string argName = argFragment.Name;
@@ -216,7 +187,6 @@ public partial class SqlBuilder : ISqlEntityRegistry
                     object? val = getter(arguments!);
                     string paramKey = Context.AddParameter(val);
                     
-                    // Replace in the mutable copy
                     resolvedSegments[i] = new SqlSegment(SqlSegmentType.Raw, paramKey);
                     resolved = true;
                 }
@@ -229,12 +199,21 @@ public partial class SqlBuilder : ISqlEntityRegistry
             }
         }
 
-        // If we resolved any arguments, use the mutable copy for the rest of the pipeline
         var finalInputSegments = resolvedSegments != null ? (IReadOnlyList<SqlSegment>)resolvedSegments : segmentsToBuild;
 
-        // 2. DIALECT FEATURE VALIDATION
+        // ---------------------------------------------------------------------
+        // 2. COMPILE PIPELINE (Lexical Analysis & Semantic Rewriters)
+        // ---------------------------------------------------------------------
+        var preprocessor = Context.Options.Preprocessor ?? SqlSegmentPreprocessor.Instance;
+        var pipeline = new SqlCompilationPipeline(preprocessor, Context.Options.Rewriters);
+        
+        var compiledSegments = pipeline.Compile(finalInputSegments, Context);
+
+        // ---------------------------------------------------------------------
+        // 3. DIALECT FEATURE VALIDATION
+        // ---------------------------------------------------------------------
         var errors = new List<string>();
-        foreach (var segment in finalInputSegments)
+        foreach (var segment in compiledSegments)
         {
             SqlFeature? requiredFeature = null;
             string? featureName = null;
@@ -244,25 +223,35 @@ public partial class SqlBuilder : ISqlEntityRegistry
                 requiredFeature = req.RequiredFeature;
                 featureName = req.FeatureName;
             }
-            else if (segment.Tag == SqlSegmentTag.ForUpdateKeyword)
+            else if (segment.HasTag(SqlSegmentTag.ForUpdateKeyword))
             {
                 requiredFeature = SqlFeature.ForUpdate;
                 featureName = "FOR UPDATE";
             }
-            else if (segment.Tag == SqlSegmentTag.ForShareKeyword)
+            else if (segment.HasTag(SqlSegmentTag.ForShareKeyword))
             {
                 requiredFeature = SqlFeature.ForShare;
                 featureName = "FOR SHARE";
             }
-            else if (segment.Tag == SqlSegmentTag.ReturningKeyword)
+            else if (segment.HasTag(SqlSegmentTag.ReturningKeyword))
             {
                 requiredFeature = SqlFeature.Returning;
                 featureName = "RETURNING";
             }
-            else if (segment.Tag == SqlSegmentTag.OnConflictKeyword)
+            else if (segment.HasTag(SqlSegmentTag.OnConflictKeyword))
             {
                 requiredFeature = SqlFeature.OnConflict;
                 featureName = "ON CONFLICT";
+            }
+            else if (segment.HasTag(SqlSegmentTag.DeleteAsKeyword))
+            {
+                requiredFeature = SqlFeature.DeleteAs;
+                featureName = "DELETE with target alias";
+            }
+            else if (segment.HasTag(SqlSegmentTag.UpdateAsKeyword))
+            {
+                requiredFeature = SqlFeature.UpdateAs;
+                featureName = "UPDATE with target alias";
             }
 
             if (requiredFeature.HasValue && !Context.Dialect.SupportedFeatures.Contains(requiredFeature.Value))
@@ -276,15 +265,17 @@ public partial class SqlBuilder : ISqlEntityRegistry
             throw new SqlDialectException($"Dialect capabilities validation failed:{Environment.NewLine}- " + string.Join($"{Environment.NewLine}- ", errors));
         }
 
-        // 3. REWRITE & RENDER
-        var finalSegments = Context.Dialect.RewriteSegments(finalInputSegments).ToList();
+        // ---------------------------------------------------------------------
+        // 4. RENDER TO TEXT
+        // ---------------------------------------------------------------------
         var vsb = new SqlInterpol.Parsing.ValueStringBuilder(stackalloc char[2048]);
 
         try
         {
-            for (int i = 0; i < finalSegments.Count; i++)
+            for (int i = 0; i < compiledSegments.Count; i++)
             {
-                vsb.Append(Renderer.Render(Context, finalSegments[i], i, finalSegments) ?? string.Empty);
+                CurrentRenderIndex = i; // Save rendering track index natively for Subquery Declaration layouts
+                vsb.Append(Renderer.Render(Context, compiledSegments[i], i, compiledSegments) ?? string.Empty);
             }
             return new SqlQueryResult(vsb.ToString(), Context.Parameters.AsReadOnly());
         }
@@ -294,17 +285,29 @@ public partial class SqlBuilder : ISqlEntityRegistry
         }
     }
 
-    internal SqlSegment ProcessLiteral(string value)
-    {
-        string? tag = Parser.ProcessLiteral(Context, value.AsSpan());
-        return new SqlSegment(SqlSegmentType.Literal, value, null, tag);
-    }
-
-    internal SqlSegment ProcessValue(object? value) => Parser.ProcessValue(Context, value);
-
     internal void AppendSegment(SqlSegment segment)
     {
         _segments.Add(segment);
+    }
+
+    /// <summary>
+    /// Processes an interpolated value into a typed SQL segment for the preprocessor.
+    /// </summary>
+    internal SqlSegment ProcessValue(object? value)
+    {
+        if (value is SqlSegment segment) 
+            return segment;
+
+        // Entities go to the preprocessor as Unresolved so they can be securely mapped (e.g. SELECT *)
+        if (value is ISqlEntityBase entity) 
+            return new SqlSegment(SqlSegmentType.Unresolved, entity);
+
+        // Explicit structural AST nodes bypass parameterization
+        if (value is ISqlFragment fragment) 
+            return new SqlSegment(SqlSegmentType.Raw, fragment);
+
+        // Primitives, DTOs, and Iterables are deferred for parameter extraction
+        return new SqlSegment(SqlSegmentType.Unresolved, value);
     }
 
     ISqlEntity<T> ISqlEntityRegistry.RegisterEntity<T>(string? name, string? schema, string? alias)

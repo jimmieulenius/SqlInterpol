@@ -82,7 +82,7 @@ public static class Sql
     /// Every DTO property must have a corresponding mapped property on the entity's model type.
     /// </param>
     /// <param name="context">
-    /// The parser context supplying the global <see cref="SqlEnumFormat"/> setting, which can be
+    /// The standard SQL context supplying the global <see cref="SqlEnumFormat"/> setting, which can be
     /// overridden per-property with <see cref="SqlEnumFormatAttribute"/>.
     /// </param>
     /// <returns>An ordered list of assignment fragments ready to be interpolated into a <c>SET</c> or <c>VALUES</c> clause.</returns>
@@ -90,7 +90,7 @@ public static class Sql
     /// Thrown when <paramref name="entity"/> does not implement <see cref="ISqlEntityBase{T}"/>,
     /// or when a DTO property has no matching column on the entity.
     /// </exception>
-    public static List<ISqlAssignmentFragment> BuildAssignments(ISqlEntityBase entity, object dto, ISqlParserContext context)
+    public static List<ISqlAssignmentFragment> BuildAssignments(ISqlEntityBase entity, object dto, ISqlContext context)
     {
         var properties = SqlMetadataRegistry.GetDtoProperties(dto.GetType());
         var assignments = new List<ISqlAssignmentFragment>(properties.Length);
@@ -98,7 +98,7 @@ public static class Sql
         Type? modelType = null;
         foreach (var i in entity.GetType().GetInterfaces())
         {
-            if (i.IsGenericType && i.GetGenericTypeDefinition() == typeof(ISqlEntityBase<>))
+            if (i.IsGenericType && (i.GetGenericTypeDefinition() == typeof(ISqlEntityBase<>) || i.Name.StartsWith("ISqlEntity")))
             {
                 modelType = i.GetGenericArguments()[0];
                 break;
@@ -108,7 +108,7 @@ public static class Sql
         if (modelType == null) throw new ArgumentException("Entity must implement ISqlEntityBase<T>");
 
         var meta = SqlMetadataRegistry.GetMetadata(modelType);
-        var globalEnumFormat = context.Options?.EnumFormat ?? SqlEnumFormat.Integer;
+        var globalEnumFormat = context.Options.EnumFormat;
 
         foreach (var prop in properties)
         {

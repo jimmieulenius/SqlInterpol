@@ -1,27 +1,22 @@
 namespace SqlInterpol;
 
 /// <summary>
-/// Represents a captured SQL query that can be built to a <see cref="SqlQueryResult"/> or embedded as a subquery.
+/// Represents a complete, top-level executable query capable of compiling into a finalized SQL statement and parameter matrix.
 /// </summary>
-/// <seealso cref="ISqlQuery{T}"/>
-public interface ISqlQuery : ISqlFragment
+public interface ISqlQuery : ISqlQueryFragment
 {
-    /// <summary>Gets the ordered list of SQL segments that make up this query.</summary>
-    IReadOnlyList<SqlSegment> Segments { get; }
-
     /// <summary>
-    /// Builds the query into a <see cref="SqlQueryResult"/> containing the rendered SQL string
-    /// and the dictionary of extracted parameters.
+    /// Compiles the query into its final executable SQL string and parameter mapping state.
     /// </summary>
-    /// <returns>The <see cref="SqlQueryResult"/> ready for execution via Dapper, EF Core, or raw ADO.NET.</returns>
+    /// <returns>The compiled <see cref="SqlQueryResult"/> ready for execution via ADO.NET, Dapper, or EF Core.</returns>
     SqlQueryResult Build();
 }
 
 /// <summary>
-/// A typed <see cref="ISqlQuery"/> bound to entity type <typeparamref name="T"/>, supporting
-/// expression-based column indexer access for embedding as a subquery.
+/// A strongly-typed, executable <see cref="ISqlQuery"/> bound to entity model type <typeparamref name="T"/>, 
+/// capable of being built directly or composed seamlessly as a subquery.
 /// </summary>
-/// <typeparam name="T">The CLR entity type whose columns can be accessed on this subquery.</typeparam>
-public interface ISqlQuery<T> : ISqlQuery, ISqlEntityBase<T>
+/// <typeparam name="T">The CLR entity model type whose columns are exposed by this subquery context.</typeparam>
+public interface ISqlQuery<T> : ISqlQuery, ISqlQueryFragment<T>
 {
 }

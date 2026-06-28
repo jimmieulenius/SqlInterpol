@@ -1,15 +1,9 @@
 namespace SqlInterpol;
 
 /// <summary>
-/// Represents a single unit of parsed SQL content in the builder's internal segment pipeline.
-/// The pipeline accumulates <see cref="SqlSegment"/> instances as SQL is appended, then renders
-/// them into the final <see cref="SqlQueryResult"/> during the build phase.
+/// Represents a single tokenized piece of the SQL query timeline.
 /// </summary>
-/// <param name="type">The kind of content this segment holds.</param>
-/// <param name="value">The raw value — a string, fragment, parameter value, or reference object depending on <paramref name="type"/>.</param>
-/// <param name="renderMode">Optional rendering hint that overrides the default render behaviour for this segment.</param>
-/// <param name="tag">Optional tag set by the parser to carry dialect-validation metadata (e.g. <see cref="SqlSegmentTag"/>).</param>
-public class SqlSegment(SqlSegmentType type, object? value, SqlRenderMode? renderMode = null, string? tag = null)
+public class SqlSegment(SqlSegmentType type, object? value, SqlRenderMode? renderMode = null, params string[]? tags)
 {
     /// <summary>Gets the kind of content this segment holds.</summary>
     public SqlSegmentType Type { get; } = type;
@@ -17,6 +11,23 @@ public class SqlSegment(SqlSegmentType type, object? value, SqlRenderMode? rende
     public object? Value { get; } = value;
     /// <summary>Gets the optional render-mode hint that overrides default rendering behaviour.</summary>
     public SqlRenderMode? RenderMode { get; } = renderMode;
-    /// <summary>Gets the optional parser tag used for dialect-capability validation at build time.</summary>
-    public string? Tag { get; } = tag;
+
+    /// <summary>
+    /// Semantic tags assigned to this segment by the preprocessor. 
+    /// Allows pipeline rewriters to easily identify and target specific segments.
+    /// </summary>
+    public string[]? Tags { get; } = tags != null && tags.Length > 0 ? tags : null;
+
+    /// <summary>
+    /// Evaluates in O(N) time (where N is the number of tags on this specific segment, usually 1-3).
+    /// </summary>
+    public bool HasTag(string tag)
+    {
+        if (Tags == null) return false;
+        for (int i = 0; i < Tags.Length; i++)
+        {
+            if (string.Equals(Tags[i], tag, StringComparison.OrdinalIgnoreCase)) return true;
+        }
+        return false;
+    }
 }

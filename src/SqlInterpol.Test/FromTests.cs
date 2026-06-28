@@ -1,5 +1,5 @@
-using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
+using SqlInterpol.Test.Dialects;
 
 namespace SqlInterpol.Test;
 
@@ -9,60 +9,60 @@ public class FromTests
     [MemberData(nameof(From_SingleEntityData))]
     public void From_SingleEntity(SqlTestCase testCase)
     {
-        // Arrange
-        var db = testCase.CreateBuilder();
-        
-        // Act
-        var result = db
-            .Entity<OrderLine>(out var ol)
-            .Append($$"""
-            SELECT *
-            FROM {{ol}}
-            """)
-            .Build();
+        testCase.Action(() =>
+        {
+            var db = testCase.CreateBuilder();
+            
+            return db
+                .Entity<OrderLine>(out var ol)
+                .Append($$"""
+                SELECT *
+                FROM {{ol}}
+                """)
+                .Build();
+        });
 
-        // Assert
-        testCase.AssertSql(result.Sql);
+        testCase.Assert();
     }
 
     [Theory]
     [MemberData(nameof(From_EntityWithSqlTableNameOnlyData))]
     public void From_Entity_WithSqlTableNameOnly(SqlTestCase testCase)
     {
-        // Arrange
-        var db = testCase.CreateBuilder();
-        
-        // Act
-        var result = db
-            .Entity<TableOnlyModel>(out var m)
-            .Append($$"""
-            SELECT *
-            FROM {{m}}
-            """)
-            .Build();
+        testCase.Action(() =>
+        {
+            var db = testCase.CreateBuilder();
+            
+            return db
+                .Entity<TableOnlyModel>(out var m)
+                .Append($$"""
+                SELECT *
+                FROM {{m}}
+                """)
+                .Build();
+        });
 
-        // Assert
-        testCase.AssertSql(result.Sql);
+        testCase.Assert();
     }
 
     [Theory]
     [MemberData(nameof(From_Entity_WithSqlTableNameAndSchemaData))]
     public void From_Entity_WithSqlTableNameAndSchema(SqlTestCase testCase)
     {
-        // Arrange
-        var db = testCase.CreateBuilder();
+        testCase.Action(() =>
+        {
+            var db = testCase.CreateBuilder();
 
-        // Act
-        var result = db
-            .Entity<TableAndSchemaModel>(out var m)
-            .Append($$"""
-            SELECT *
-            FROM {{m}}
-            """)
-            .Build();
+            return db
+                .Entity<TableAndSchemaModel>(out var m)
+                .Append($$"""
+                SELECT *
+                FROM {{m}}
+                """)
+                .Build();
+        });
 
-        // Assert
-        testCase.AssertSql(result.Sql);
+        testCase.Assert();
     }
 
     public static TheoryData<SqlTestCase> From_SingleEntityData =>

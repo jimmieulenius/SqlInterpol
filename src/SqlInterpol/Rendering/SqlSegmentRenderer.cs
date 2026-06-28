@@ -1,5 +1,3 @@
-using SqlInterpol.Parsing;
-
 namespace SqlInterpol;
 
 /// <summary>
@@ -22,36 +20,8 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
             case SqlSegmentType.Reference:
                 if (segment.Value is ISqlFragment fragment)
                 {
-                    var mode = segment.RenderMode ?? ResolveRenderMode(index, segment, segments);
-
-                    if (segment.Type == SqlSegmentType.Reference && 
-                        segment.Value is ISqlEntityBase entity &&
-                        context is ISqlParserContext parserContext &&
-                        parserContext.ParserState.EntityRoles.TryGetValue(entity, out var role) &&
-                        role == SqlEntityRole.Cte)
-                    {
-                        if (mode == SqlRenderMode.BaseName || mode == SqlRenderMode.Declaration)
-                        {
-                            string baseName = context.Dialect.QuoteIdentifier(SqlMetadataRegistry.GetEntityName(entity));
-
-                            if (mode == SqlRenderMode.Declaration && entity.Reference is ISqlReference entRef && !string.IsNullOrEmpty(entRef.Alias))
-                            {
-                                rendered = $"{baseName} AS {context.Dialect.QuoteIdentifier(entRef.Alias)}";
-                            }
-                            else
-                            {
-                                rendered = baseName;
-                            }
-                        }
-                        else 
-                        {
-                            rendered = fragment.ToSql(context, mode);
-                        }
-                    }
-                    else
-                    {
-                        rendered = fragment.ToSql(context, mode);
-                    }
+                    var mode = segment.RenderMode ?? ResolveRenderMode(context, index, segment, segments);
+                    rendered = fragment.ToSql(context, mode);
                 }
                 break;
 
@@ -59,7 +29,7 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
             {
                 var text = segment.Value?.ToString() ?? string.Empty;
                 
-                if (index > 0 && segments[index - 1].Value is ISqlQuery prevSubquery)
+                if (index > 0 && segments[index - 1].Value is ISqlQueryFragment prevSubquery)
                 {
                     var trimmed = text.TrimStart();
 
@@ -67,8 +37,8 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
                     {
                         var afterClose = trimmed[1..].TrimStart();
                         bool alreadyHasAs = afterClose.StartsWith($"{SqlKeyword.As.Value} ", StringComparison.OrdinalIgnoreCase)
-                                        || afterClose.StartsWith($"{SqlKeyword.As.Value}\n", StringComparison.OrdinalIgnoreCase)
-                                        || afterClose.StartsWith($"{SqlKeyword.As.Value}\r", StringComparison.OrdinalIgnoreCase);
+                                         || afterClose.StartsWith($"{SqlKeyword.As.Value}\n", StringComparison.OrdinalIgnoreCase)
+                                         || afterClose.StartsWith($"{SqlKeyword.As.Value}\r", StringComparison.OrdinalIgnoreCase);
 
                         bool requiresAlias = true;
 
@@ -106,7 +76,9 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
             case SqlSegmentType.Raw:
                 if (segment.Value is ISqlFragment rawFrag)
                 {
-                    rendered = rawFrag.ToSql(context, SqlRenderMode.Default);
+                    // FIX: Respect the explicitly assigned RenderMode from the Preprocessor!
+                    var mode = segment.RenderMode ?? SqlRenderMode.Default;
+                    rendered = rawFrag.ToSql(context, mode);
                 }
                 else
                 {
@@ -115,7 +87,7 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
                 break;
         }
 
-        if (segment.Value is ISqlQuery && segment.Type != SqlSegmentType.Projection && rendered != null)
+        if (segment.Value is ISqlQueryFragment && segment.Type != SqlSegmentType.Projection && rendered != null)
         {
             rendered = ApplyAutoIndentation(rendered, index, segments);
         }
@@ -123,7 +95,6 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
         return rendered;
     }
 
-    /// <summary>Indents all newlines in <paramref name="rendered"/> to match the whitespace prefix of the preceding literal segment.</summary>
     private string ApplyAutoIndentation(string rendered, int index, IReadOnlyList<SqlSegment> segments)
     {
         if (index <= 0 || segments[index - 1].Type != SqlSegmentType.Literal)
@@ -144,75 +115,89 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
         if (indentChars.Length > 0)
         {
             var indent = new string(indentChars);
-
             return rendered.Replace("\n", $"\n{indent}");
         }
 
         return rendered;
     }
 
-    /// <summary>Determines the appropriate <see cref="SqlRenderMode"/> for the given entity segment based on context look-behind and look-ahead.</summary>
-    private SqlRenderMode ResolveRenderMode(int index, SqlSegment segment, IReadOnlyList<SqlSegment> segments)
+    private SqlRenderMode ResolveRenderMode(ISqlContext context, int index, SqlSegment segment, IReadOnlyList<SqlSegment> segments)
     {
+        if (segment.Value is SqlColumnReferenceBase)
+        {
+            if (index > 0 && segments[index - 1].Type == SqlSegmentType.Literal)
+            {
+                var prevText = segments[index - 1].Value?.ToString()?.TrimEnd();
+                if (prevText != null && prevText.EndsWith("AS", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (prevText.Length == 2 || !char.IsLetterOrDigit(prevText[^3]))
+                    {
+                        return SqlRenderMode.AliasOnly;
+                    }
+                }
+            }
+            return SqlRenderMode.Default;
+        }
+
         if (segment.Value is not ISqlEntityBase entity) return SqlRenderMode.Default;
 
-        // 1. Look-Behind: Did the user manually open a parenthesis?
         if (index > 0 && segments[index - 1].Type == SqlSegmentType.Literal)
         {
             var prevText = segments[index - 1].Value?.ToString()?.TrimEnd();
             if (prevText != null && prevText.EndsWith("("))
             {
-                // The user controls the wrapping. Just return the raw SQL body.
                 return SqlRenderMode.Default;
             }
         }
 
-        // 2. Look-Ahead Checks
-        if (index + 1 < segments.Count)
+        int lookahead = index + 1;
+        while (lookahead < segments.Count && segments[lookahead].Type == SqlSegmentType.Literal && string.IsNullOrWhiteSpace(segments[lookahead].Value as string))
         {
-            var next = segments[index + 1];
-            if (next.Type == SqlSegmentType.Literal)
-            {
-                var text = next.Value?.ToString()?.TrimStart();
-                
-                // If they manually type AS, drop the declaration but keep parens if it's a query
-                if (text?.StartsWith($"{SqlKeyword.As.Value} ", StringComparison.OrdinalIgnoreCase) == true
-                    || text?.StartsWith($"{SqlKeyword.As.Value}\n", StringComparison.OrdinalIgnoreCase) == true)
-                {
-                    return SqlRenderMode.BaseName;
-                }
+            lookahead++;
+        }
 
-                // If they manually type the alias directly (e.g., " p1"), suppress the auto-generated alias
-                if (entity.Reference is ISqlReference entRef && !string.IsNullOrEmpty(entRef.Alias) && text != null &&
-                    text.StartsWith(entRef.Alias, StringComparison.OrdinalIgnoreCase))
+        if (lookahead < segments.Count && segments[lookahead].Type == SqlSegmentType.Literal)
+        {
+            var text = segments[lookahead].Value?.ToString()?.TrimStart();
+            
+            if (text?.StartsWith($"{SqlKeyword.As.Value} ", StringComparison.OrdinalIgnoreCase) == true
+                || text?.StartsWith($"{SqlKeyword.As.Value}\n", StringComparison.OrdinalIgnoreCase) == true
+                || string.Equals(text, SqlKeyword.As.Value, StringComparison.OrdinalIgnoreCase))
+            {
+                return SqlRenderMode.BaseName;
+            }
+
+            if (entity.Reference is ISqlReference entRef && !string.IsNullOrEmpty(entRef.Alias) && text != null)
+            {
+                var unquotedAlias = context.Dialect.UnquoteIdentifier(entRef.Alias);
+                var quotedAlias = context.Dialect.QuoteIdentifier(entRef.Alias);
+                
+                if (text.StartsWith(unquotedAlias, StringComparison.OrdinalIgnoreCase) || 
+                    text.StartsWith(quotedAlias, StringComparison.OrdinalIgnoreCase))
                 {
-                    // Ensure it's a whole word match (so "p1" doesn't falsely match "p11")
-                    if (text.Length == entRef.Alias.Length || !char.IsLetterOrDigit(text[entRef.Alias.Length]))
+                    int matchLen = text.StartsWith(quotedAlias, StringComparison.OrdinalIgnoreCase) ? quotedAlias.Length : unquotedAlias.Length;
+                    if (text.Length == matchLen || !char.IsLetterOrDigit(text[matchLen]))
                     {
                         return SqlRenderMode.BaseName;
                     }
                 }
-
-                // If the next string closes a parenthesis, they opened one.
-                if (text?.StartsWith(")") == true)
-                {
-                    return SqlRenderMode.Default;
-                }
             }
-            else if (next.Type == SqlSegmentType.Raw)
+
+            if (text?.StartsWith(")") == true)
             {
-                return SqlRenderMode.BaseName;
+                return SqlRenderMode.Default;
             }
         }
+        else if (lookahead < segments.Count && segments[lookahead].Type == SqlSegmentType.Raw)
+        {
+            return SqlRenderMode.BaseName;
+        }
 
-        // 3. Auto-wrapping for un-wrapped physical tables / queries
         if (entity.Reference is ISqlReference reference && !string.IsNullOrEmpty(reference.Alias))
         {
             return SqlRenderMode.Declaration;
         }
 
-        // Subqueries without an alias (like UNION) render natively to avoid arbitrary parentheses.
-        // Physical tables without an alias render their BaseName (e.g., [Products]).
-        return entity is ISqlQuery ? SqlRenderMode.Default : SqlRenderMode.BaseName;
+        return entity is ISqlQueryFragment ? SqlRenderMode.Default : SqlRenderMode.BaseName;
     }
 }

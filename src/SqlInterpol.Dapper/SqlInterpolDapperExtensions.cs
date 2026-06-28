@@ -1,6 +1,5 @@
 ﻿using System.Data;
 using Dapper;
-using SqlInterpol.Dialects;
 
 namespace SqlInterpol.Dapper;
 
@@ -29,12 +28,12 @@ public static class SqlInterpolDapperExtensions
     private static ISqlDialect? TryMatchType(Type type) => type.Name switch
     {
         "SqlConnection" when type.Namespace is "Microsoft.Data.SqlClient" or "System.Data.SqlClient"
-            => new SqlServerSqlDialect(),
-        "NpgsqlConnection"  => new PostgreSqlSqlDialect(),
-        "SqliteConnection"  => new SqLiteSqlDialect(),
-        "MySqlConnection"   => new MySqlSqlDialect(),
-        "OracleConnection"  => new OracleSqlDialect(),
-        "FbConnection"      => new FirebirdSqlDialect(),
+            => new SqlServerDialect(),
+        "NpgsqlConnection"  => new PostgreSqlDialect(),
+        "SqliteConnection"  => new SqLiteDialect(),
+        "MySqlConnection"   => new MySqlDialect(),
+        "OracleConnection"  => new OracleDialect(),
+        "FbConnection"      => new FirebirdDialect(),
         _ => null
     };
 

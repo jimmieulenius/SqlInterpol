@@ -1,5 +1,6 @@
 using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
+using Xunit;
 
 namespace SqlInterpol.Test;
 
@@ -9,168 +10,168 @@ public class FromAsTests
     [MemberData(nameof(From_EntityManualAliasData))]
     public void From_EntityManualAlias(SqlTestCase testCase)
     {
-        // Arrange
-        var db = testCase.CreateBuilder();
+        testCase.Action(() =>
+        {
+            var db = testCase.CreateBuilder();
 
-        // Act
-        var result = db
-            .Entity<Product>(out var p)
-            .Append($$"""
-                SELECT
-                    {{p.Id}}
-                FROM {{p}} AS p
-                """)
-            .Build();
+            return db
+                .Entity<Product>(out var p)
+                .Append($$"""
+                    SELECT
+                        {{p.Id}}
+                    FROM {{p}} AS p
+                    """)
+                .Build();
+        });
 
-        // Assert
-        testCase.AssertSql(result.Sql);
+        testCase.Assert();
     }
 
     [Theory]
     [MemberData(nameof(From_EntitySqlTableAttributeData))]
     public void From_EntitySqlTableAttribute(SqlTestCase testCase)
     {
-        // Arrange
-        var db = testCase.CreateBuilder();
-        
-        // Act
-        var result = db
-            .Entity<Product>(out var p)
-            .Append($$"""
-                SELECT
-                    {{p.Id}}
-                FROM {{p}} AS prod
-                """)
-            .Build();
+        testCase.Action(() =>
+        {
+            var db = testCase.CreateBuilder();
+            
+            return db
+                .Entity<Product>(out var p)
+                .Append($$"""
+                    SELECT
+                        {{p.Id}}
+                    FROM {{p}} AS prod
+                    """)
+                .Build();
+        });
 
-        // Assert
-        testCase.AssertSql(result.Sql);
+        testCase.Assert();
     }
 
     [Theory]
     [MemberData(nameof(From_LiteralTableAsEntityWithoutAttributeData))]
     public void From_LiteralTableAsEntityWithoutAttribute(SqlTestCase testCase)
     {
-        // Arrange
-        var db = testCase.CreateBuilder();
+        testCase.Action(() =>
+        {
+            var db = testCase.CreateBuilder();
 
-        // Act
-        var result = db
-            .Entity<OrderLine>(out var ol)
-            .Append($$"""
-                SELECT
-                    {{ol.OrderId}}
-                FROM ORDER_LINES AS {{ol:alias}}
-                """)
-            .Build();
+            return db
+                .Entity<OrderLine>(out var ol)
+                .Append($$"""
+                    SELECT
+                        {{ol.OrderId}}
+                    FROM ORDER_LINES AS {{ol:alias}}
+                    """)
+                .Build();
+        });
 
-        // Assert
-        testCase.AssertSql(result.Sql);
+        testCase.Assert();
     }
 
     [Theory]
     [MemberData(nameof(From_LiteralTableAsExplicitAliasedEntityData))]
     public void From_LiteralTableAsExplicitAliasedEntity(SqlTestCase testCase)
     {
-        // Arrange
-        var db = testCase.CreateBuilder();
+        testCase.Action(() =>
+        {
+            var db = testCase.CreateBuilder();
 
-        // Act
-        var result = db
-            .Entity<Product>(out var p, "prod")
-            .Append($$"""
-                SELECT
-                    {{p.Id}}
-                FROM products AS {{p:alias}}
-                """)
-            .Build();
+            return db
+                .Entity<Product>(out var p, "prod")
+                .Append($$"""
+                    SELECT
+                        {{p.Id}}
+                    FROM products AS {{p:alias}}
+                    """)
+                .Build();
+        });
 
-        // Assert
-        testCase.AssertSql(result.Sql);
+        testCase.Assert();
     }
 
     [Theory]
     [MemberData(nameof(From_EntityAsEntityWithSchemaData))]
     public void From_EntityAsEntityWithSchema(SqlTestCase testCase)
     {
-        // Arrange
-        var db = testCase.CreateBuilder();
+        testCase.Action(() =>
+        {
+            var db = testCase.CreateBuilder();
 
-        // Act
-        var result = db
-            .Entity<Product>(out var p, "Product")
-            .Append($$"""
-                SELECT
-                    {{p.Id}}
-                FROM {{p:base}} AS {{p:alias}}
-                """)
-            .Build();
+            return db
+                .Entity<Product>(out var p, "Product")
+                .Append($$"""
+                    SELECT
+                        {{p.Id}}
+                    FROM {{p:base}} AS {{p:alias}}
+                    """)
+                .Build();
+        });
 
-        // Assert
-        testCase.AssertSql(result.Sql);
+        testCase.Assert();
     }
 
     [Theory]
     [MemberData(nameof(FromAsEntityAsItsOwnAliasInceptionData))]
     public void From_As_EntityAsItsOwnAlias_Inception(SqlTestCase testCase)
     {
-        // Arrange
-        var db = testCase.CreateBuilder();
+        testCase.Action(() =>
+        {
+            var db = testCase.CreateBuilder();
 
-        // Act
-        var result = db
-            .Entity<Product>(out var p)
-            .Append($$"""
-                SELECT {{p}}
-                FROM {{p:base}} AS {{p:alias}}
-                """)
-            .Build();
+            return db
+                .Entity<Product>(out var p)
+                .Append($$"""
+                    SELECT {{p}}
+                    FROM {{p:base}} AS {{p:alias}}
+                    """)
+                .Build();
+        });
 
-        // Assert
-        testCase.AssertSql(result.Sql);
+        testCase.Assert();
     }
 
     [Theory]
     [MemberData(nameof(From_EntityAutoAliasingData))]
     public void From_EntityAutoAliasing(SqlTestCase testCase)
     {
-        // Arrange
-        var db = testCase.CreateBuilder();
-        db.Context.Options.EntityAutoAliasing = true;
+        testCase.Action(() =>
+        {
+            var db = testCase.CreateBuilder();
+            db.Context.Options.EntityAutoAliasing = true;
 
-        // Act
-        var result = db
-            .Entity<Product>(out var prod)
-            .Append($$"""
-                SELECT
-                    {{prod.Id}}
-                FROM {{prod}}
-                """)
-            .Build();
+            return db
+                .Entity<Product>(out var prod)
+                .Append($$"""
+                    SELECT
+                        {{prod.Id}}
+                    FROM {{prod}}
+                    """)
+                .Build();
+        });
 
-        // Assert
-        testCase.AssertSql(result.Sql);
+        testCase.Assert();
     }
 
     [Theory]
     [MemberData(nameof(From_AutoAliasingInceptionData))]
     public void From_AutoAliasing_Inception(SqlTestCase testCase)
     {
-        // Arrange
-        var db = testCase.CreateBuilder();
-        db.Context.Options.EntityAutoAliasing = true;
+        testCase.Action(() =>
+        {
+            var db = testCase.CreateBuilder();
+            db.Context.Options.EntityAutoAliasing = true;
 
-        // Act
-        var result = db
-            .Entity<Product>(out var myProd)
-            .Append($$"""
-                SELECT {{myProd}}
-                FROM {{myProd:decl}}
-                """)
-            .Build();
+            return db
+                .Entity<Product>(out var myProd)
+                .Append($$"""
+                    SELECT {{myProd}}
+                    FROM {{myProd:decl}}
+                    """)
+                .Build();
+        });
 
-        // Assert
-        testCase.AssertSql(result.Sql);
+        testCase.Assert();
     }
 
     public static TheoryData<SqlTestCase> From_EntityManualAliasData =>
@@ -180,8 +181,8 @@ public class FromAsTests
             [
                 """
                 SELECT
-                    p.<<Id>>
-                FROM <<dbo>>.<<Products>> AS p
+                    <<p>>.<<Id>>
+                FROM <<dbo>>.<<Products>> AS <<p>>
                 """
             ]
         ),
@@ -190,8 +191,8 @@ public class FromAsTests
             [
                 """
                 SELECT
-                    p."Id"
-                FROM "dbo"."Products" AS p
+                    "p"."Id"
+                FROM "dbo"."Products" AS "p"
                 """
             ]
         ),
@@ -200,8 +201,8 @@ public class FromAsTests
             [
                 """
                 SELECT
-                    p.`Id`
-                FROM `dbo`.`Products` AS p
+                    `p`.`Id`
+                FROM `dbo`.`Products` AS `p`
                 """
             ]
         ),
@@ -210,8 +211,8 @@ public class FromAsTests
             [
                 """
                 SELECT
-                    p."Id"
-                FROM "dbo"."Products" AS p
+                    "p"."Id"
+                FROM "dbo"."Products" "p"
                 """
             ]
         ),
@@ -220,8 +221,8 @@ public class FromAsTests
             [
                 """
                 SELECT
-                    p."Id"
-                FROM "dbo"."Products" AS p
+                    "p"."Id"
+                FROM "dbo"."Products" AS "p"
                 """
             ]
         ),
@@ -230,8 +231,8 @@ public class FromAsTests
             [
                 """
                 SELECT
-                    p."Id"
-                FROM "dbo"."Products" AS p
+                    "p"."Id"
+                FROM "dbo"."Products" AS "p"
                 """
             ]
         ),
@@ -240,8 +241,8 @@ public class FromAsTests
             [
                 """
                 SELECT
-                    p.[Id]
-                FROM [dbo].[Products] AS p
+                    [p].[Id]
+                FROM [dbo].[Products] AS [p]
                 """
             ]
         )
@@ -254,8 +255,8 @@ public class FromAsTests
             [
                 """
                 SELECT
-                    prod.<<Id>>
-                FROM <<dbo>>.<<Products>> AS prod
+                    <<prod>>.<<Id>>
+                FROM <<dbo>>.<<Products>> AS <<prod>>
                 """
             ]
         ),
@@ -264,8 +265,8 @@ public class FromAsTests
             [
                 """
                 SELECT
-                    prod."Id"
-                FROM "dbo"."Products" AS prod
+                    "prod"."Id"
+                FROM "dbo"."Products" AS "prod"
                 """
             ]
         ),
@@ -274,8 +275,8 @@ public class FromAsTests
             [
                 """
                 SELECT
-                    prod.`Id`
-                FROM `dbo`.`Products` AS prod
+                    `prod`.`Id`
+                FROM `dbo`.`Products` AS `prod`
                 """
             ]
         ),
@@ -284,8 +285,8 @@ public class FromAsTests
             [
                 """
                 SELECT
-                    prod."Id"
-                FROM "dbo"."Products" AS prod
+                    "prod"."Id"
+                FROM "dbo"."Products" "prod"
                 """
             ]
         ),
@@ -294,8 +295,8 @@ public class FromAsTests
             [
                 """
                 SELECT
-                    prod."Id"
-                FROM "dbo"."Products" AS prod
+                    "prod"."Id"
+                FROM "dbo"."Products" AS "prod"
                 """
             ]
         ),
@@ -304,8 +305,8 @@ public class FromAsTests
             [
                 """
                 SELECT
-                    prod."Id"
-                FROM "dbo"."Products" AS prod
+                    "prod"."Id"
+                FROM "dbo"."Products" AS "prod"
                 """
             ]
         ),
@@ -314,8 +315,8 @@ public class FromAsTests
             [
                 """
                 SELECT
-                    prod.[Id]
-                FROM [dbo].[Products] AS prod
+                    [prod].[Id]
+                FROM [dbo].[Products] AS [prod]
                 """
             ]
         )
@@ -359,7 +360,7 @@ public class FromAsTests
                 """
                 SELECT
                     "OrderLine"."OrderId"
-                FROM ORDER_LINES AS "OrderLine"
+                FROM ORDER_LINES "OrderLine"
                 """
             ]
         ),
@@ -433,7 +434,7 @@ public class FromAsTests
                 """
                 SELECT
                     "prod"."Id"
-                FROM products AS "prod"
+                FROM products "prod"
                 """
             ]
         ),
@@ -507,7 +508,7 @@ public class FromAsTests
                 """
                 SELECT
                     "Product"."Id"
-                FROM "dbo"."Products" AS "Product"
+                FROM "dbo"."Products" "Product"
                 """
             ]
         ),
@@ -549,7 +550,7 @@ public class FromAsTests
             SqlDialectKind.CustomDb,
             [
                 """
-                SELECT <<Product>>.<<CategoryId>>, <<Product>>.<<Id>>, <<Product>>.<<IsActive>>, <<Product>>.<<Price>>, <<Product>>.<<PROD_NAME>>
+                SELECT <<Product>>.<<CategoryId>>, <<Product>>.<<Id>>, <<Product>>.<<IsActive>>, <<Product>>.<<PROD_NAME>>, <<Product>>.<<Price>>
                 FROM <<dbo>>.<<Products>> AS <<Product>>
                 """
             ]
@@ -558,7 +559,7 @@ public class FromAsTests
             SqlDialectKind.Firebird,
             [
                 """
-                SELECT "Product"."CategoryId", "Product"."Id", "Product"."IsActive", "Product"."Price", "Product"."PROD_NAME"
+                SELECT "Product"."CategoryId", "Product"."Id", "Product"."IsActive", "Product"."PROD_NAME", "Product"."Price"
                 FROM "dbo"."Products" AS "Product"
                 """
             ]
@@ -567,7 +568,7 @@ public class FromAsTests
             SqlDialectKind.MySql,
             [
                 """
-                SELECT `Product`.`CategoryId`, `Product`.`Id`, `Product`.`IsActive`, `Product`.`Price`, `Product`.`PROD_NAME`
+                SELECT `Product`.`CategoryId`, `Product`.`Id`, `Product`.`IsActive`, `Product`.`PROD_NAME`, `Product`.`Price`
                 FROM `dbo`.`Products` AS `Product`
                 """
             ]
@@ -576,8 +577,8 @@ public class FromAsTests
             SqlDialectKind.Oracle,
             [
                 """
-                SELECT "Product"."CategoryId", "Product"."Id", "Product"."IsActive", "Product"."Price", "Product"."PROD_NAME"
-                FROM "dbo"."Products" AS "Product"
+                SELECT "Product"."CategoryId", "Product"."Id", "Product"."IsActive", "Product"."PROD_NAME", "Product"."Price"
+                FROM "dbo"."Products" "Product"
                 """
             ]
         ),
@@ -585,7 +586,7 @@ public class FromAsTests
             SqlDialectKind.PostgreSql,
             [
                 """
-                SELECT "Product"."CategoryId", "Product"."Id", "Product"."IsActive", "Product"."Price", "Product"."PROD_NAME"
+                SELECT "Product"."CategoryId", "Product"."Id", "Product"."IsActive", "Product"."PROD_NAME", "Product"."Price"
                 FROM "dbo"."Products" AS "Product"
                 """
             ]
@@ -594,7 +595,7 @@ public class FromAsTests
             SqlDialectKind.SqLite,
             [
                 """
-                SELECT "Product"."CategoryId", "Product"."Id", "Product"."IsActive", "Product"."Price", "Product"."PROD_NAME"
+                SELECT "Product"."CategoryId", "Product"."Id", "Product"."IsActive", "Product"."PROD_NAME", "Product"."Price"
                 FROM "dbo"."Products" AS "Product"
                 """
             ]
@@ -603,7 +604,7 @@ public class FromAsTests
             SqlDialectKind.SqlServer,
             [
                 """
-                SELECT [Product].[CategoryId], [Product].[Id], [Product].[IsActive], [Product].[Price], [Product].[PROD_NAME]
+                SELECT [Product].[CategoryId], [Product].[Id], [Product].[IsActive], [Product].[PROD_NAME], [Product].[Price]
                 FROM [dbo].[Products] AS [Product]
                 """
             ]
@@ -648,7 +649,7 @@ public class FromAsTests
                 """
                 SELECT
                     "prod"."Id"
-                FROM "dbo"."Products" AS "prod"
+                FROM "dbo"."Products" "prod"
                 """
             ]
         ),
@@ -690,7 +691,7 @@ public class FromAsTests
             SqlDialectKind.CustomDb,
             [
                 """
-                SELECT <<myProd>>.<<CategoryId>>, <<myProd>>.<<Id>>, <<myProd>>.<<IsActive>>, <<myProd>>.<<Price>>, <<myProd>>.<<PROD_NAME>>
+                SELECT <<myProd>>.<<CategoryId>>, <<myProd>>.<<Id>>, <<myProd>>.<<IsActive>>, <<myProd>>.<<PROD_NAME>>, <<myProd>>.<<Price>>
                 FROM <<dbo>>.<<Products>> AS <<myProd>>
                 """
             ]
@@ -699,7 +700,7 @@ public class FromAsTests
             SqlDialectKind.Firebird,
             [
                 """
-                SELECT "myProd"."CategoryId", "myProd"."Id", "myProd"."IsActive", "myProd"."Price", "myProd"."PROD_NAME"
+                SELECT "myProd"."CategoryId", "myProd"."Id", "myProd"."IsActive", "myProd"."PROD_NAME", "myProd"."Price"
                 FROM "dbo"."Products" AS "myProd"
                 """
             ]
@@ -708,7 +709,7 @@ public class FromAsTests
             SqlDialectKind.MySql,
             [
                 """
-                SELECT `myProd`.`CategoryId`, `myProd`.`Id`, `myProd`.`IsActive`, `myProd`.`Price`, `myProd`.`PROD_NAME`
+                SELECT `myProd`.`CategoryId`, `myProd`.`Id`, `myProd`.`IsActive`, `myProd`.`PROD_NAME`, `myProd`.`Price`
                 FROM `dbo`.`Products` AS `myProd`
                 """
             ]
@@ -717,8 +718,8 @@ public class FromAsTests
             SqlDialectKind.Oracle,
             [
                 """
-                SELECT "myProd"."CategoryId", "myProd"."Id", "myProd"."IsActive", "myProd"."Price", "myProd"."PROD_NAME"
-                FROM "dbo"."Products" AS "myProd"
+                SELECT "myProd"."CategoryId", "myProd"."Id", "myProd"."IsActive", "myProd"."PROD_NAME", "myProd"."Price"
+                FROM "dbo"."Products" "myProd"
                 """
             ]
         ),
@@ -726,7 +727,7 @@ public class FromAsTests
             SqlDialectKind.PostgreSql,
             [
                 """
-                SELECT "myProd"."CategoryId", "myProd"."Id", "myProd"."IsActive", "myProd"."Price", "myProd"."PROD_NAME"
+                SELECT "myProd"."CategoryId", "myProd"."Id", "myProd"."IsActive", "myProd"."PROD_NAME", "myProd"."Price"
                 FROM "dbo"."Products" AS "myProd"
                 """
             ]
@@ -735,7 +736,7 @@ public class FromAsTests
             SqlDialectKind.SqLite,
             [
                 """
-                SELECT "myProd"."CategoryId", "myProd"."Id", "myProd"."IsActive", "myProd"."Price", "myProd"."PROD_NAME"
+                SELECT "myProd"."CategoryId", "myProd"."Id", "myProd"."IsActive", "myProd"."PROD_NAME", "myProd"."Price"
                 FROM "dbo"."Products" AS "myProd"
                 """
             ]
@@ -744,7 +745,7 @@ public class FromAsTests
             SqlDialectKind.SqlServer,
             [
                 """
-                SELECT [myProd].[CategoryId], [myProd].[Id], [myProd].[IsActive], [myProd].[Price], [myProd].[PROD_NAME]
+                SELECT [myProd].[CategoryId], [myProd].[Id], [myProd].[IsActive], [myProd].[PROD_NAME], [myProd].[Price]
                 FROM [dbo].[Products] AS [myProd]
                 """
             ]

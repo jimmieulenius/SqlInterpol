@@ -4,8 +4,14 @@ namespace SqlInterpol;
 /// Represents a multi-table UPDATE statement, delegating dialect-specific rendering
 /// to <see cref="ISqlDialect.RenderFragment"/>.
 /// </summary>
-public class SqlMultiTableUpdateFragment : ISqlFragment, ISqlSwappableFragment
+public class SqlMultiTableUpdateFragment : ISqlFragment, ISqlSwappableFragment, ISqlFeatureRequirement
 {
+    /// <inheritdoc />
+    public SqlFeature RequiredFeature => SqlFeature.MultiTableUpdate;
+
+    /// <inheritdoc />
+    public string FeatureName => "Multi-Table UPDATE";
+
     /// <summary>Gets the target table fragment (the table to be updated).</summary>
     public ISqlFragment Target { get; }
 

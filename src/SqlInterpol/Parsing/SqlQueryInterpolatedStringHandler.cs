@@ -1,69 +1,13 @@
-using System;
 using System.Buffers;
-using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.CompilerServices;
 
 namespace SqlInterpol.Parsing;
 
-internal class SqlSubqueryDeclarationFragment : ISqlFragment
-{
-    private readonly ISqlQuery _query;
-
-    public SqlSubqueryDeclarationFragment(ISqlQuery query)
-    {
-        _query = query;
-    }
-
-    public string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
-    {
-        // 1. Extract the pristine inner SELECT statement layout
-        string innerSql = ((ISqlFragment)_query).ToSql(context, mode);
-        
-        // 2. Discover the baseline indent of the current line by looking backward 
-        // at the trailing text of the preceding literal segment relative to the active rendering cursor.
-        string baseIndent = "";
-        if (context is SqlBuilder builder)
-        {
-            int currentIndex = ((ISqlParserState)context).CurrentSegmentIndex;
-            
-            if (currentIndex > 0 && currentIndex - 1 < builder.Segments.Count)
-            {
-                var lastSeg = builder.Segments[currentIndex - 1];
-                if (lastSeg.Value is string lastLiteral)
-                {
-                    int lastNewLine = lastLiteral.LastIndexOf('\n');
-                    string currentLinePrefix = lastNewLine >= 0 ? lastLiteral[(lastNewLine + 1)..] : lastLiteral;
-                    
-                    // Capture all preceding spaces/tabs on the current active line
-                    baseIndent = new string(currentLinePrefix.TakeWhile(char.IsWhiteSpace).ToArray());
-                }
-            }
-        }
-
-        // 3. Apply the golden layout rule: Inner Level Indent = Current Baseline + Configured Indent Size
-        string extraIndent = new string(' ', context.Options.IndentSize);
-        string totalBodyIndent = baseIndent + extraIndent;
-
-        // 4. Shift all lines of the inner body cleanly into the calculated indentation track
-        string[] lines = innerSql.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
-        string formattedInnerSql = string.Join("\n", lines.Select(l => string.IsNullOrWhiteSpace(l) ? l : totalBodyIndent + l));
-        
-        // 5. Resolve and cleanly quote the auto-captured C# variable name as the SQL alias
-        var entityRef = ((ISqlEntityBase)_query).Reference;
-        string alias = entityRef.Alias ?? entityRef.FallbackAlias ?? "stats";
-        string quotedAlias = context.Dialect.QuoteIdentifier(alias);
-        
-        // 6. Package it up, aligning the closing parenthesis perfectly back with the parent line's baseline!
-        return $"(\n{formattedInnerSql}\n{baseIndent}) AS {quotedAlias}";
-    }
-}
-
-[InterpolatedStringHandler]
 /// <summary>
 /// The interpolated string handler for <see cref="SqlBuilder"/> that collects raw SQL literals
 /// and interpolated values into a pooled segment buffer during query construction.
 /// </summary>
+[InterpolatedStringHandler]
 public ref struct SqlQueryInterpolatedStringHandler
 {
     private readonly SqlBuilder _builder;
@@ -85,11 +29,13 @@ public ref struct SqlQueryInterpolatedStringHandler
         _segmentCount = 0;
     }
 
-    /// <summary>Appends a raw SQL literal string as a processed segment.</summary>
+    /// <summary>Appends a raw SQL literal string as a pure literal segment.</summary>
     public void AppendLiteral(string value)
     {
         if (string.IsNullOrEmpty(value)) return;
-        AddSegment(_builder.ProcessLiteral(value));
+        
+        // NO MORE PARSER: Just box the raw text!
+        AddSegment(new SqlSegment(SqlSegmentType.Literal, value));
     }
 
     /// <summary>
@@ -116,24 +62,29 @@ public ref struct SqlQueryInterpolatedStringHandler
                 if (_builder.ScopedVariables.TryGetValue(expression, out var tableEntity))
                 {
                     // SPECIALIZED SUBQUERY ROUTING
-                    if (tableEntity is ISqlQuery queryEntity)
+                    if (tableEntity is ISqlQuery queryEntity && tableEntity is ISqlEntityBase queryEntityBase)
                     {
                         SqlSegment segment;
-                        var entityBase = (ISqlEntityBase)queryEntity;
 
                         if (format == "alias")
                         {
-                            segment = _builder.ProcessValue(entityBase.Reference);
-                            segment = new SqlSegment(segment.Type, segment.Value, SqlRenderMode.AliasOnly, segment.Tag);
+                            segment = _builder.ProcessValue(queryEntityBase.Reference);
+                            segment = new SqlSegment(segment.Type, segment.Value, SqlRenderMode.AliasOnly, segment.Tags);
                         }
                         else if (format == "base")
                         {
-                            segment = _builder.ProcessValue(entityBase.Reference);
-                            segment = new SqlSegment(segment.Type, segment.Value, SqlRenderMode.BaseName, segment.Tag);
+                            segment = _builder.ProcessValue(queryEntityBase.Reference);
+                            segment = new SqlSegment(segment.Type, segment.Value, SqlRenderMode.BaseName, segment.Tags);
                         }
                         // Handle explicit :decl OR naked variable invocation when EntityAutoAliasing is true
                         else if (format == "decl" || (format == null && _builder.Context.Options.EntityAutoAliasing))
                         {
+                            // FIX: Auto-inject the C# variable name as the SQL alias!
+                            if (string.IsNullOrEmpty(queryEntityBase.Reference.Alias) && queryEntityBase.Reference is ISqlAliasable aliasable)
+                            {
+                                aliasable.Alias = expression;
+                            }
+                            
                             var declFragment = new SqlSubqueryDeclarationFragment(queryEntity);
                             segment = _builder.ProcessValue(declFragment);
                         }
@@ -149,23 +100,36 @@ public ref struct SqlQueryInterpolatedStringHandler
                     }
 
                     // STANDARD PHYSICAL TABLE ROUTING
-                    SqlRenderMode? mode = format switch
+                    if (tableEntity is ISqlEntityBase standardEntityBase)
                     {
-                        "decl"  => SqlRenderMode.Declaration,
-                        "alias" => SqlRenderMode.AliasOnly,
-                        "base"  => SqlRenderMode.BaseName,
-                        _       => null
-                    };
+                        SqlRenderMode? mode = format switch
+                        {
+                            "decl"  => SqlRenderMode.Declaration,
+                            "alias" => SqlRenderMode.AliasOnly,
+                            "base"  => SqlRenderMode.BaseName,
+                            _       => null
+                        };
 
-                    var segmentResult = _builder.ProcessValue(tableEntity);
-                    
-                    if (mode != null)
-                    {
-                        segmentResult = new SqlSegment(segmentResult.Type, segmentResult.Value, mode, segmentResult.Tag);
+                        // FIX: Auto-inject the C# variable name as the SQL alias!
+                        if (format == "decl" || (format == null && _builder.Context.Options.EntityAutoAliasing))
+                        {
+                            mode = SqlRenderMode.Declaration;
+                            if (string.IsNullOrEmpty(standardEntityBase.Reference.Alias) && standardEntityBase.Reference is ISqlAliasable aliasable)
+                            {
+                                aliasable.Alias = expression;
+                            }
+                        }
+
+                        var segmentResult = _builder.ProcessValue(standardEntityBase);
+                        
+                        if (mode != null)
+                        {
+                            segmentResult = new SqlSegment(segmentResult.Type, segmentResult.Value, mode, segmentResult.Tags);
+                        }
+                        
+                        AddSegment(segmentResult);
+                        return;
                     }
-                    
-                    AddSegment(segmentResult);
-                    return;
                 }
             }
             // Scenario B: Column projection (e.g., SELECT {p.Id} or {stats.TotalPrice:col})
@@ -174,15 +138,16 @@ public ref struct SqlQueryInterpolatedStringHandler
                 var varName = expression[..dotIndex];
                 var propertyName = expression[(dotIndex + 1)..];
 
-                if (_builder.ScopedVariables.TryGetValue(varName, out var entity))
+                if (_builder.ScopedVariables.TryGetValue(varName, out var entity) && entity is ISqlEntityBase entityBase)
                 {
-                    var entityModelType = entity.GetType().GetGenericArguments()[0];
-                    var meta = SqlMetadataRegistry.GetMetadata(entityModelType);
+                    // FIX: Lightning fast O(1) type resolution replacing slow array reflection
+                    var meta = SqlMetadataRegistry.GetMetadata(entityBase.ModelType);
                     
-                    var columnMap = meta.Columns.FirstOrDefault(c => c.Key.Name == propertyName);
-                    string physicalColumnName = columnMap.Key != null ? columnMap.Value : propertyName;
+                    // Optimized column mapping lookup sequence matching our preprocessor
+                    var memberMeta = meta.Columns.Keys.FirstOrDefault(k => k.Name.Equals(propertyName, StringComparison.OrdinalIgnoreCase));
+                    string physicalColumnName = memberMeta != null ? meta.Columns[memberMeta] : propertyName;
 
-                    var columnRef = new SqlColumnReference(entity.Reference, physicalColumnName, propertyName);
+                    var columnRef = new SqlColumnReference(entityBase.Reference, physicalColumnName, propertyName);
                     
                     SqlRenderMode? mode = format switch
                     {
@@ -194,7 +159,7 @@ public ref struct SqlQueryInterpolatedStringHandler
                     var segmentResult = _builder.ProcessValue(columnRef);
                     if (mode != null)
                     {
-                        segmentResult = new SqlSegment(segmentResult.Type, segmentResult.Value, mode, segmentResult.Tag);
+                        segmentResult = new SqlSegment(segmentResult.Type, segmentResult.Value, mode, segmentResult.Tags);
                     }
                     AddSegment(segmentResult);
                     return;
@@ -222,7 +187,6 @@ public ref struct SqlQueryInterpolatedStringHandler
         _segments = _arrayToReturn;
     }
 
-    /// <summary>Transfers all collected segments into <paramref name="destination"/> and releases the pooled buffer.</summary>
     internal void TransferSegments(List<SqlSegment> destination)
     {
         for (int i = 0; i < _segmentCount; i++) destination.Add(_segments[i]);

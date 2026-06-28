@@ -17,6 +17,12 @@ public abstract class SqlEntityBase<T> : ISqlEntityBase<T>
     public ISqlDeclaration Declaration { get; protected set; } = null!;
 
     /// <summary>
+    /// Gets the underlying C# model type this entity represents.
+    /// Resolves to <typeparamref name="T"/> to provide O(1) type resolution for the rendering engine.
+    /// </summary>
+    public Type ModelType => typeof(T);
+
+    /// <summary>
     /// Gets a fragment that renders a quoted sub-entity identifier scoped to this entity.
     /// </summary>
     /// <param name="name">The identifier to render.</param>

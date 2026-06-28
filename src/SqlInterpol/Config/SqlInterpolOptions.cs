@@ -1,4 +1,5 @@
 using SqlInterpol.Dialects;
+using SqlInterpol.Parsing;
 
 namespace SqlInterpol;
 
@@ -68,10 +69,21 @@ public record SqlInterpolOptions
     public SqlDialectKind Dialect { get; init; } = SqlDialectKind.SqlServer;
 
     /// <summary>
-    /// Gets an optional custom <see cref="ISqlInterpolationParser"/>.
-    /// When <see langword="null"/>, <c>SqlInterpolationParser.Instance</c> is used.
+    /// Gets an optional custom <see cref="ISqlSegmentPreprocessor"/>.
+    /// When <see langword="null"/>, <c>SqlSegmentPreprocessor.Instance</c> is used.
     /// </summary>
-    public ISqlInterpolationParser? Parser { get; init; }
+    public ISqlSegmentPreprocessor? Preprocessor { get; init; }
+
+    /// <summary>
+    /// The compilation pipeline modules. Modifying this list allows you to inject 
+    /// custom SQL AST transformations. Duplicate rewriter types are safely ignored.
+    /// </summary>
+    public SqlSegmentRewriterCollection Rewriters { get; } = new SqlSegmentRewriterCollection
+    {
+        new SqlCoreSyntaxRewriter(),
+        new SqlSelectIntoRewriter(),
+        new SqlMultiTableDmlRewriter()
+    };
 
     /// <summary>
     /// Gets an optional custom <see cref="ISqlSegmentRenderer"/>.

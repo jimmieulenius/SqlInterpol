@@ -6,6 +6,8 @@ namespace SqlInterpol.Test;
 
 public class CteTests
 {
+    private const int Threshold = 100;
+
     [Theory]
     [MemberData(nameof(Select_WithCteData))]
     public void Select_WithCte(SqlTestCase testCase)
@@ -14,145 +16,74 @@ public class CteTests
         var db = testCase.CreateBuilder();
         
         // Define the inner query for the CTE
-        var innerQuery = db.Query<Product>(p => db.Append($$"""
-            SELECT {{p[x => x.CategoryId]}}, SUM({{p[x => x.Price]}}) AS TotalPrice
-            FROM {{p}}
-            GROUP BY {{p[x => x.CategoryId]}}
-            """));
+        var innerQuery = db
+            .Entity<Product>(out var p)
+            .Subquery(p, sub => sub.Append($$"""
+                SELECT {{p.CategoryId}}, SUM({{p.Price}}) AS TotalPrice
+                FROM {{p}} AS {{"p"}}
+                GROUP BY {{p.CategoryId}}
+                """));
 
         // Act
-        // The parser sniffs "WITH" and treats cte as a CTE role
-        var result = db.Query<Category, CategoryStats>((c, cte) => 
-            db.Append($$"""
-            WITH {{cte}} AS (
-                {{innerQuery}}
-            )
-            SELECT {{c[x => x.Name]}}, {{cte[x => x.TotalPrice]}}
-            FROM {{c}} AS {{"c"}}
-            JOIN {{cte}} AS {{"cs"}}
-                ON {{c[x => x.Id]}} = {{cte[x => x.CategoryId]}}
-            """))
-            .Build();
+        testCase.Action(() => 
+        {
+            db.Entity<Category>(out var c);
+            db.Entity<CategoryStats>(out var cs);
+
+            // The parser sniffs "WITH" and treats cs as a CTE role
+            return db.Append($$"""
+                WITH {{cs}} AS (
+                    {{innerQuery}}
+                )
+                SELECT {{c.Name}}, {{cs.TotalPrice}}
+                FROM {{c}} AS {{"c"}}
+                JOIN {{cs}} AS {{"cs"}}
+                    ON {{c.Id}} = {{cs.CategoryId}}
+                """).Build();
+        });
 
         // Assert
-        testCase.AssertSql(result.Sql);
+        testCase.Assert();
     }
 
-    public static TheoryData<SqlTestCase> Select_WithCteData =>
-    [
-        new SqlTestCase(
-            SqlDialectKind.CustomDb,
-            [
-                """
-                WITH <<CategoryStats>> AS (
-                    SELECT <<dbo>>.<<Products>>.<<CategoryId>>, SUM(<<dbo>>.<<Products>>.<<Price>>) AS TotalPrice
-                    FROM <<dbo>>.<<Products>>
-                    GROUP BY <<dbo>>.<<Products>>.<<CategoryId>>
+    [Theory]
+    [MemberData(nameof(Select_WithCteData))]
+    public void Select_WithCte_AutoAliased(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        db.Context.Options.EntityAutoAliasing = true;
+        
+        // Define the inner query for the CTE
+        var innerQuery = db
+            .Entity<Product>(out var p)
+            .Subquery(p, sub => sub.Append($$"""
+                SELECT {{p.CategoryId}}, SUM({{p.Price}}) AS TotalPrice
+                FROM {{p}}
+                GROUP BY {{p.CategoryId}}
+                """));
+
+        // Act
+        testCase.Action(() => 
+        {
+            db.Entity<Category>(out var c);
+            db.Entity<CategoryStats>(out var cs);
+
+            // Auto-aliasing detects the FROM and JOIN locations and injects "AS c" and "AS cs" automatically!
+            return db.Append($$"""
+                WITH {{cs}} AS (
+                    {{innerQuery}}
                 )
-                SELECT <<c>>.<<Name>>, <<cs>>.<<TotalPrice>>
-                FROM <<Category>> AS <<c>>
-                JOIN <<CategoryStats>> AS <<cs>>
-                    ON <<c>>.<<Id>> = <<cs>>.<<CategoryId>>
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.Firebird,
-            [
-                """
-                WITH "CategoryStats" AS (
-                    SELECT "dbo"."Products"."CategoryId", SUM("dbo"."Products"."Price") AS TotalPrice
-                    FROM "dbo"."Products"
-                    GROUP BY "dbo"."Products"."CategoryId"
-                )
-                SELECT "c"."Name", "cs"."TotalPrice"
-                FROM "Category" AS "c"
-                JOIN "CategoryStats" AS "cs"
-                    ON "c"."Id" = "cs"."CategoryId"
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.MySql,
-            [
-                """
-                WITH `CategoryStats` AS (
-                    SELECT `dbo`.`Products`.`CategoryId`, SUM(`dbo`.`Products`.`Price`) AS TotalPrice
-                    FROM `dbo`.`Products`
-                    GROUP BY `dbo`.`Products`.`CategoryId`
-                )
-                SELECT `c`.`Name`, `cs`.`TotalPrice`
-                FROM `Category` AS `c`
-                JOIN `CategoryStats` AS `cs`
-                    ON `c`.`Id` = `cs`.`CategoryId`
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.Oracle,
-            [
-                """
-                WITH "CategoryStats" AS (
-                    SELECT "dbo"."Products"."CategoryId", SUM("dbo"."Products"."Price") AS TotalPrice
-                    FROM "dbo"."Products"
-                    GROUP BY "dbo"."Products"."CategoryId"
-                )
-                SELECT "c"."Name", "cs"."TotalPrice"
-                FROM "Category" AS "c"
-                JOIN "CategoryStats" AS "cs"
-                    ON "c"."Id" = "cs"."CategoryId"
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.PostgreSql,
-            [
-                """
-                WITH "CategoryStats" AS (
-                    SELECT "dbo"."Products"."CategoryId", SUM("dbo"."Products"."Price") AS TotalPrice
-                    FROM "dbo"."Products"
-                    GROUP BY "dbo"."Products"."CategoryId"
-                )
-                SELECT "c"."Name", "cs"."TotalPrice"
-                FROM "Category" AS "c"
-                JOIN "CategoryStats" AS "cs"
-                    ON "c"."Id" = "cs"."CategoryId"
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.SqLite,
-            [
-                """
-                WITH "CategoryStats" AS (
-                    SELECT "dbo"."Products"."CategoryId", SUM("dbo"."Products"."Price") AS TotalPrice
-                    FROM "dbo"."Products"
-                    GROUP BY "dbo"."Products"."CategoryId"
-                )
-                SELECT "c"."Name", "cs"."TotalPrice"
-                FROM "Category" AS "c"
-                JOIN "CategoryStats" AS "cs"
-                    ON "c"."Id" = "cs"."CategoryId"
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.SqlServer,
-            [
-                """
-                WITH [CategoryStats] AS (
-                    SELECT [dbo].[Products].[CategoryId], SUM([dbo].[Products].[Price]) AS TotalPrice
-                    FROM [dbo].[Products]
-                    GROUP BY [dbo].[Products].[CategoryId]
-                )
-                SELECT [c].[Name], [cs].[TotalPrice]
-                FROM [Category] AS [c]
-                JOIN [CategoryStats] AS [cs]
-                    ON [c].[Id] = [cs].[CategoryId]
-                """
-            ]
-        )
-    ];
+                SELECT {{c.Name}}, {{cs.TotalPrice}}
+                FROM {{c}}
+                JOIN {{cs}}
+                    ON {{c.Id}} = {{cs.CategoryId}}
+                """).Build();
+        });
+
+        // Assert
+        testCase.Assert();
+    }
 
     [Theory]
     [MemberData(nameof(Select_WithRecursiveCteData))]
@@ -162,114 +93,19 @@ public class CteTests
         var db = testCase.CreateBuilder();
 
         // Act
-        db.Append($"""
+        testCase.Action(() => db.Append($"""
             WITH RECURSIVE Numbers AS (
                 SELECT 1 AS n
                 UNION ALL
                 SELECT n + 1 FROM Numbers WHERE n < 10
             )
             SELECT n FROM Numbers
-            """);
-        var result = db.Build();
+            """).Build()
+        );
 
         // Assert
-        testCase.AssertSql(result.Sql);
+        testCase.Assert();
     }
-
-    public static TheoryData<SqlTestCase> Select_WithRecursiveCteData =>
-    [
-        new SqlTestCase(
-            SqlDialectKind.CustomDb,
-            [
-                """
-                WITH RECURSIVE Numbers AS (
-                    SELECT 1 AS n
-                    UNION ALL
-                    SELECT n + 1 FROM Numbers WHERE n < 10
-                )
-                SELECT n FROM Numbers
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.Firebird,
-            [
-                """
-                WITH RECURSIVE Numbers AS (
-                    SELECT 1 AS n
-                    UNION ALL
-                    SELECT n + 1 FROM Numbers WHERE n < 10
-                )
-                SELECT n FROM Numbers
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.MySql,
-            [
-                """
-                WITH RECURSIVE Numbers AS (
-                    SELECT 1 AS n
-                    UNION ALL
-                    SELECT n + 1 FROM Numbers WHERE n < 10
-                )
-                SELECT n FROM Numbers
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.Oracle,
-            [
-                """
-                WITH Numbers AS (
-                    SELECT 1 AS n
-                    UNION ALL
-                    SELECT n + 1 FROM Numbers WHERE n < 10
-                )
-                SELECT n FROM Numbers
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.PostgreSql,
-            [
-                """
-                WITH RECURSIVE Numbers AS (
-                    SELECT 1 AS n
-                    UNION ALL
-                    SELECT n + 1 FROM Numbers WHERE n < 10
-                )
-                SELECT n FROM Numbers
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.SqLite,
-            [
-                """
-                WITH RECURSIVE Numbers AS (
-                    SELECT 1 AS n
-                    UNION ALL
-                    SELECT n + 1 FROM Numbers WHERE n < 10
-                )
-                SELECT n FROM Numbers
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.SqlServer,
-            [
-                """
-                WITH Numbers AS (
-                    SELECT 1 AS n
-                    UNION ALL
-                    SELECT n + 1 FROM Numbers WHERE n < 10
-                )
-                SELECT n FROM Numbers
-                """
-            ]
-        )
-    ];
 
     [Theory]
     [MemberData(nameof(RawCteData))]
@@ -277,88 +113,328 @@ public class CteTests
     {
         // Arrange
         var db = testCase.CreateBuilder();
-        var threshold = 100;
 
         // Act
-        var result = db.Query<Product>(p => db.Append($$"""
-            WITH ExpensiveProducts AS (
-                SELECT * FROM {{p}} WHERE {{p[x => x.Price]}} > {{threshold}}
-            )
-            SELECT * FROM ExpensiveProducts
-            """)).Build();
+        testCase.Action(() => 
+        {
+            db.Entity<Product>(out var p);
+
+            return db.Append($$"""
+                WITH ExpensiveProducts AS (
+                    SELECT * FROM {{p}} WHERE {{p.Price}} > {{Threshold}}
+                )
+                SELECT * FROM ExpensiveProducts
+                """).Build();
+        });
 
         // Assert
-        testCase.AssertSql(result.Sql);
-        Assert.Single(result.Parameters);
+        testCase.Assert();
     }
 
-    public static TheoryData<SqlTestCase> RawCteData =>
-    [
-        new SqlTestCase(
-            SqlDialectKind.Firebird,
+    public static TheoryData<SqlTestCase> Select_WithCteData
+    {
+        get
+        {
+            return
             [
-                """
-                WITH ExpensiveProducts AS (
-                    SELECT * FROM "dbo"."Products" WHERE "dbo"."Products"."Price" > @p0
+                new SqlTestCase(
+                    SqlDialectKind.CustomDb,
+                    [
+                        """
+                        WITH <<CategoryStats>> AS (
+                            SELECT <<p>>.<<CategoryId>>, SUM(<<p>>.<<Price>>) AS TotalPrice
+                            FROM <<dbo>>.<<Products>> AS <<p>>
+                            GROUP BY <<p>>.<<CategoryId>>
+                        )
+                        SELECT <<c>>.<<Name>>, <<cs>>.<<TotalPrice>>
+                        FROM <<Category>> AS <<c>>
+                        JOIN <<CategoryStats>> AS <<cs>>
+                            ON <<c>>.<<Id>> = <<cs>>.<<CategoryId>>
+                        """
+                    ]
+                ),
+                new SqlTestCase(
+                    SqlDialectKind.Firebird,
+                    [
+                        """
+                        WITH "CategoryStats" AS (
+                            SELECT "p"."CategoryId", SUM("p"."Price") AS TotalPrice
+                            FROM "dbo"."Products" AS "p"
+                            GROUP BY "p"."CategoryId"
+                        )
+                        SELECT "c"."Name", "cs"."TotalPrice"
+                        FROM "Category" AS "c"
+                        JOIN "CategoryStats" AS "cs"
+                            ON "c"."Id" = "cs"."CategoryId"
+                        """
+                    ]
+                ),
+                new SqlTestCase(
+                    SqlDialectKind.MySql,
+                    [
+                        """
+                        WITH `CategoryStats` AS (
+                            SELECT `p`.`CategoryId`, SUM(`p`.`Price`) AS TotalPrice
+                            FROM `dbo`.`Products` AS `p`
+                            GROUP BY `p`.`CategoryId`
+                        )
+                        SELECT `c`.`Name`, `cs`.`TotalPrice`
+                        FROM `Category` AS `c`
+                        JOIN `CategoryStats` AS `cs`
+                            ON `c`.`Id` = `cs`.`CategoryId`
+                        """
+                    ]
+                ),
+                new SqlTestCase(
+                    SqlDialectKind.Oracle,
+                    [
+                        """
+                        WITH "CategoryStats" AS (
+                            SELECT "p"."CategoryId", SUM("p"."Price") AS TotalPrice
+                            FROM "dbo"."Products" AS "p"
+                            GROUP BY "p"."CategoryId"
+                        )
+                        SELECT "c"."Name", "cs"."TotalPrice"
+                        FROM "Category" AS "c"
+                        JOIN "CategoryStats" AS "cs"
+                            ON "c"."Id" = "cs"."CategoryId"
+                        """
+                    ]
+                ),
+                new SqlTestCase(
+                    SqlDialectKind.PostgreSql,
+                    [
+                        """
+                        WITH "CategoryStats" AS (
+                            SELECT "p"."CategoryId", SUM("p"."Price") AS TotalPrice
+                            FROM "dbo"."Products" AS "p"
+                            GROUP BY "p"."CategoryId"
+                        )
+                        SELECT "c"."Name", "cs"."TotalPrice"
+                        FROM "Category" AS "c"
+                        JOIN "CategoryStats" AS "cs"
+                            ON "c"."Id" = "cs"."CategoryId"
+                        """
+                    ]
+                ),
+                new SqlTestCase(
+                    SqlDialectKind.SqLite,
+                    [
+                        """
+                        WITH "CategoryStats" AS (
+                            SELECT "p"."CategoryId", SUM("p"."Price") AS TotalPrice
+                            FROM "dbo"."Products" AS "p"
+                            GROUP BY "p"."CategoryId"
+                        )
+                        SELECT "c"."Name", "cs"."TotalPrice"
+                        FROM "Category" AS "c"
+                        JOIN "CategoryStats" AS "cs"
+                            ON "c"."Id" = "cs"."CategoryId"
+                        """
+                    ]
+                ),
+                new SqlTestCase(
+                    SqlDialectKind.SqlServer,
+                    [
+                        """
+                        WITH [CategoryStats] AS (
+                            SELECT [p].[CategoryId], SUM([p].[Price]) AS TotalPrice
+                            FROM [dbo].[Products] AS [p]
+                            GROUP BY [p].[CategoryId]
+                        )
+                        SELECT [c].[Name], [cs].[TotalPrice]
+                        FROM [Category] AS [c]
+                        JOIN [CategoryStats] AS [cs]
+                            ON [c].[Id] = [cs].[CategoryId]
+                        """
+                    ]
                 )
-                SELECT * FROM ExpensiveProducts
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.MySql,
+            ];
+        }
+    }
+
+    public static TheoryData<SqlTestCase> Select_WithRecursiveCteData
+    {
+        get
+        {
+            return
             [
-                """
-                WITH ExpensiveProducts AS (
-                    SELECT * FROM `dbo`.`Products` WHERE `dbo`.`Products`.`Price` > @p0
+                new SqlTestCase(
+                    SqlDialectKind.CustomDb,
+                    [
+                        """
+                        WITH RECURSIVE Numbers AS (
+                            SELECT 1 AS n
+                            UNION ALL
+                            SELECT n + 1 FROM Numbers WHERE n < 10
+                        )
+                        SELECT n FROM Numbers
+                        """
+                    ]
+                ),
+                new SqlTestCase(
+                    SqlDialectKind.Firebird,
+                    [
+                        """
+                        WITH RECURSIVE Numbers AS (
+                            SELECT 1 AS n
+                            UNION ALL
+                            SELECT n + 1 FROM Numbers WHERE n < 10
+                        )
+                        SELECT n FROM Numbers
+                        """
+                    ]
+                ),
+                new SqlTestCase(
+                    SqlDialectKind.MySql,
+                    [
+                        """
+                        WITH RECURSIVE Numbers AS (
+                            SELECT 1 AS n
+                            UNION ALL
+                            SELECT n + 1 FROM Numbers WHERE n < 10
+                        )
+                        SELECT n FROM Numbers
+                        """
+                    ]
+                ),
+                new SqlTestCase(
+                    SqlDialectKind.Oracle,
+                    [
+                        """
+                        WITH Numbers AS (
+                            SELECT 1 AS n
+                            UNION ALL
+                            SELECT n + 1 FROM Numbers WHERE n < 10
+                        )
+                        SELECT n FROM Numbers
+                        """
+                    ]
+                ),
+                new SqlTestCase(
+                    SqlDialectKind.PostgreSql,
+                    [
+                        """
+                        WITH RECURSIVE Numbers AS (
+                            SELECT 1 AS n
+                            UNION ALL
+                            SELECT n + 1 FROM Numbers WHERE n < 10
+                        )
+                        SELECT n FROM Numbers
+                        """
+                    ]
+                ),
+                new SqlTestCase(
+                    SqlDialectKind.SqLite,
+                    [
+                        """
+                        WITH RECURSIVE Numbers AS (
+                            SELECT 1 AS n
+                            UNION ALL
+                            SELECT n + 1 FROM Numbers WHERE n < 10
+                        )
+                        SELECT n FROM Numbers
+                        """
+                    ]
+                ),
+                new SqlTestCase(
+                    SqlDialectKind.SqlServer,
+                    [
+                        """
+                        WITH Numbers AS (
+                            SELECT 1 AS n
+                            UNION ALL
+                            SELECT n + 1 FROM Numbers WHERE n < 10
+                        )
+                        SELECT n FROM Numbers
+                        """
+                    ]
                 )
-                SELECT * FROM ExpensiveProducts
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.Oracle,
+            ];
+        }
+    }
+
+    public static TheoryData<SqlTestCase> RawCteData
+    {
+        get
+        {
+            object?[] expectedParams = [Threshold];
+
+            return
             [
-                """
-                WITH ExpensiveProducts AS (
-                    SELECT * FROM "dbo"."Products" WHERE "dbo"."Products"."Price" > :0
+                new SqlTestCase(
+                    SqlDialectKind.Firebird,
+                    [
+                        """
+                        WITH ExpensiveProducts AS (
+                            SELECT * FROM "dbo"."Products" WHERE "dbo"."Products"."Price" > @p0
+                        )
+                        SELECT * FROM ExpensiveProducts
+                        """
+                    ],
+                    expectedParameters: expectedParams
+                ),
+                new SqlTestCase(
+                    SqlDialectKind.MySql,
+                    [
+                        """
+                        WITH ExpensiveProducts AS (
+                            SELECT * FROM `dbo`.`Products` WHERE `dbo`.`Products`.`Price` > @p0
+                        )
+                        SELECT * FROM ExpensiveProducts
+                        """
+                    ],
+                    expectedParameters: expectedParams
+                ),
+                new SqlTestCase(
+                    SqlDialectKind.Oracle,
+                    [
+                        """
+                        WITH ExpensiveProducts AS (
+                            SELECT * FROM "dbo"."Products" WHERE "dbo"."Products"."Price" > :0
+                        )
+                        SELECT * FROM ExpensiveProducts
+                        """
+                    ],
+                    expectedParameters: expectedParams
+                ),
+                new SqlTestCase(
+                    SqlDialectKind.PostgreSql,
+                    [
+                        """
+                        WITH ExpensiveProducts AS (
+                            SELECT * FROM "dbo"."Products" WHERE "dbo"."Products"."Price" > $1
+                        )
+                        SELECT * FROM ExpensiveProducts
+                        """
+                    ],
+                    expectedParameters: expectedParams
+                ),
+                new SqlTestCase(
+                    SqlDialectKind.SqLite,
+                    [
+                        """
+                        WITH ExpensiveProducts AS (
+                            SELECT * FROM "dbo"."Products" WHERE "dbo"."Products"."Price" > @p1
+                        )
+                        SELECT * FROM ExpensiveProducts
+                        """
+                    ],
+                    expectedParameters: expectedParams
+                ),
+                new SqlTestCase(
+                    SqlDialectKind.SqlServer,
+                    [
+                        """
+                        WITH ExpensiveProducts AS (
+                            SELECT * FROM [dbo].[Products] WHERE [dbo].[Products].[Price] > @p0
+                        )
+                        SELECT * FROM ExpensiveProducts
+                        """
+                    ],
+                    expectedParameters: expectedParams
                 )
-                SELECT * FROM ExpensiveProducts
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.PostgreSql,
-            [
-                """
-                WITH ExpensiveProducts AS (
-                    SELECT * FROM "dbo"."Products" WHERE "dbo"."Products"."Price" > $1
-                )
-                SELECT * FROM ExpensiveProducts
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.SqLite,
-            [
-                """
-                WITH ExpensiveProducts AS (
-                    SELECT * FROM "dbo"."Products" WHERE "dbo"."Products"."Price" > @p1
-                )
-                SELECT * FROM ExpensiveProducts
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.SqlServer,
-            [
-                """
-                WITH ExpensiveProducts AS (
-                    SELECT * FROM [dbo].[Products] WHERE [dbo].[Products].[Price] > @p0
-                )
-                SELECT * FROM ExpensiveProducts
-                """
-            ]
-        )
-    ];
+            ];
+        }
+    }
 }

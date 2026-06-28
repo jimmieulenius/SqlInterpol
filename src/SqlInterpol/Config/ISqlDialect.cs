@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+
 namespace SqlInterpol;
 
 /// <summary>
@@ -72,13 +75,6 @@ public interface ISqlDialect
     /// <param name="context">The active context providing parameter state and options.</param>
     /// <returns>The SQL string representation of <paramref name="fragment"/>.</returns>
     string RenderFragment(ISqlFragment fragment, ISqlContext context);
-
-    /// <summary>
-    /// Rewrites a segment list to apply dialect-specific transformations (e.g. paging syntax, lock hints).
-    /// </summary>
-    /// <param name="segments">The original ordered segment list to rewrite.</param>
-    /// <returns>The rewritten segment sequence, which may differ in length and content from the input.</returns>
-    IEnumerable<SqlSegment> RewriteSegments(IReadOnlyList<SqlSegment> segments);
 
     /// <summary>Returns the default <see cref="SqlInterpolOptions"/> for this dialect.</summary>
     /// <returns>A new <see cref="SqlInterpolOptions"/> with dialect-appropriate defaults.</returns>

@@ -13,7 +13,7 @@ public interface ISqlReference : ISqlFragment
     ISqlFragment Source { get; }
 
     /// <summary>Gets or sets the alias to use when this reference appears in a SELECT projection.</summary>
-    string? Alias { get; set; }
+    string? Alias { get; }
 
     /// <summary>Gets or sets whether the alias should be wrapped in dialect-specific identifier quotes.</summary>
     bool IsAliasQuoted { get; set; }

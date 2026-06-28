@@ -1,6 +1,7 @@
-using SqlInterpol.Parsing;
+using System;
 using System.Collections;
 using System.Text;
+using SqlInterpol.Parsing;
 
 namespace SqlInterpol.Test.Parsing;
 
@@ -12,21 +13,15 @@ public class SqlInListFragment(IEnumerable items) : ISqlFragment
     {
         var sb = new StringBuilder("(");
         bool first = true;
-        var parserContext = (ISqlParserContext)context;
 
         foreach (var item in _items)
         {
             if (!first) sb.Append(", ");
             first = false;
 
-            // Safely generate parameter keys based on context state
-            int index = parserContext.Options.ParameterIndexStart + parserContext.ParserState.ParameterCount;
-            string prefix = parserContext.Options.ParameterPrefixOverride ?? parserContext.Dialect.ParameterPrefix;
-            string paramKey = $"{prefix}{index}";
-
-            // Add to the builder's dictionary
-            parserContext.Parameters[paramKey] = item ?? DBNull.Value;
-            parserContext.ParserState.ParameterCount++;
+            // The new AddParameter method securely handles all index tracking, 
+            // prefix generation, and dictionary assignment internally!
+            string paramKey = context.AddParameter(item);
 
             sb.Append(paramKey);
         }

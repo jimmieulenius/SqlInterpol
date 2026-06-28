@@ -11,14 +11,14 @@ public static class ServiceCollectionExtensions
     extension (IServiceCollection services)
     {
         /// <summary>
-        /// Registers the SqlInterpol options and interpolation parser as singletons
-        /// in the dependency injection container.
+        /// Registers the SqlInterpol options, segment preprocessor, and segment renderer
+        /// as singletons in the dependency injection container.
         /// </summary>
         /// <remarks>
-        /// After calling this method, <see cref="SqlInterpolOptions"/> and
-        /// <see cref="ISqlInterpolationParser"/> can be injected into any service.
-        /// A <see cref="SqlBuilder"/> is typically created per-request using the
-        /// dialect factory methods (e.g. <see cref="SqlBuilder.PostgreSql"/>).
+        /// After calling this method, <see cref="SqlInterpolOptions"/>,
+        /// <see cref="ISqlSegmentPreprocessor"/>, and <see cref="ISqlSegmentRenderer"/> 
+        /// can be injected into any service. A <see cref="SqlBuilder"/> is typically 
+        /// created per-request using the dialect factory methods (e.g. <see cref="SqlBuilder.PostgreSql"/>).
         /// <code>
         /// builder.Services.AddSqlInterpol();
         /// </code>
@@ -28,8 +28,13 @@ public static class ServiceCollectionExtensions
         public IServiceCollection AddSqlInterpol(SqlInterpolOptions? options = null)
         {
             var resolved = options ?? new SqlInterpolOptions();
+            
             services.AddSingleton(resolved);
-            services.AddSingleton<ISqlInterpolationParser>(sp => resolved.Parser ?? new SqlInterpolationParser());
+            
+            // Register the new pipeline middleware, falling back to the zero-allocation singletons
+            services.AddSingleton<ISqlSegmentPreprocessor>(sp => resolved.Preprocessor ?? SqlSegmentPreprocessor.Instance);
+            services.AddSingleton<ISqlSegmentRenderer>(sp => resolved.Renderer ?? SqlSegmentRenderer.Instance);
+            
             return services;
         }
     }

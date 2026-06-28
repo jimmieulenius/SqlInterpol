@@ -4,8 +4,14 @@ namespace SqlInterpol;
 /// Represents a multi-table DELETE statement, delegating dialect-specific rendering
 /// to <see cref="ISqlDialect.RenderFragment"/>.
 /// </summary>
-public class SqlMultiTableDeleteFragment : ISqlFragment, ISqlSwappableFragment
+public class SqlMultiTableDeleteFragment : ISqlFragment, ISqlSwappableFragment, ISqlFeatureRequirement
 {
+    /// <inheritdoc />
+    public SqlFeature RequiredFeature => SqlFeature.MultiTableDelete;
+
+    /// <inheritdoc />
+    public string FeatureName => "Multi-Table DELETE";
+
     /// <summary>Gets the target table fragment (the table from which rows are deleted).</summary>
     public ISqlFragment Target { get; }
 

@@ -17,7 +17,7 @@ public static partial class SqlBuilderExtensions
         if (string.IsNullOrWhiteSpace(expression)) return null;
         
         var parts = expression.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        return parts[^1]; // Modern index-from-end syntax
+        return parts[^1];
     }
 
     /// <summary>
@@ -30,7 +30,6 @@ public static partial class SqlBuilderExtensions
         string? alias = null,
         [CallerArgumentExpression(nameof(dummyPoco))] string? varName = null) 
     {
-        // Safely create a dummy token without invoking any constructors
         if (typeof(T).IsValueType)
         {
             dummyPoco = default!;
@@ -41,8 +40,6 @@ public static partial class SqlBuilderExtensions
         }
         
         string? cleanVarName = ExtractVariableName(varName);
-        
-        // If an explicit alias is provided, use it. Otherwise, check the auto-aliasing flag.
         string? sqlAlias = alias ?? (builder.Context.Options.EntityAutoAliasing ? cleanVarName : null);
         
         var entity = ((ISqlEntityRegistry)builder).RegisterEntity<T>(alias: sqlAlias);
@@ -68,27 +65,23 @@ public static partial class SqlBuilderExtensions
         {
             if (string.IsNullOrWhiteSpace(key)) return null;
             var parts = key.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            return parts[^1]; // Modern index-from-end syntax
+            return parts[^1];
         }
 
-        // 1. Safely initialize the local dummy token
         if (typeof(T).IsValueType)
         {
             localDummy = default!;
         }
         else
         {
-            localDummy = (T)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(T));
+            localDummy = (T)RuntimeHelpers.GetUninitializedObject(typeof(T));
         }
 
-        // 2. Aggressively strip "out var" so "out var p1", "out p1", and "p1" all become "p1"
         var cleanSource = CleanKey(sourceKey);
         var cleanLocal = CleanKey(localKey);
 
-        // 3. Map the variable using robust matching
         if (!string.IsNullOrEmpty(cleanSource) && !string.IsNullOrEmpty(cleanLocal))
         {
-            // First try exact match or clean match
             if (builder.ScopedVariables.TryGetValue(sourceKey!, out var node) ||
                 builder.ScopedVariables.TryGetValue(cleanSource, out node))
             {
@@ -96,7 +89,6 @@ public static partial class SqlBuilderExtensions
             }
             else
             {
-                // Fallback: If the dictionary saved "out var p1" but we only have "p1"
                 foreach (var kvp in builder.ScopedVariables)
                 {
                     if (kvp.Key.EndsWith(cleanSource))
@@ -112,7 +104,7 @@ public static partial class SqlBuilderExtensions
     }
 
     /// <summary>
-    /// Captures a subquery and binds its SQL definition to the specified dummy POCO variable.
+    /// Captures a buildable subquery and binds its SQL definition to the specified dummy POCO variable.
     /// This upgrades the variable in the builder's scope from a Table to a Subquery AST node.
     /// </summary>
     public static ISqlQuery<T> Subquery<T>(
@@ -131,14 +123,14 @@ public static partial class SqlBuilderExtensions
         
         if (!string.IsNullOrEmpty(cleanVarName))
         {
-            builder.ScopedVariables[cleanVarName] = typedQuery; // Upgrades Table to Subquery!
+            builder.ScopedVariables[cleanVarName] = typedQuery;
         }
         
         return typedQuery;
     }
 
     /// <summary>
-    /// Captures a subquery and binds its SQL definition to the specified dummy POCO variable.
+    /// Captures a buildable subquery and binds its SQL definition to the specified dummy POCO variable.
     /// Provides the current SqlBuilder to the lambda to avoid outer-variable shadowing.
     /// </summary>
     public static ISqlQuery<T> Subquery<T>(
@@ -148,7 +140,6 @@ public static partial class SqlBuilderExtensions
         string? alias = null,
         [CallerArgumentExpression(nameof(dummyPoco))] string? varName = null)
     {
-        // Wrap the Action<SqlBuilder> into a parameterless Action by passing the builder context in
         var innerQuery = builder.Query(() => action(builder));
         
         string? cleanVarName = ExtractVariableName(varName);
@@ -158,7 +149,7 @@ public static partial class SqlBuilderExtensions
         
         if (!string.IsNullOrEmpty(cleanVarName))
         {
-            builder.ScopedVariables[cleanVarName] = typedQuery; // Upgrades Table to Subquery!
+            builder.ScopedVariables[cleanVarName] = typedQuery;
         }
         
         return typedQuery;

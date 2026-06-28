@@ -7,91 +7,74 @@ public class UpdateAsTests
 {
     [Theory]
     [MemberData(nameof(UpdateSetWithAliasData))]
-    public void Update_WithExplicitAlias_StripsPrefixInSetClause(SqlTestCase testCase)
+    public void Update_WithExplicitAlias(SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
         var updateDto = new { Status = "Shipped", Total = 99.99m };
         
         // Act
-        var result = db
-            .Entity<OrderModel>(alias: "ord")
-            .Query(o =>
-            db.Append($$"""
-            UPDATE {{o}}
-            SET {{updateDto}}
-            WHERE {{o[x => x.Id]}} = 1
-            """))
-            .Build();
+        testCase.Action(() => db
+            .Entity<OrderModel>(out var o)
+            .Append($$"""
+                UPDATE {{o}} AS {{"ord"}}
+                SET {{updateDto}}
+                WHERE {{o.Id}} = 1
+                """)
+            .Build()
+        );
 
         // Assert
-        testCase.AssertSql(result.Sql);
-        
-        Assert.Equal("Shipped", result.Parameters.ElementAt(0).Value);
-        Assert.Equal(99.99m, result.Parameters.ElementAt(1).Value);
+        testCase.Assert();
     }
 
-    public static TheoryData<SqlTestCase> UpdateSetWithAliasData =>
-    [
-        new SqlTestCase(
-            SqlDialectKind.CustomDb,
+    public static TheoryData<SqlTestCase> UpdateSetWithAliasData
+    {
+        get
+        {
+            object?[] expectedParams = ["Shipped", 99.99m];
+
+            return
             [
-                """
-                UPDATE <<dbo>>.<<Orders>> AS <<ord>>
-                SET <<order_status>> = !!100, <<Total>> = !!101
-                WHERE <<ord>>.<<Id>> = 1
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.MySql,
-            [
-                """
-                UPDATE `dbo`.`Orders` AS `ord`
-                SET `order_status` = @p0, `Total` = @p1
-                WHERE `ord`.`Id` = 1
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.Oracle,
-            [
-                """
-                UPDATE "dbo"."Orders" AS "ord"
-                SET "order_status" = :0, "Total" = :1
-                WHERE "ord"."Id" = 1
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.PostgreSql,
-            [
-                """
-                UPDATE "dbo"."Orders" AS "ord"
-                SET "order_status" = $1, "Total" = $2
-                WHERE "ord"."Id" = 1
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.SqLite,
-            [
-                """
-                UPDATE "dbo"."Orders" AS "ord"
-                SET "order_status" = @p1, "Total" = @p2
-                WHERE "ord"."Id" = 1
-                """
-            ]
-        ),
-        new SqlTestCase(
-            SqlDialectKind.SqlServer,
-            [
-                """
-                UPDATE [dbo].[Orders] AS [ord]
-                SET [order_status] = @p0, [Total] = @p1
-                WHERE [ord].[Id] = 1
-                """
-            ]
-        )
-    ];
+                new SqlTestCase(SqlDialectKind.CustomDb, typeof(SqlDialectException)),
+                new SqlTestCase(SqlDialectKind.Firebird, typeof(SqlDialectException)),
+                new SqlTestCase(
+                    SqlDialectKind.MySql,
+                    [
+                        """
+                        UPDATE `ord`, `dbo`.`Orders` AS `ord`
+                        SET `order_status` = @p0, `Total` = @p1
+                        WHERE `ord`.`Id` = 1
+                        """
+                    ],
+                    expectedParameters: expectedParams
+                ),
+                new SqlTestCase(SqlDialectKind.Oracle, typeof(SqlDialectException)),
+                new SqlTestCase(
+                    SqlDialectKind.PostgreSql,
+                    [
+                        """
+                        UPDATE "dbo"."Orders" AS "ord"
+                        SET "order_status" = $1, "Total" = $2
+                        WHERE "ord"."Id" = 1
+                        """
+                    ],
+                    expectedParameters: expectedParams
+                ),
+                new SqlTestCase(SqlDialectKind.SqLite, typeof(SqlDialectException)),
+                new SqlTestCase(
+                    SqlDialectKind.SqlServer,
+                    [
+                        """
+                        UPDATE [ord]
+                        SET [order_status] = @p0, [Total] = @p1
+                        FROM [dbo].[Orders] AS [ord]
+                        WHERE [ord].[Id] = 1
+                        """
+                    ],
+                    expectedParameters: expectedParams
+                )
+            ];
+        }
+    }
 }

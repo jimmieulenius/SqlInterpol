@@ -20,6 +20,12 @@ public interface ISqlEntityBase : ISqlFragment
     ISqlReference Reference { get; }
 
     /// <summary>
+    /// Gets the underlying C# model type this entity represents.
+    /// Provides O(1) type resolution for the rendering engine.
+    /// </summary>
+    Type ModelType { get; }
+
+    /// <summary>
     /// Gets a SQL reference to the named column on this entity.
     /// </summary>
     /// <param name="columnName">The physical column name.</param>

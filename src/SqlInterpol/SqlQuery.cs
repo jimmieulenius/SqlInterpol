@@ -7,74 +7,62 @@ namespace SqlInterpol;
 /// A compiled SQL query produced by <see cref="SqlBuilder.Query(Action)"/>, holding the
 /// captured <see cref="SqlSegment"/> list ready for rendering or further composition.
 /// </summary>
-/// <param name="builder">The <see cref="SqlBuilder"/> that owns this query.</param>
-/// <param name="segments">The ordered list of segments captured from the query body.</param>
 public class SqlQuery(SqlBuilder builder, IReadOnlyList<SqlSegment> segments) : ISqlQuery
 {
-    /// <summary>Gets the <see cref="SqlBuilder"/> that owns this query.</summary>
     public SqlBuilder Builder { get; } = builder;
-    /// <summary>Gets the ordered list of <see cref="SqlSegment"/> instances captured from the query body.</summary>
     public IReadOnlyList<SqlSegment> Segments { get; } = segments;
+    
+    /// <inheritdoc />
+    public bool ExcludeParentheses { get; set; }
 
-    /// <summary>
-    /// Renders this query to a SQL string using the builder's active dialect.
-    /// </summary>
-    /// <param name="context">The SQL context supplying the dialect and render settings.</param>
-    /// <param name="mode">The render mode; only <see cref="SqlRenderMode.Default"/> is meaningful for top-level queries.</param>
-    /// <returns>The rendered SQL string.</returns>
+    /// <inheritdoc />
     public string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
     {
-        return Builder.Build(this).Sql;
+        var sql = Builder.Build(this).Sql;
+        
+        // Deferred rendering naturally respects the AST state!
+        if (ExcludeParentheses) return sql;
+        
+        return $"({sql})";
     }
 
-    /// <summary>
-    /// Builds this query into a <see cref="SqlQueryResult"/> containing the rendered SQL and extracted parameters.
-    /// </summary>
-    /// <returns>The <see cref="SqlQueryResult"/> ready for execution.</returns>
-    public SqlQueryResult Build()
-    {
-        return Builder.Build(this);
-    }
+    /// <inheritdoc />
+    public SqlQueryResult Build() => Builder.Build(this);
 }
 
 /// <summary>
-/// A typed SQL subquery scoped to a primary entity type <typeparamref name="T"/>.
-/// Can be interpolated into an outer query as a subquery, with its alias applied automatically.
+/// A typed SQL subquery scope bound to a primary entity model type <typeparamref name="T"/>.
 /// </summary>
-/// <typeparam name="T">The CLR model type of the primary entity this query is scoped to.</typeparam>
 public class SqlQuery<T> : SqlEntityBase<T>, ISqlQuery<T>
 {
-    /// <summary>Gets the <see cref="SqlBuilder"/> that owns this query.</summary>
     public SqlBuilder Builder { get; }
-    /// <summary>Gets the ordered list of <see cref="SqlSegment"/> instances captured from the query body.</summary>
+    
+    /// <inheritdoc />
     public IReadOnlyList<SqlSegment> Segments => _innerQuery.Segments;
+    
+    /// <inheritdoc />
+    public bool ExcludeParentheses 
+    { 
+        get => _innerQuery.ExcludeParentheses; 
+        set => _innerQuery.ExcludeParentheses = value; 
+    }
 
     private readonly ISqlQuery _innerQuery;
 
-    /// <summary>
-    /// Initializes a new typed subquery, wiring up the entity reference and alias for use as a composable fragment.
-    /// </summary>
-    /// <param name="builder">The owning <see cref="SqlBuilder"/>.</param>
-    /// <param name="innerQuery">The untyped inner query holding the captured segments.</param>
-    /// <param name="alias">
-    /// The SQL alias to assign to this subquery. When non-null, the alias will be quoted with the active dialect's
-    /// identifier quotes when rendered.
-    /// </param>
     public SqlQuery(SqlBuilder builder, ISqlQuery innerQuery, string? alias)
     {
         Builder = builder;
         _innerQuery = innerQuery;
 
-        Reference = new SqlEntityReference(this) 
-        { 
+        Reference = new SqlEntityReference(this)
+        {
             Alias = alias,
             FallbackAlias = typeof(T).Name,
-            IsAliasQuoted = !string.IsNullOrWhiteSpace(alias) 
+            IsAliasQuoted = !string.IsNullOrWhiteSpace(alias)
         };
         Declaration = new SqlDeclaration(this);
     }
 
-    // TODO (v2.0): Remove when deleting old lambda syntax
     [Obsolete("Use the zero-allocation out var syntax and direct POCO property access.")]
     public new ISqlProjection this[Expression<Func<T, object?>> expression]
     {
@@ -85,14 +73,7 @@ public class SqlQuery<T> : SqlEntityBase<T>, ISqlQuery<T>
         }
     }
 
-    /// <summary>
-    /// Renders this subquery to SQL, respecting the requested <paramref name="mode"/>.
-    /// In <see cref="SqlRenderMode.Declaration"/> the output is wrapped in parentheses with the alias applied;
-    /// in <see cref="SqlRenderMode.AliasOnly"/> or <see cref="SqlRenderMode.AsAlias"/> the inner SQL is not built.
-    /// </summary>
-    /// <param name="context">The SQL context supplying the dialect and identifier-quoting rules.</param>
-    /// <param name="mode">Controls which form of the subquery is emitted.</param>
-    /// <returns>The rendered SQL fragment for this subquery in the requested mode.</returns>
+    /// <inheritdoc />
     public override string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
     {
         var aliasToUse = Reference.Alias ?? Reference.FallbackAlias;
@@ -103,17 +84,17 @@ public class SqlQuery<T> : SqlEntityBase<T>, ISqlQuery<T>
 
         var innerSql = Builder.Build(_innerQuery).Sql;
 
+        // Deferred rendering dynamically handles the structural bounds
+        if (ExcludeParentheses) return innerSql;
+
         return mode switch
         {
             SqlRenderMode.Declaration => context.Dialect.ApplyAlias($"({innerSql})", escapedAlias),
             SqlRenderMode.BaseName => $"({innerSql})",
-            _ => innerSql
+            _ => $"({innerSql})"
         };
     }
 
-    /// <summary>
-    /// Builds the inner query into a <see cref="SqlQueryResult"/> containing the rendered SQL and extracted parameters.
-    /// </summary>
-    /// <returns>The <see cref="SqlQueryResult"/> ready for execution.</returns>
+    /// <inheritdoc />
     public SqlQueryResult Build() => Builder.Build(_innerQuery);
 }

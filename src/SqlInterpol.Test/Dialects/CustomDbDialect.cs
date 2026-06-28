@@ -19,6 +19,11 @@ public class CustomDbSqlDialect : SqlDialectBase
     public override string CloseQuote => ">>";
     public override SqlDialectKind Kind => SqlDialectKind.CustomDb;
 
+    public override IReadOnlySet<SqlFeature> SupportedFeatures { get; } = new HashSet<SqlFeature>
+    {
+        SqlFeature.UpdatableInlineViews
+    };
+
     public override SqlInterpolOptions GetDefaultOptions() => new() { ParameterIndexStart = 100 };
 }
 

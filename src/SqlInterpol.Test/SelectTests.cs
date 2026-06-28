@@ -1,5 +1,5 @@
-using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
+using SqlInterpol.Test.Dialects;
 
 namespace SqlInterpol.Test;
 
@@ -7,22 +7,23 @@ public class SelectTests
 {
     [Theory]
     [MemberData(nameof(SelectExpansionData))]
-    public void Select_EntityExpansion_ExpandsColumnsAndAppliesAlias(SqlTestCase testCase)
+    public void Select_EntityExpansion(SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
 
         // Act
-        var result = db
+        testCase.Action(() => db
             .Entity<ProductWithIgnoreModel>(out var p)
             .Append($$"""
             SELECT {{p}}
             FROM {{p}} AS p1
             """)
-            .Build();
+            .Build()
+        );
 
-        // Assert SQL
-        testCase.AssertSql(result.Sql);
+        // Assert
+        testCase.Assert();
     }
 
     [Theory]
@@ -33,17 +34,18 @@ public class SelectTests
         var db = testCase.CreateBuilder();
         
         // Act
-        var result = db
+        testCase.Action(() => db
             .Entity<Product>(out var p)
             .Append($$"""
             SELECT
                 {{p.Id}}
             FROM {{p}}
             """)
-            .Build();
+            .Build()
+        );
 
         // Assert
-        testCase.AssertSql(result.Sql);
+        testCase.Assert();
     }
 
     [Theory]
@@ -54,7 +56,7 @@ public class SelectTests
         var db = testCase.CreateBuilder();
         
         // Act
-        var result = db
+        testCase.Action(() => db
             .Entity<Product>(out var p)
             .Append($$"""
             SELECT
@@ -62,10 +64,11 @@ public class SelectTests
                 {{p.CategoryId}}
             FROM {{p}}
             """)
-            .Build();
+            .Build()
+        );
 
         // Assert
-        testCase.AssertSql(result.Sql);
+        testCase.Assert();
     }
 
     [Theory]
@@ -76,17 +79,18 @@ public class SelectTests
         var db = testCase.CreateBuilder();
         
         // Act
-        var result = db
+        testCase.Action(() => db
             .Entity<Product>(out var p)
             .Append($$"""
             SELECT
                 COUNT({{p.Id}})
             FROM {{p}}
             """)
-            .Build();
+            .Build()
+        );
 
         // Assert
-        testCase.AssertSql(result.Sql);
+        testCase.Assert();
     }
 
     [Theory]
@@ -96,21 +100,22 @@ public class SelectTests
         // Arrange
         var db = testCase.CreateBuilder();
         int activeStatus = 1;
+        SqlQueryResult? result = null;
 
         // Act
-        var result = db
+        testCase.Action(() => result = db
             .Entity<Product>(out var p)
             .Append($$"""
             SELECT
                 {{activeStatus}}
             FROM {{p}}
             """)
-            .Build();
+            .Build()
+        );
 
         // Assert
-        testCase.AssertSql(result.Sql);
-        
-        // Verify the parameter was captured correctly
+        testCase.Assert();
+        Assert.NotNull(result);
         Assert.Single(result.Parameters);
         Assert.Equal(1, result.Parameters.Values.First());
     }
@@ -123,17 +128,18 @@ public class SelectTests
         var db = testCase.CreateBuilder();
 
         // Act
-        var result = db
+        testCase.Action(() => db
             .Entity<Product>(out var p)
             .Append($$"""
             SELECT
                 {{p.Name}}
             FROM {{p}}
             """)
-            .Build();
+            .Build()
+        );
 
         // Assert
-        testCase.AssertSql(result.Sql);
+        testCase.Assert();
     }
 
     [Theory]
@@ -145,16 +151,17 @@ public class SelectTests
         db.Context.Options.CollectionLayout = SqlCollectionLayout.Vertical;
 
         // Act
-        var result = db
+        testCase.Action(() => db
             .Entity<ProductWithIgnoreModel>(out var p)
             .Append($$"""
             SELECT DISTINCT {{p}}
             FROM {{p}} AS p1
             """)
-            .Build();
+            .Build()
+        );
 
         // Assert
-        testCase.AssertSql(result.Sql);
+        testCase.Assert();
     }
 
     [Theory]
@@ -165,16 +172,17 @@ public class SelectTests
         var db = testCase.CreateBuilder();
 
         // Act
-        var result = db
+        testCase.Action(() => db
             .Entity<Product>(out var p)
             .Append($$"""
             SELECT TOP 10 {{p.Id}}
             FROM {{p}}
             """)
-            .Build();
+            .Build()
+        );
 
         // Assert
-        testCase.AssertSql(result.Sql);
+        testCase.Assert();
     }
 
     [Theory]
@@ -183,20 +191,21 @@ public class SelectTests
     {
         // Arrange
         var db = testCase.CreateBuilder();
-        
+        SqlQueryResult? result = null;
+
         // Act
-        var result = db
+        testCase.Action(() => result = db
             .Entity<ComplexProduct>(out var p)
             .Append($$"""
             SELECT {{p}}
             FROM {{p}} AS {{Sql.Quote("p")}}
             """)
-            .Build();
+            .Build()
+        );
 
         // Assert
-        testCase.AssertSql(result.Sql);
-        
-        // Extra paranoia check to ensure the complex type didn't bleed into the SQL
+        testCase.Assert();
+        Assert.NotNull(result);
         Assert.DoesNotContain("Supplier", result.Sql);
     }
 
@@ -206,8 +215,8 @@ public class SelectTests
             SqlDialectKind.CustomDb,
             [
                 """
-                SELECT p1.<<Id>>, p1.<<PROD_NAME>>
-                FROM <<dbo>>.<<Products>> AS p1
+                SELECT <<p1>>.<<Id>>, <<p1>>.<<PROD_NAME>>
+                FROM <<dbo>>.<<Products>> AS <<p1>>
                 """
             ]
         ),
@@ -215,8 +224,8 @@ public class SelectTests
             SqlDialectKind.Firebird,
             [
                 """
-                SELECT p1."Id", p1."PROD_NAME"
-                FROM "dbo"."Products" AS p1
+                SELECT "p1"."Id", "p1"."PROD_NAME"
+                FROM "dbo"."Products" AS "p1"
                 """
             ]
         ),
@@ -224,8 +233,8 @@ public class SelectTests
             SqlDialectKind.MySql,
             [
                 """
-                SELECT p1.`Id`, p1.`PROD_NAME`
-                FROM `dbo`.`Products` AS p1
+                SELECT `p1`.`Id`, `p1`.`PROD_NAME`
+                FROM `dbo`.`Products` AS `p1`
                 """
             ]
         ),
@@ -233,8 +242,8 @@ public class SelectTests
             SqlDialectKind.Oracle,
             [
                 """
-                SELECT p1."Id", p1."PROD_NAME"
-                FROM "dbo"."Products" AS p1
+                SELECT "p1"."Id", "p1"."PROD_NAME"
+                FROM "dbo"."Products" "p1"
                 """
             ]
         ),
@@ -242,8 +251,8 @@ public class SelectTests
             SqlDialectKind.PostgreSql,
             [
                 """
-                SELECT p1."Id", p1."PROD_NAME"
-                FROM "dbo"."Products" AS p1
+                SELECT "p1"."Id", "p1"."PROD_NAME"
+                FROM "dbo"."Products" AS "p1"
                 """
             ]
         ),
@@ -251,8 +260,8 @@ public class SelectTests
             SqlDialectKind.SqLite,
             [
                 """
-                SELECT p1."Id", p1."PROD_NAME"
-                FROM "dbo"."Products" AS p1
+                SELECT "p1"."Id", "p1"."PROD_NAME"
+                FROM "dbo"."Products" AS "p1"
                 """
             ]
         ),
@@ -260,8 +269,8 @@ public class SelectTests
             SqlDialectKind.SqlServer,
             [
                 """
-                SELECT p1.[Id], p1.[PROD_NAME]
-                FROM [dbo].[Products] AS p1
+                SELECT [p1].[Id], [p1].[PROD_NAME]
+                FROM [dbo].[Products] AS [p1]
                 """
             ]
         )
@@ -651,9 +660,9 @@ public class SelectTests
             [
                 """
                 SELECT DISTINCT
-                    p1.<<Id>>,
-                    p1.<<PROD_NAME>>
-                FROM <<dbo>>.<<Products>> AS p1
+                    <<p1>>.<<Id>>,
+                    <<p1>>.<<PROD_NAME>>
+                FROM <<dbo>>.<<Products>> AS <<p1>>
                 """
             ]
         ),
@@ -662,9 +671,9 @@ public class SelectTests
             [
                 """
                 SELECT DISTINCT
-                    p1."Id",
-                    p1."PROD_NAME"
-                FROM "dbo"."Products" AS p1
+                    "p1"."Id",
+                    "p1"."PROD_NAME"
+                FROM "dbo"."Products" AS "p1"
                 """
             ]
         ),
@@ -673,9 +682,9 @@ public class SelectTests
             [
                 """
                 SELECT DISTINCT
-                    p1.`Id`,
-                    p1.`PROD_NAME`
-                FROM `dbo`.`Products` AS p1
+                    `p1`.`Id`,
+                    `p1`.`PROD_NAME`
+                FROM `dbo`.`Products` AS `p1`
                 """
             ]
         ),
@@ -684,9 +693,9 @@ public class SelectTests
             [
                 """
                 SELECT DISTINCT
-                    p1."Id",
-                    p1."PROD_NAME"
-                FROM "dbo"."Products" AS p1
+                    "p1"."Id",
+                    "p1"."PROD_NAME"
+                FROM "dbo"."Products" "p1"
                 """
             ]
         ),
@@ -695,9 +704,9 @@ public class SelectTests
             [
                 """
                 SELECT DISTINCT
-                    p1."Id",
-                    p1."PROD_NAME"
-                FROM "dbo"."Products" AS p1
+                    "p1"."Id",
+                    "p1"."PROD_NAME"
+                FROM "dbo"."Products" AS "p1"
                 """
             ]
         ),
@@ -706,9 +715,9 @@ public class SelectTests
             [
                 """
                 SELECT DISTINCT
-                    p1."Id",
-                    p1."PROD_NAME"
-                FROM "dbo"."Products" AS p1
+                    "p1"."Id",
+                    "p1"."PROD_NAME"
+                FROM "dbo"."Products" AS "p1"
                 """
             ]
         ),
@@ -717,9 +726,9 @@ public class SelectTests
             [
                 """
                 SELECT DISTINCT
-                    p1.[Id],
-                    p1.[PROD_NAME]
-                FROM [dbo].[Products] AS p1
+                    [p1].[Id],
+                    [p1].[PROD_NAME]
+                FROM [dbo].[Products] AS [p1]
                 """
             ]
         )
@@ -727,6 +736,60 @@ public class SelectTests
 
     public static TheoryData<SqlTestCase> TopKeywordData =>
     [
+        new SqlTestCase(
+            SqlDialectKind.CustomDb,
+            [
+                """
+                SELECT TOP 10 <<dbo>>.<<Products>>.<<Id>>
+                FROM <<dbo>>.<<Products>>
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT TOP 10 "dbo"."Products"."Id"
+                FROM "dbo"."Products"
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.MySql,
+            [
+                """
+                SELECT TOP 10 `dbo`.`Products`.`Id`
+                FROM `dbo`.`Products`
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Oracle,
+            [
+                """
+                SELECT TOP 10 "dbo"."Products"."Id"
+                FROM "dbo"."Products"
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.PostgreSql,
+            [
+                """
+                SELECT TOP 10 "dbo"."Products"."Id"
+                FROM "dbo"."Products"
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqLite,
+            [
+                """
+                SELECT TOP 10 "dbo"."Products"."Id"
+                FROM "dbo"."Products"
+                """
+            ]
+        ),
         new SqlTestCase(
             SqlDialectKind.SqlServer,
             [
@@ -740,8 +803,7 @@ public class SelectTests
 
     public static TheoryData<SqlTestCase> SelectComplexData =>
     [
-        new SqlTestCase
-        (
+        new SqlTestCase(
             SqlDialectKind.CustomDb,
             [
                 """
@@ -750,8 +812,7 @@ public class SelectTests
                 """
             ]
         ),
-        new SqlTestCase
-        (
+        new SqlTestCase(
             SqlDialectKind.Firebird,
             [
                 """
@@ -760,8 +821,7 @@ public class SelectTests
                 """
             ] 
         ),
-        new SqlTestCase
-        (
+        new SqlTestCase(
             SqlDialectKind.MySql,
             [
                 """
@@ -770,18 +830,16 @@ public class SelectTests
                 """
             ]
         ),
-        new SqlTestCase
-        (
+        new SqlTestCase(
             SqlDialectKind.Oracle,
             [
                 """
                 SELECT "p"."Category", "p"."Id", "p"."Name", "p"."Status"
-                FROM "tbl_complex_products" AS "p"
+                FROM "tbl_complex_products" "p"
                 """
             ]
         ),
-        new SqlTestCase
-        (
+        new SqlTestCase(
             SqlDialectKind.PostgreSql,
             [
                 """
@@ -790,8 +848,7 @@ public class SelectTests
                 """
             ]
         ),
-        new SqlTestCase
-        (
+        new SqlTestCase(
             SqlDialectKind.SqLite,
             [
                 """
@@ -800,8 +857,7 @@ public class SelectTests
                 """
             ]
         ),
-        new SqlTestCase
-        (
+        new SqlTestCase(
             SqlDialectKind.SqlServer,
             [
                 """

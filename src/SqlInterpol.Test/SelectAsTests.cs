@@ -1,5 +1,5 @@
-using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
+using SqlInterpol.Test.Dialects;
 
 namespace SqlInterpol.Test;
 
@@ -13,17 +13,18 @@ public class SelectAsTests
         var db = testCase.CreateBuilder();
         
         // Act
-        var result = db
+        testCase.Action(() => db
             .Entity<Product>(out var p)
             .Append($$"""
             SELECT
                 {{p.Id}} AS ProductId
             FROM {{p}}
             """)
-            .Build();
+            .Build()
+        );
 
         // Assert
-        testCase.AssertSql(result.Sql);
+        testCase.Assert();
     }
 
     [Theory]
@@ -34,19 +35,18 @@ public class SelectAsTests
         var db = testCase.CreateBuilder();
         
         // Act
-        // TODO: Migrate string indexer lookup and lambda mapping to new syntax
-        #pragma warning disable SQLI003
-        var result = db.Query<Product>(p =>
-            db.Append($$"""
+        testCase.Action(() => db
+            .Entity<Product>(out var p)
+            .Append($$"""
             SELECT
-                {{p["ProductId"]}} AS {{p[x => x.Id]}}
+                {{p.Column("Id")}} AS {{"ProductId"}}
             FROM {{p}}
-            """))
-            .Build();
-        #pragma warning restore SQLI003
+            """)
+            .Build()
+        );
 
         // Assert
-        testCase.AssertSql(result.Sql);
+        testCase.Assert();
     }
 
     [Theory]
@@ -57,17 +57,18 @@ public class SelectAsTests
         var db = testCase.CreateBuilder();
         
         // Act
-        var result = db
+        testCase.Action(() => db
             .Entity<Product>(out var p)
             .Append($$"""
             SELECT
                 {{p.Name}} AS {{p.Name}}
             FROM {{p}}
             """)
-            .Build();
+            .Build()
+        );
 
         // Assert
-        testCase.AssertSql(result.Sql);
+        testCase.Assert();
     }
 
     public static TheoryData<SqlTestCase> ProjectionAsLiteralData =>
@@ -151,7 +152,7 @@ public class SelectAsTests
             [
                 """
                 SELECT
-                    <<dbo>>.<<Products>>.<<ProductId>> AS <<Id>>
+                    <<dbo>>.<<Products>>.<<Id>> AS <<ProductId>>
                 FROM <<dbo>>.<<Products>>
                 """
             ]
@@ -161,7 +162,7 @@ public class SelectAsTests
             [
                 """
                 SELECT
-                    "dbo"."Products"."ProductId" AS "Id"
+                    "dbo"."Products"."Id" AS "ProductId"
                 FROM "dbo"."Products"
                 """
             ]
@@ -171,7 +172,7 @@ public class SelectAsTests
             [
                 """
                 SELECT
-                    `dbo`.`Products`.`ProductId` AS `Id`
+                    `dbo`.`Products`.`Id` AS `ProductId`
                 FROM `dbo`.`Products`
                 """
             ]
@@ -181,7 +182,7 @@ public class SelectAsTests
             [
                 """
                 SELECT
-                    "dbo"."Products"."ProductId" AS "Id"
+                    "dbo"."Products"."Id" AS "ProductId"
                 FROM "dbo"."Products"
                 """
             ]
@@ -191,7 +192,7 @@ public class SelectAsTests
             [
                 """
                 SELECT
-                    "dbo"."Products"."ProductId" AS "Id"
+                    "dbo"."Products"."Id" AS "ProductId"
                 FROM "dbo"."Products"
                 """
             ]
@@ -201,7 +202,7 @@ public class SelectAsTests
             [
                 """
                 SELECT
-                    "dbo"."Products"."ProductId" AS "Id"
+                    "dbo"."Products"."Id" AS "ProductId"
                 FROM "dbo"."Products"
                 """
             ]
@@ -211,7 +212,7 @@ public class SelectAsTests
             [
                 """
                 SELECT
-                    [dbo].[Products].[ProductId] AS [Id]
+                    [dbo].[Products].[Id] AS [ProductId]
                 FROM [dbo].[Products]
                 """
             ]
