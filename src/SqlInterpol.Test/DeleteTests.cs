@@ -165,7 +165,6 @@ public class DeleteTests
                 new SqlTestCase(
                     SqlDialectKind.MySql,
                     [
-                        // MySQL accurately extracts the target table to the front of the FROM clause
                         """
                         DELETE `dbo`.`Products`
                         FROM `dbo`.`Products`, `Category` AS `c1`

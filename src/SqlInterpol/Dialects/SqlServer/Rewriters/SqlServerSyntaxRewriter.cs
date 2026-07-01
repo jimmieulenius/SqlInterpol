@@ -4,7 +4,7 @@ namespace SqlInterpol.Dialects.SqlServer;
 
 /// <summary>
 /// A structural rewriter that transpiles generic Upserts into MERGE statements, maps UPDATE AS fragments, 
-/// and handles SQL Server's custom OUTPUT inserted.* logic.
+/// handles SQL Server's custom OUTPUT inserted.* logic, and transpiles LIMIT/OFFSET paging.
 /// </summary>
 public class SqlServerSyntaxRewriter : ISqlSegmentRewriter
 {
@@ -129,22 +129,32 @@ public class SqlServerSyntaxRewriter : ISqlSegmentRewriter
                 }
             }
 
+            // FIX: Restored Paging syntax rewriter and safely scan past structural whitespace!
             if (segment.HasTag(SqlSegmentTag.Paging) && segment.Value is string textPaging)
             {
-                if (i + 3 < segments.Count && segments[i + 1].Type == SqlSegmentType.Parameter && segments[i + 3].Type == SqlSegmentType.Parameter)
+                int p1Idx = i + 1;
+                while (p1Idx < segments.Count && segments[p1Idx].Type == SqlSegmentType.Literal && string.IsNullOrWhiteSpace(segments[p1Idx].Value as string)) p1Idx++;
+                
+                int p2Idx = p1Idx + 1;
+                while (p2Idx < segments.Count && segments[p2Idx].Type == SqlSegmentType.Literal && string.IsNullOrWhiteSpace(segments[p2Idx].Value as string)) p2Idx++;
+                
+                int p3Idx = p2Idx + 1;
+                while (p3Idx < segments.Count && segments[p3Idx].Type == SqlSegmentType.Literal && string.IsNullOrWhiteSpace(segments[p3Idx].Value as string)) p3Idx++;
+
+                if (p3Idx < segments.Count && segments[p1Idx].Type == SqlSegmentType.Parameter && segments[p3Idx].Type == SqlSegmentType.Parameter)
                 {
                     int index = textPaging.LastIndexOf(SqlKeyword.Limit, StringComparison.OrdinalIgnoreCase);
                     if (index > -1) rewritten.Add(new SqlSegment(SqlSegmentType.Literal, textPaging[..index]));
 
                     rewritten.Add(new SqlSegment(SqlSegmentType.Literal, $"{SqlKeyword.Offset} "));
-                    rewritten.Add(segments[i + 3]); 
+                    rewritten.Add(segments[p3Idx]); 
                     
                     rewritten.Add(new SqlSegment(SqlSegmentType.Literal, " ROWS FETCH NEXT "));
-                    rewritten.Add(segments[i + 1]); 
+                    rewritten.Add(segments[p1Idx]); 
                     
                     rewritten.Add(new SqlSegment(SqlSegmentType.Literal, " ROWS ONLY"));
 
-                    i += 3;
+                    i = p3Idx;
                     continue;
                 }
             }
@@ -154,8 +164,6 @@ public class SqlServerSyntaxRewriter : ISqlSegmentRewriter
         }
 
         int upAsIdx = rewritten.FindIndex(s => s.Type == SqlSegmentType.Raw && s.Value is SqlUpdateAsFragment);
-        
-        // FIX: Ensure we do NOT apply the Update AS transformation if this query has already been elevated to a CTE or Subquery Update by the core engine!
         bool isAlreadyElevated = rewritten.Any(s => s.Type == SqlSegmentType.Raw && (s.Value is SqlUpdateCteFragment || s.Value is SqlUpdateSubqueryFragment));
 
         if (upAsIdx > -1 && !isAlreadyElevated)

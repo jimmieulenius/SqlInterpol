@@ -84,7 +84,11 @@ public abstract class SqlDialectBase : ISqlDialect
     public virtual string ApplyAlias(string source, string? alias = null)
     {
         if (string.IsNullOrWhiteSpace(alias)) return source;
-        return $"{QuoteIdentifier(source)} {SqlKeyword.As.Value} {alias}";
+        
+        // Safely bypass quoting if the source is already an inline view / subquery.
+        string safeSource = string.IsNullOrWhiteSpace(source) ? "" : (source.TrimStart().StartsWith("(") ? source : QuoteIdentifier(source));
+        
+        return string.IsNullOrWhiteSpace(safeSource) ? $"{SqlKeyword.As.Value} {alias}" : $"{safeSource} {SqlKeyword.As.Value} {alias}";
     }
 
     /// <inheritdoc />

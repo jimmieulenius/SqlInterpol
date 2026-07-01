@@ -1,3 +1,8 @@
+using SqlInterpol.Parsing;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
 namespace SqlInterpol;
 
 /// <summary>
@@ -17,7 +22,56 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
         switch (segment.Type)
         {
             case SqlSegmentType.Projection:
+                if (segment.Value is ISqlFragment projFragment)
+                {
+                    var mode = segment.RenderMode ?? ResolveRenderMode(context, index, segment, segments);
+                    rendered = projFragment.ToSql(context, mode);
+                }
+                break;
+
             case SqlSegmentType.Reference:
+                // Intercept CTE Declarations to enforce schema-less physical table names
+                if (segment.Value is ISqlEntityBase entityCte && segment.Value is not ISqlQueryFragment && segment.Value is not ISqlQuery)
+                {
+                    bool isCte = false;
+                    int lookahead = index + 1;
+                    while (lookahead < segments.Count && segments[lookahead].Type == SqlSegmentType.Literal && string.IsNullOrWhiteSpace(segments[lookahead].Value as string)) lookahead++;
+
+                    if (lookahead < segments.Count && segments[lookahead].Type == SqlSegmentType.Literal)
+                    {
+                        var text = segments[lookahead].Value?.ToString()?.TrimStart();
+                        bool hasAs = text?.StartsWith($"{SqlKeyword.As.Value} ", StringComparison.OrdinalIgnoreCase) == true
+                            || text?.StartsWith($"{SqlKeyword.As.Value}\n", StringComparison.OrdinalIgnoreCase) == true
+                            || text?.StartsWith($"{SqlKeyword.As.Value}\r", StringComparison.OrdinalIgnoreCase) == true
+                            || text?.StartsWith($"{SqlKeyword.As.Value}(", StringComparison.OrdinalIgnoreCase) == true
+                            || string.Equals(text, SqlKeyword.As.Value, StringComparison.OrdinalIgnoreCase);
+
+                        if (hasAs)
+                        {
+                            var afterAs = text!.Substring(2).TrimStart();
+                            if (afterAs.StartsWith("(")) isCte = true;
+                            else if (string.IsNullOrEmpty(afterAs))
+                            {
+                                int next = lookahead + 1;
+                                while (next < segments.Count && segments[next].Type == SqlSegmentType.Literal && string.IsNullOrWhiteSpace(segments[next].Value as string)) next++;
+                                if (next < segments.Count)
+                                {
+                                    var nextSeg = segments[next];
+                                    if (nextSeg.Type == SqlSegmentType.Literal && nextSeg.Value?.ToString()?.TrimStart().StartsWith("(") == true) isCte = true;
+                                    else if (nextSeg.Value is ISqlQueryFragment || nextSeg.Value is ISqlQuery) isCte = true;
+                                }
+                            }
+                        }
+                    }
+
+                    if (isCte)
+                    {
+                        var meta = SqlMetadataRegistry.GetMetadata(entityCte.ModelType);
+                        rendered = context.Dialect.QuoteIdentifier(meta.Name);
+                        break; // Bypass fragment.ToSql completely to strip assigned aliases and schemas!
+                    }
+                }
+                
                 if (segment.Value is ISqlFragment fragment)
                 {
                     var mode = segment.RenderMode ?? ResolveRenderMode(context, index, segment, segments);
@@ -58,11 +112,48 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
                             }
                         }
 
+                        if (!alreadyHasAs)
+                        {
+                            int lookahead = index + 1;
+                            while (lookahead < segments.Count && segments[lookahead].Type == SqlSegmentType.Literal && string.IsNullOrWhiteSpace(segments[lookahead].Value?.ToString()))
+                            {
+                                lookahead++;
+                            }
+
+                            if (lookahead < segments.Count)
+                            {
+                                var nextSeg = segments[lookahead];
+                                var nextText = nextSeg.Value?.ToString()?.TrimStart();
+
+                                if (nextText != null && (
+                                    nextText.StartsWith($"{SqlKeyword.As.Value} ", StringComparison.OrdinalIgnoreCase) || 
+                                    nextText.StartsWith($"{SqlKeyword.As.Value}\n", StringComparison.OrdinalIgnoreCase) || 
+                                    nextText.StartsWith($"{SqlKeyword.As.Value}\r", StringComparison.OrdinalIgnoreCase) || 
+                                    nextText.Equals(SqlKeyword.As.Value, StringComparison.OrdinalIgnoreCase)))
+                                {
+                                    alreadyHasAs = true;
+                                }
+                                else if (nextSeg.Type == SqlSegmentType.Raw)
+                                {
+                                    alreadyHasAs = true;
+                                }
+                            }
+                        }
+
                         if (!alreadyHasAs && requiresAlias)
                         {
-                            int ws = text.Length - trimmed.Length;
                             var asAlias = prevSubquery.ToSql(context, SqlRenderMode.AsAlias);
-                            return text[..ws] + ") " + asAlias + trimmed[1..];
+                            
+                            if (string.IsNullOrWhiteSpace(asAlias))
+                            {
+                                return text;
+                            }
+                            
+                            int wsLen = text.Length - trimmed.Length;
+                            string ws = text[..wsLen];
+                            if (ws.EndsWith(" ") || ws.EndsWith("\t")) ws = ws[..^1];
+                            
+                            return ws + ") " + asAlias + (trimmed[1..].StartsWith(" ") ? trimmed[1..] : " " + trimmed[1..].TrimStart());
                         }
                     }
                 }
@@ -76,7 +167,6 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
             case SqlSegmentType.Raw:
                 if (segment.Value is ISqlFragment rawFrag)
                 {
-                    // FIX: Respect the explicitly assigned RenderMode from the Preprocessor!
                     var mode = segment.RenderMode ?? SqlRenderMode.Default;
                     rendered = rawFrag.ToSql(context, mode);
                 }
@@ -160,9 +250,11 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
         {
             var text = segments[lookahead].Value?.ToString()?.TrimStart();
             
-            if (text?.StartsWith($"{SqlKeyword.As.Value} ", StringComparison.OrdinalIgnoreCase) == true
+            bool hasAs = text?.StartsWith($"{SqlKeyword.As.Value} ", StringComparison.OrdinalIgnoreCase) == true
                 || text?.StartsWith($"{SqlKeyword.As.Value}\n", StringComparison.OrdinalIgnoreCase) == true
-                || string.Equals(text, SqlKeyword.As.Value, StringComparison.OrdinalIgnoreCase))
+                || string.Equals(text, SqlKeyword.As.Value, StringComparison.OrdinalIgnoreCase);
+
+            if (hasAs)
             {
                 return SqlRenderMode.BaseName;
             }

@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using SqlInterpol.Parsing;
 
 namespace SqlInterpol;
 
@@ -8,6 +9,9 @@ namespace SqlInterpol;
 /// <seealso cref="ISqlEntityBase{T}"/>
 public interface ISqlEntityBase : ISqlFragment
 {
+    /// <summary>Gets the assigned execution role (e.g. Table or CTE) for this entity.</summary>
+    SqlEntityRole Role { get; }
+
     /// <summary>
     /// Gets the fragment that renders this entity as a full declaration, including alias
     /// (e.g. <c>"Products" AS "p"</c>).

@@ -17,7 +17,7 @@ public static partial class SqlBuilderExtensions
         if (string.IsNullOrWhiteSpace(expression)) return null;
         
         var parts = expression.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        return parts[^1];
+        return parts[^1].Trim();
     }
 
     /// <summary>
@@ -65,7 +65,7 @@ public static partial class SqlBuilderExtensions
         {
             if (string.IsNullOrWhiteSpace(key)) return null;
             var parts = key.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            return parts[^1];
+            return parts[^1].Trim();
         }
 
         if (typeof(T).IsValueType)

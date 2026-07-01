@@ -51,7 +51,12 @@ public class OracleDialect : SqlDialectBase
     public override string ApplyAlias(string source, string? alias = null)
     {
         if (string.IsNullOrWhiteSpace(alias)) return source;
-        return $"{QuoteIdentifier(source)} {alias}";
+        
+        // Safely bypass quoting if the source is already an inline view / subquery.
+        string safeSource = string.IsNullOrWhiteSpace(source) ? "" : (source.TrimStart().StartsWith("(") ? source : QuoteIdentifier(source));
+        
+        // Oracle uniquely drops the 'AS' keyword for table aliases
+        return string.IsNullOrWhiteSpace(safeSource) ? alias : $"{safeSource} {alias}";
     }
 
     /// <inheritdoc />

@@ -29,6 +29,11 @@ public class SqlNestedQueryFragment : ISqlQueryFragment, ISqlEntityBase, ISqlSeg
     public bool ExcludeParentheses { get; set; }
 
     /// <summary>
+    /// Gets or sets the assigned execution role (e.g., Table or CTE) for this subquery entity.
+    /// </summary>
+    public SqlEntityRole Role { get; set; } = SqlEntityRole.Table;
+
+    /// <summary>
     /// Gets the underlying C# model type this entity represents.
     /// Resolves to the fragment's own type for dynamic structural subqueries.
     /// </summary>

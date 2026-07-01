@@ -131,7 +131,7 @@ public class SelectSubqueryTests
                                     <<Category>>.<<Name>>
                                 FROM <<Category>>
                                 WHERE <<Category>>.<<Id>> = <<prod>>.<<CategoryId>> AND <<Category>>.<<IsActive>> = !!100
-                            ) AS CategoryName
+                            ) AS <<CategoryName>>
                         FROM <<dbo>>.<<Products>> AS <<prod>>
                         WHERE <<prod>>.<<Price>> > !!101
                         """,
@@ -143,7 +143,7 @@ public class SelectSubqueryTests
                                     <<Category>>.<<Name>>
                                 FROM <<Category>>
                                 WHERE <<Category>>.<<Id>> = <<second_prod>>.<<CategoryId>> AND <<Category>>.<<IsActive>> = !!100
-                            ) AS CategoryName
+                            ) AS <<CategoryName>>
                         FROM <<dbo>>.<<Products>> AS <<second_prod>>
                         WHERE <<second_prod>>.<<Price>> > !!101
                         """
@@ -161,7 +161,7 @@ public class SelectSubqueryTests
                                     "Category"."Name"
                                 FROM "Category"
                                 WHERE "Category"."Id" = "prod"."CategoryId" AND "Category"."IsActive" = @p0
-                            ) AS CategoryName
+                            ) AS "CategoryName"
                         FROM "dbo"."Products" AS "prod"
                         WHERE "prod"."Price" > @p1
                         """,
@@ -173,7 +173,7 @@ public class SelectSubqueryTests
                                     "Category"."Name"
                                 FROM "Category"
                                 WHERE "Category"."Id" = "second_prod"."CategoryId" AND "Category"."IsActive" = @p0
-                            ) AS CategoryName
+                            ) AS "CategoryName"
                         FROM "dbo"."Products" AS "second_prod"
                         WHERE "second_prod"."Price" > @p1
                         """
@@ -191,7 +191,7 @@ public class SelectSubqueryTests
                                     `Category`.`Name`
                                 FROM `Category`
                                 WHERE `Category`.`Id` = `prod`.`CategoryId` AND `Category`.`IsActive` = @p0
-                            ) AS CategoryName
+                            ) AS `CategoryName`
                         FROM `dbo`.`Products` AS `prod`
                         WHERE `prod`.`Price` > @p1
                         """,
@@ -203,7 +203,7 @@ public class SelectSubqueryTests
                                     `Category`.`Name`
                                 FROM `Category`
                                 WHERE `Category`.`Id` = `second_prod`.`CategoryId` AND `Category`.`IsActive` = @p0
-                            ) AS CategoryName
+                            ) AS `CategoryName`
                         FROM `dbo`.`Products` AS `second_prod`
                         WHERE `second_prod`.`Price` > @p1
                         """
@@ -221,7 +221,7 @@ public class SelectSubqueryTests
                                     "Category"."Name"
                                 FROM "Category"
                                 WHERE "Category"."Id" = "prod"."CategoryId" AND "Category"."IsActive" = :0
-                            ) AS CategoryName
+                            ) AS "CategoryName"
                         FROM "dbo"."Products" "prod"
                         WHERE "prod"."Price" > :1
                         """,
@@ -233,7 +233,7 @@ public class SelectSubqueryTests
                                     "Category"."Name"
                                 FROM "Category"
                                 WHERE "Category"."Id" = "second_prod"."CategoryId" AND "Category"."IsActive" = :0
-                            ) AS CategoryName
+                            ) AS "CategoryName"
                         FROM "dbo"."Products" "second_prod"
                         WHERE "second_prod"."Price" > :1
                         """
@@ -251,7 +251,7 @@ public class SelectSubqueryTests
                                     "Category"."Name"
                                 FROM "Category"
                                 WHERE "Category"."Id" = "prod"."CategoryId" AND "Category"."IsActive" = $1
-                            ) AS CategoryName
+                            ) AS "CategoryName"
                         FROM "dbo"."Products" AS "prod"
                         WHERE "prod"."Price" > $2
                         """,
@@ -263,7 +263,7 @@ public class SelectSubqueryTests
                                     "Category"."Name"
                                 FROM "Category"
                                 WHERE "Category"."Id" = "second_prod"."CategoryId" AND "Category"."IsActive" = $1
-                            ) AS CategoryName
+                            ) AS "CategoryName"
                         FROM "dbo"."Products" AS "second_prod"
                         WHERE "second_prod"."Price" > $2
                         """
@@ -281,7 +281,7 @@ public class SelectSubqueryTests
                                     "Category"."Name"
                                 FROM "Category"
                                 WHERE "Category"."Id" = "prod"."CategoryId" AND "Category"."IsActive" = @p1
-                            ) AS CategoryName
+                            ) AS "CategoryName"
                         FROM "dbo"."Products" AS "prod"
                         WHERE "prod"."Price" > @p2
                         """,
@@ -293,7 +293,7 @@ public class SelectSubqueryTests
                                     "Category"."Name"
                                 FROM "Category"
                                 WHERE "Category"."Id" = "second_prod"."CategoryId" AND "Category"."IsActive" = @p1
-                            ) AS CategoryName
+                            ) AS "CategoryName"
                         FROM "dbo"."Products" AS "second_prod"
                         WHERE "second_prod"."Price" > @p2
                         """
@@ -311,7 +311,7 @@ public class SelectSubqueryTests
                                     [Category].[Name]
                                 FROM [Category]
                                 WHERE [Category].[Id] = [prod].[CategoryId] AND [Category].[IsActive] = @p0
-                            ) AS CategoryName
+                            ) AS [CategoryName]
                         FROM [dbo].[Products] AS [prod]
                         WHERE [prod].[Price] > @p1
                         """,
@@ -323,7 +323,7 @@ public class SelectSubqueryTests
                                     [Category].[Name]
                                 FROM [Category]
                                 WHERE [Category].[Id] = [second_prod].[CategoryId] AND [Category].[IsActive] = @p0
-                            ) AS CategoryName
+                            ) AS [CategoryName]
                         FROM [dbo].[Products] AS [second_prod]
                         WHERE [second_prod].[Price] > @p1
                         """

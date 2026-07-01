@@ -80,11 +80,10 @@ public class SqlQuery<T> : SqlEntityBase<T>, ISqlQuery<T>
         var escapedAlias = Reference.IsAliasQuoted ? context.Dialect.QuoteIdentifier(aliasToUse) : aliasToUse;
 
         if (mode == SqlRenderMode.AliasOnly) return escapedAlias;
-        if (mode == SqlRenderMode.AsAlias) return $"{SqlKeyword.As.Value} {escapedAlias}";
+        if (mode == SqlRenderMode.AsAlias) return context.Dialect.ApplyAlias("", escapedAlias).Trim();
 
         var innerSql = Builder.Build(_innerQuery).Sql;
 
-        // Deferred rendering dynamically handles the structural bounds
         if (ExcludeParentheses) return innerSql;
 
         return mode switch

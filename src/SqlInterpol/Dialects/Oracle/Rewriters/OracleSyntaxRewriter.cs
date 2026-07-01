@@ -5,7 +5,7 @@ namespace SqlInterpol.Dialects.Oracle;
 
 /// <summary>
 /// A structural rewriter that transforms EXCEPT to MINUS, handles recursive CTE syntax, 
-/// strips invalid AS aliases recursively, and safely repositions deferred locks for Oracle.
+/// strips invalid AS aliases recursively, transpiles LIMIT/OFFSET paging, and safely repositions deferred locks for Oracle.
 /// </summary>
 public class OracleSyntaxRewriter : ISqlSegmentRewriter
 {
@@ -35,7 +35,7 @@ public class OracleSyntaxRewriter : ISqlSegmentRewriter
             // RECURSIVE DRILLING PASS
             // ====================================================================
             
-            // FIX: Safely unwrap and drill into subqueries hidden by higher-level DML layout AST nodes!
+            // Safely unwrap and drill into subqueries hidden by higher-level DML layout AST nodes!
             if (segment.Value is SqlUpdateSubqueryFragment updateSubquery && updateSubquery.Subquery is SqlNestedQueryFragment subNested)
             {
                 var rewrittenInner = Rewrite(subNested.Segments.ToList(), context).ToList();
@@ -56,6 +56,39 @@ public class OracleSyntaxRewriter : ISqlSegmentRewriter
                     ExcludeParentheses = nestedQuery.ExcludeParentheses
                 };
                 segment = new SqlSegment(segment.Type, newNestedFragment, segment.RenderMode, segment.Tags);
+            }
+
+            // ====================================================================
+            // PAGING TRANSFORMATION PASS
+            // ====================================================================
+            
+            if (segment.HasTag(SqlSegmentTag.Paging) && segment.Value is string textPaging)
+            {
+                int p1Idx = i + 1;
+                while (p1Idx < segments.Count && segments[p1Idx].Type == SqlSegmentType.Literal && string.IsNullOrWhiteSpace(segments[p1Idx].Value as string)) p1Idx++;
+                
+                int p2Idx = p1Idx + 1;
+                while (p2Idx < segments.Count && segments[p2Idx].Type == SqlSegmentType.Literal && string.IsNullOrWhiteSpace(segments[p2Idx].Value as string)) p2Idx++;
+                
+                int p3Idx = p2Idx + 1;
+                while (p3Idx < segments.Count && segments[p3Idx].Type == SqlSegmentType.Literal && string.IsNullOrWhiteSpace(segments[p3Idx].Value as string)) p3Idx++;
+
+                if (p3Idx < segments.Count && segments[p1Idx].Type == SqlSegmentType.Parameter && segments[p3Idx].Type == SqlSegmentType.Parameter)
+                {
+                    int index = textPaging.LastIndexOf("LIMIT", StringComparison.OrdinalIgnoreCase);
+                    if (index > -1) rewritten.Add(new SqlSegment(SqlSegmentType.Literal, textPaging[..index]));
+
+                    rewritten.Add(new SqlSegment(SqlSegmentType.Literal, "OFFSET "));
+                    rewritten.Add(segments[p3Idx]); 
+                    
+                    rewritten.Add(new SqlSegment(SqlSegmentType.Literal, " ROWS FETCH NEXT "));
+                    rewritten.Add(segments[p1Idx]); 
+                    
+                    rewritten.Add(new SqlSegment(SqlSegmentType.Literal, " ROWS ONLY"));
+
+                    i = p3Idx;
+                    continue;
+                }
             }
 
             // ====================================================================

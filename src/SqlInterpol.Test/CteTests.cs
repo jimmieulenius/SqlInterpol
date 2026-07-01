@@ -1,6 +1,5 @@
 using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
-using Xunit;
 
 namespace SqlInterpol.Test;
 
@@ -14,8 +13,6 @@ public class CteTests
     {
         // Arrange
         var db = testCase.CreateBuilder();
-        
-        // Define the inner query for the CTE
         var innerQuery = db
             .Entity<Product>(out var p)
             .Subquery(p, sub => sub.Append($$"""
@@ -30,7 +27,6 @@ public class CteTests
             db.Entity<Category>(out var c);
             db.Entity<CategoryStats>(out var cs);
 
-            // The parser sniffs "WITH" and treats cs as a CTE role
             return db.Append($$"""
                 WITH {{cs}} AS (
                     {{innerQuery}}
@@ -191,12 +187,12 @@ public class CteTests
                         """
                         WITH "CategoryStats" AS (
                             SELECT "p"."CategoryId", SUM("p"."Price") AS TotalPrice
-                            FROM "dbo"."Products" AS "p"
+                            FROM "dbo"."Products" "p"
                             GROUP BY "p"."CategoryId"
                         )
                         SELECT "c"."Name", "cs"."TotalPrice"
-                        FROM "Category" AS "c"
-                        JOIN "CategoryStats" AS "cs"
+                        FROM "Category" "c"
+                        JOIN "CategoryStats" "cs"
                             ON "c"."Id" = "cs"."CategoryId"
                         """
                     ]

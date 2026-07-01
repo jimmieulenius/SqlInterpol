@@ -19,28 +19,29 @@ public abstract class SqlColumnReferenceBase(ISqlReference sourceReference)
     /// <summary>
     /// Renders the column reference according to the specified <paramref name="mode"/>.
     /// </summary>
-    /// <param name="context">The active context providing dialect quoting.</param>
-    /// <param name="mode">
-    /// <see cref="SqlRenderMode.AliasOnly"/> emits just the quoted property name;
-    /// <see cref="SqlRenderMode.BaseName"/> emits the quoted physical column name;
-    /// default emits the fully qualified <c>"alias"."column"</c> form.
-    /// </param>
-    /// <returns>The SQL string for this column reference.</returns>
     public override string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
     {
         return mode switch
         {
             SqlRenderMode.AliasOnly => context.Dialect.QuoteIdentifier(PropertyName),
-
             SqlRenderMode.BaseName => context.Dialect.QuoteIdentifier(ColumnName),
-            
             _ => RenderFullReference(context)
         };
     }
 
     private string RenderFullReference(ISqlContext context)
     {
-        var sourcePointer = SourceReference.ToSql(context);
+        // PROPER PREFIX RESOLUTION
+        // Always try the Alias first, then fall back to the Base Name (Table Name).
+        // We explicitly use AliasOnly so Subqueries do not accidentally render their full bodies!
+        var sourcePointer = SourceReference.ToSql(context, SqlRenderMode.AliasOnly);
+        
+        if (string.IsNullOrWhiteSpace(sourcePointer))
+            sourcePointer = SourceReference.ToSql(context, SqlRenderMode.BaseName);
+            
+        if (string.IsNullOrWhiteSpace(sourcePointer))
+            sourcePointer = SourceReference.ToSql(context); // Ultimate fallback
+        
         var columnName = ColumnName;
         
         return $"{sourcePointer}.{context.Dialect.QuoteIdentifier(columnName)}";

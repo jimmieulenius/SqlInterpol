@@ -1,6 +1,5 @@
 using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
-using Xunit;
 
 namespace SqlInterpol.Test;
 
@@ -10,7 +9,6 @@ public class AdvancedTests
     [MemberData(nameof(DynamicQueryData))]
     public void DynamicQuery(SqlTestCase testCase)
     {
-        var db = testCase.CreateBuilder();
         var request = new GetOrderStatsRequest
         {
             CustomerId = 5,
@@ -20,47 +18,65 @@ public class AdvancedTests
             PageSize = 20
         };
 
-        var result = db
-            .Entity<ApiOrderStatsModel>()
-            .Entity<OrderModel>(alias: "o")
-            .Entity<OrderLine>(alias: "ol")
-            .Query((stats, o, ol) =>
+        testCase.Action(() =>
+        {
+            var db = testCase.CreateBuilder();
+
+            db.Entity<ApiOrderStatsModel>(out var stats, "stats")
+              .Entity<OrderModel>(out var o, "o")
+              .Entity<OrderLine>(out var ol, "ol");
+
+            db.Append($"SELECT ");
+            bool first = true;
+            foreach (var f in request.SelectFields)
             {
-                var dynamicSelects = request.SelectFields.Select(f => stats[f]);
-                var dynamicSorts = request.SortFields.Select(sort => 
-                    stats.OrderBy(sort.Field, sort.Descending ? SqlOrderDirection.Desc : SqlOrderDirection.Asc));
+                if (!first) db.Append($", ");
+                db.Append($"{stats.Column(f)}");
+                first = false;
+            }
 
-                db.AppendLine($$"""
-                    SELECT {{dynamicSelects}}
-                    FROM (
-                        SELECT 
-                            {{o[x => x.CustomerId]}},
-                            {{o[x => x.Id]}} AS {{ol[x => x.OrderId]}}, 
-                            SUM({{ol[x => x.Price]}}) AS {{stats[x => x.TotalAmount]}}
-                        FROM {{o}}
-                        JOIN {{ol}} ON {{o[x => x.Id]}} = {{ol[x => x.OrderId]}}
-                        GROUP BY {{o[x => x.CustomerId]}}, {{o[x => x.Id]}}
-                    ) AS {{stats.As("stats")}}
-                    """);
-
-                if (request.CustomerId.HasValue) 
-                    db.AppendLine($"WHERE {stats[x => x.CustomerId]} = {request.CustomerId}"); 
+            db.AppendLine($"""
                 
-                if (dynamicSorts.Any()) 
-                    db.AppendLine($"ORDER BY {dynamicSorts}");
+                FROM (
+                    SELECT 
+                        {o.CustomerId},
+                        {o.Id} AS {ol.OrderId:alias}, 
+                        SUM({ol.Price}) AS {stats.TotalAmount:alias}
+                    FROM {o}
+                    JOIN {ol} ON {o.Id} = {ol.OrderId}
+                    GROUP BY {o.CustomerId}, {o.Id}
+                ) AS {stats:alias}
+                """);
 
-                int offset = (request.Page - 1) * request.PageSize;
-                db.Append($"LIMIT {request.PageSize} OFFSET {offset}");
-            }).Build();
+            if (request.CustomerId.HasValue) 
+                db.AppendLine($"WHERE {stats.CustomerId} = {request.CustomerId}"); 
+            
+            if (request.SortFields.Any()) 
+            {
+                db.Append($"ORDER BY ");
+                first = true;
+                foreach (var sort in request.SortFields)
+                {
+                    if (!first) db.Append($", ");
+                    db.Append($"{stats.Column(sort.Field)} {(sort.Descending ? Sql.Raw("DESC") : Sql.Raw("ASC"))}");
+                    first = false;
+                }
+                db.AppendLine($"");
+            }
 
-        testCase.AssertSql(result.Sql);
+            int offset = (request.Page - 1) * request.PageSize;
+            db.Append($"LIMIT {request.PageSize} OFFSET {offset}");
+
+            return db.Build();
+        });
+
+        testCase.Assert();
     }
 
     [Theory]
     [MemberData(nameof(AdvancedDynamicQueryData))]
     public void AdvancedDynamicQuery(SqlTestCase testCase)
     {
-        var db = testCase.CreateBuilder();
         var request = new GetMassiveStatsRequest
         {
             ProductNameFilter = "Laptop",
@@ -70,54 +86,99 @@ public class AdvancedTests
             PageSize = 20
         };
 
-        var o = db.AddEntity<OrderModel>(alias: "o");
-        var ol = db.AddEntity<OrderLine>(alias: "ol");
-        var p = db.AddEntity<Product>(alias: "p");
-        var cat = db.AddEntity<Category>(alias: "cat");
-        
-        var olAgg = db.AddEntity<OrderLineAggModel>(alias: "ol_agg");
-
-        var result = db.Query<MassiveOrderStatsModel>(stats =>
+        testCase.Action(() =>
         {
-            var dynamicSelects = request.SelectFields.Select(f => stats[f]);
-            var dynamicSorts = request.SortFields.Select(sort => 
-                stats.OrderBy(sort.Field, sort.Descending ? SqlOrderDirection.Desc : SqlOrderDirection.Asc));
+            var db = testCase.CreateBuilder();
+            
+            db.Entity<MassiveOrderStatsModel>(out var stats, "stats")
+              .Entity<OrderModel>(out var o, "o")
+              .Entity<OrderLine>(out var ol, "ol")
+              .Entity<Product>(out var p, "p")
+              .Entity<Category>(out var cat, "cat")
+              .Entity<OrderLineAggModel>(out var olAgg, "ol_agg");
 
-            db.AppendLine($$"""
-                SELECT {{dynamicSelects}}
+            db.Append($"SELECT ");
+            bool first = true;
+            foreach (var f in request.SelectFields)
+            {
+                if (!first) db.Append($", ");
+                db.Append($"{stats.Column(f)}");
+                first = false;
+            }
+
+            db.AppendLine($"""
+                
                 FROM (
                     SELECT 
-                        {{o[x => x.Id]}} AS {{stats[x => x.OrderId]}}, 
-                        {{p[x => x.Name]}} AS {{stats[x => x.ProductName]}},
-                        {{olAgg[x => x.TotalAmount]}} AS {{stats[x => x.TotalAmount]}}
-                    FROM {{o}}
+                        {o.Id} AS {stats.OrderId:alias}, 
+                        {p.Name} AS {stats.ProductName:alias},
+                        {olAgg.TotalAmount} AS {stats.TotalAmount:alias}
+                    FROM {o}
                     
                     JOIN (
                         SELECT 
-                            {{ol[x => x.OrderId]}} AS {{olAgg[x => x.OrderId]}},
-                            {{ol[x => x.ProductId]}} AS {{olAgg[x => x.ProductId]}},
-                            SUM({{ol[x => x.Price]}}) AS {{olAgg[x => x.TotalAmount]}}
-                        -- JOIN {{"ol_agg"}} ON ...
-                        FROM {{ol}}
-                        GROUP BY {{ol[x => x.OrderId]}}, {{ol[x => x.ProductId]}}
-                    ) AS {{olAgg.As("ol_agg")}} ON {{o[x => x.Id]}} = {{olAgg[x => x.OrderId]}}
+                            {ol.OrderId} AS {olAgg.OrderId:alias},
+                            {ol.ProductId} AS {olAgg.ProductId:alias},
+                            SUM({ol.Price}) AS {olAgg.TotalAmount:alias}
+                        -- JOIN ol_agg ON ...
+                        FROM {ol}
+                        GROUP BY {ol.OrderId}, {ol.ProductId}
+                    ) AS {olAgg:alias} ON {o.Id} = {olAgg.OrderId}
                     
-                    JOIN {{p}} ON {{olAgg[x => x.ProductId]}} = {{p[x => x.Id]}}
-                    JOIN {{cat}} ON {{p[x => x.CategoryId]}} = {{cat[x => x.Id]}}
-                ) AS {{stats.As("stats")}}
+                    JOIN {p} ON {olAgg.ProductId} = {p.Id}
+                    JOIN {cat} ON {p.CategoryId} = {cat.Id}
+                ) AS {stats:alias}
                 """);
 
             if (!string.IsNullOrEmpty(request.ProductNameFilter)) 
-                db.AppendLine($"WHERE {stats[x => x.ProductName]} = {request.ProductNameFilter}"); 
+                db.AppendLine($"WHERE {stats.ProductName} = {request.ProductNameFilter}"); 
             
-            if (dynamicSorts.Any()) 
-                db.AppendLine($"ORDER BY {dynamicSorts}");
+            if (request.SortFields.Any()) 
+            {
+                db.Append($"ORDER BY ");
+                first = true;
+                foreach (var sort in request.SortFields)
+                {
+                    if (!first) db.Append($", ");
+                    db.Append($"{stats.Column(sort.Field)} {(sort.Descending ? Sql.Raw("DESC") : Sql.Raw("ASC"))}");
+                    first = false;
+                }
+                db.AppendLine($"");
+            }
 
             int offset = (request.Page - 1) * request.PageSize;
             db.Append($"LIMIT {request.PageSize} OFFSET {offset}");
-        }).Build();
 
-        testCase.AssertSql(result.Sql);
+            return db.Build();
+        });
+
+        testCase.Assert();
+    }
+
+    [Theory]
+    [MemberData(nameof(ComplexRawSqlData))]
+    public void RawSql_ComplexStatements_PassThroughUnmodified(SqlTestCase testCase)
+    {
+        var minPrice = 50.00m;
+
+        testCase.Action(() => 
+        {
+            var db = testCase.CreateBuilder();
+            db.Entity<Product>(out var p);
+            
+            return db.Append($"""
+                SELECT {p.Id}, {p.Name}
+                FROM {p}
+                WHERE {p.Price} > {minPrice}
+                  AND p.Status = 'ACTIVE' /* Raw SQL condition */
+                GROUP BY {p.Id}, {p.Name}
+                HAVING COUNT(*) > 1
+                ORDER BY {p.Name} DESC
+                LIMIT 10 OFFSET 5
+                """).Build();
+        });
+
+        testCase.Assert();
     }
 
     public static TheoryData<SqlTestCase> DynamicQueryData =>
@@ -192,10 +253,10 @@ public class AdvancedTests
                         "o"."CustomerId",
                         "o"."Id" AS "OrderId", 
                         SUM("ol"."Price") AS "TotalAmount"
-                    FROM "dbo"."Orders" AS "o"
-                    JOIN "OrderLine" AS "ol" ON "o"."Id" = "ol"."OrderId"
+                    FROM "dbo"."Orders" "o"
+                    JOIN "OrderLine" "ol" ON "o"."Id" = "ol"."OrderId"
                     GROUP BY "o"."CustomerId", "o"."Id"
-                ) AS "stats"
+                ) "stats"
                 WHERE "stats"."CustomerId" = :0
                 ORDER BY "stats"."TotalAmount" DESC
                 OFFSET :2 ROWS FETCH NEXT :1 ROWS ONLY
@@ -283,7 +344,7 @@ public class AdvancedTests
                             <<ol>>.<<OrderId>> AS <<OrderId>>,
                             <<ol>>.<<ProductId>> AS <<ProductId>>,
                             SUM(<<ol>>.<<Price>>) AS <<TotalAmount>>
-                        -- JOIN !!100 ON ...
+                        -- JOIN ol_agg ON ...
                         FROM <<OrderLine>> AS <<ol>>
                         GROUP BY <<ol>>.<<OrderId>>, <<ol>>.<<ProductId>>
                     ) AS <<ol_agg>> ON <<o>>.<<Id>> = <<ol_agg>>.<<OrderId>>
@@ -291,9 +352,9 @@ public class AdvancedTests
                     JOIN <<dbo>>.<<Products>> AS <<p>> ON <<ol_agg>>.<<ProductId>> = <<p>>.<<Id>>
                     JOIN <<Category>> AS <<cat>> ON <<p>>.<<CategoryId>> = <<cat>>.<<Id>>
                 ) AS <<stats>>
-                WHERE <<stats>>.<<ProductName>> = !!101
+                WHERE <<stats>>.<<ProductName>> = !!100
                 ORDER BY <<stats>>.<<TotalAmount>> DESC
-                LIMIT !!102 OFFSET !!103
+                LIMIT !!101 OFFSET !!102
                 """
             ]
         ),
@@ -314,7 +375,7 @@ public class AdvancedTests
                             "ol"."OrderId" AS "OrderId",
                             "ol"."ProductId" AS "ProductId",
                             SUM("ol"."Price") AS "TotalAmount"
-                        -- JOIN @p0 ON ...
+                        -- JOIN ol_agg ON ...
                         FROM "OrderLine" AS "ol"
                         GROUP BY "ol"."OrderId", "ol"."ProductId"
                     ) AS "ol_agg" ON "o"."Id" = "ol_agg"."OrderId"
@@ -322,9 +383,9 @@ public class AdvancedTests
                     JOIN "dbo"."Products" AS "p" ON "ol_agg"."ProductId" = "p"."Id"
                     JOIN "Category" AS "cat" ON "p"."CategoryId" = "cat"."Id"
                 ) AS "stats"
-                WHERE "stats"."ProductName" = @p1
+                WHERE "stats"."ProductName" = @p0
                 ORDER BY "stats"."TotalAmount" DESC
-                FIRST @p2 SKIP @p3
+                FIRST @p1 SKIP @p2
                 """
             ]
         ),
@@ -345,7 +406,7 @@ public class AdvancedTests
                             `ol`.`OrderId` AS `OrderId`,
                             `ol`.`ProductId` AS `ProductId`,
                             SUM(`ol`.`Price`) AS `TotalAmount`
-                        -- JOIN @p0 ON ...
+                        -- JOIN ol_agg ON ...
                         FROM `OrderLine` AS `ol`
                         GROUP BY `ol`.`OrderId`, `ol`.`ProductId`
                     ) AS `ol_agg` ON `o`.`Id` = `ol_agg`.`OrderId`
@@ -353,9 +414,9 @@ public class AdvancedTests
                     JOIN `dbo`.`Products` AS `p` ON `ol_agg`.`ProductId` = `p`.`Id`
                     JOIN `Category` AS `cat` ON `p`.`CategoryId` = `cat`.`Id`
                 ) AS `stats`
-                WHERE `stats`.`ProductName` = @p1
+                WHERE `stats`.`ProductName` = @p0
                 ORDER BY `stats`.`TotalAmount` DESC
-                LIMIT @p2 OFFSET @p3
+                LIMIT @p1 OFFSET @p2
                 """
             ]
         ),
@@ -369,24 +430,24 @@ public class AdvancedTests
                         "o"."Id" AS "OrderId", 
                         "p"."PROD_NAME" AS "ProductName",
                         "ol_agg"."TotalAmount" AS "TotalAmount"
-                    FROM "dbo"."Orders" AS "o"
+                    FROM "dbo"."Orders" "o"
                     
                     JOIN (
                         SELECT 
                             "ol"."OrderId" AS "OrderId",
                             "ol"."ProductId" AS "ProductId",
                             SUM("ol"."Price") AS "TotalAmount"
-                        -- JOIN :0 ON ...
-                        FROM "OrderLine" AS "ol"
+                        -- JOIN ol_agg ON ...
+                        FROM "OrderLine" "ol"
                         GROUP BY "ol"."OrderId", "ol"."ProductId"
-                    ) AS "ol_agg" ON "o"."Id" = "ol_agg"."OrderId"
+                    ) "ol_agg" ON "o"."Id" = "ol_agg"."OrderId"
                     
-                    JOIN "dbo"."Products" AS "p" ON "ol_agg"."ProductId" = "p"."Id"
-                    JOIN "Category" AS "cat" ON "p"."CategoryId" = "cat"."Id"
-                ) AS "stats"
-                WHERE "stats"."ProductName" = :1
+                    JOIN "dbo"."Products" "p" ON "ol_agg"."ProductId" = "p"."Id"
+                    JOIN "Category" "cat" ON "p"."CategoryId" = "cat"."Id"
+                ) "stats"
+                WHERE "stats"."ProductName" = :0
                 ORDER BY "stats"."TotalAmount" DESC
-                OFFSET :3 ROWS FETCH NEXT :2 ROWS ONLY
+                OFFSET :2 ROWS FETCH NEXT :1 ROWS ONLY
                 """
             ]
         ),
@@ -407,7 +468,7 @@ public class AdvancedTests
                             "ol"."OrderId" AS "OrderId",
                             "ol"."ProductId" AS "ProductId",
                             SUM("ol"."Price") AS "TotalAmount"
-                        -- JOIN $1 ON ...
+                        -- JOIN ol_agg ON ...
                         FROM "OrderLine" AS "ol"
                         GROUP BY "ol"."OrderId", "ol"."ProductId"
                     ) AS "ol_agg" ON "o"."Id" = "ol_agg"."OrderId"
@@ -415,9 +476,9 @@ public class AdvancedTests
                     JOIN "dbo"."Products" AS "p" ON "ol_agg"."ProductId" = "p"."Id"
                     JOIN "Category" AS "cat" ON "p"."CategoryId" = "cat"."Id"
                 ) AS "stats"
-                WHERE "stats"."ProductName" = $2
+                WHERE "stats"."ProductName" = $1
                 ORDER BY "stats"."TotalAmount" DESC
-                LIMIT $3 OFFSET $4
+                LIMIT $2 OFFSET $3
                 """
             ]
         ),
@@ -438,7 +499,7 @@ public class AdvancedTests
                             "ol"."OrderId" AS "OrderId",
                             "ol"."ProductId" AS "ProductId",
                             SUM("ol"."Price") AS "TotalAmount"
-                        -- JOIN @p1 ON ...
+                        -- JOIN ol_agg ON ...
                         FROM "OrderLine" AS "ol"
                         GROUP BY "ol"."OrderId", "ol"."ProductId"
                     ) AS "ol_agg" ON "o"."Id" = "ol_agg"."OrderId"
@@ -446,9 +507,9 @@ public class AdvancedTests
                     JOIN "dbo"."Products" AS "p" ON "ol_agg"."ProductId" = "p"."Id"
                     JOIN "Category" AS "cat" ON "p"."CategoryId" = "cat"."Id"
                 ) AS "stats"
-                WHERE "stats"."ProductName" = @p2
+                WHERE "stats"."ProductName" = @p1
                 ORDER BY "stats"."TotalAmount" DESC
-                LIMIT @p3 OFFSET @p4
+                LIMIT @p2 OFFSET @p3
                 """
             ]
         ),
@@ -469,7 +530,7 @@ public class AdvancedTests
                             [ol].[OrderId] AS [OrderId],
                             [ol].[ProductId] AS [ProductId],
                             SUM([ol].[Price]) AS [TotalAmount]
-                        -- JOIN @p0 ON ...
+                        -- JOIN ol_agg ON ...
                         FROM [OrderLine] AS [ol]
                         GROUP BY [ol].[OrderId], [ol].[ProductId]
                     ) AS [ol_agg] ON [o].[Id] = [ol_agg].[OrderId]
@@ -477,40 +538,13 @@ public class AdvancedTests
                     JOIN [dbo].[Products] AS [p] ON [ol_agg].[ProductId] = [p].[Id]
                     JOIN [Category] AS [cat] ON [p].[CategoryId] = [cat].[Id]
                 ) AS [stats]
-                WHERE [stats].[ProductName] = @p1
+                WHERE [stats].[ProductName] = @p0
                 ORDER BY [stats].[TotalAmount] DESC
-                OFFSET @p3 ROWS FETCH NEXT @p2 ROWS ONLY
+                OFFSET @p2 ROWS FETCH NEXT @p1 ROWS ONLY
                 """
             ]
         )
     ];
-
-    [Theory]
-    [MemberData(nameof(ComplexRawSqlData))]
-    public void RawSql_ComplexStatements_PassThroughUnmodified(SqlTestCase testCase)
-    {
-        // Arrange
-        var db = testCase.CreateBuilder();
-        var minPrice = 50.00m;
-
-        // Act
-        // We are mixing AST nodes {{p}}, parameters {{minPrice}}, and RAW SQL here!
-        var result = db.Query<Product>(p => db.Append($$"""
-            SELECT {{p[x => x.Id]}}, {{p[x => x.Name]}}
-            FROM {{p}}
-            WHERE {{p[x => x.Price]}} > {{minPrice}}
-              AND p.Status = 'ACTIVE' /* Raw SQL condition */
-            GROUP BY {{p[x => x.Id]}}, {{p[x => x.Name]}}
-            HAVING COUNT(*) > 1
-            ORDER BY {{p[x => x.Name]}} DESC
-            LIMIT 10 OFFSET 5
-            """)).Build();
-
-        // Assert
-        testCase.AssertSql(result.Sql);
-        Assert.Single(result.Parameters);
-        Assert.Equal(minPrice, result.Parameters.First().Value);
-    }
 
     public static TheoryData<SqlTestCase> ComplexRawSqlData =>
     [

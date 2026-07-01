@@ -1,4 +1,7 @@
+using System;
 using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
 
@@ -15,14 +18,15 @@ public partial class SqlSegmentPreprocessor : ISqlSegmentPreprocessor
     // ====================================================================
     // PRE-COMPILED REGEX ENGINES (C# 11+)
     // ====================================================================
-    [GeneratedRegex(@"^(\s*)(AS)(\s+)([a-zA-Z0-9_]+)", RegexOptions.IgnoreCase)]
+    
+    [GeneratedRegex(@"^(\s*\)*\s*)(AS)(\s+)([a-zA-Z0-9_]+)", RegexOptions.IgnoreCase)]
     private static partial Regex ExplicitAliasRegex();
 
-    [GeneratedRegex(@"^\s+([a-zA-Z0-9_]+)", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"^(\s*\)*\s+)([a-zA-Z0-9_]+)", RegexOptions.IgnoreCase)]
     private static partial Regex ImplicitAliasRegex();
 
     // ====================================================================
-    // ROLE INTERFACES
+    // ROLE INTERFACES & PROXIES
     // ====================================================================
     private static void SetAlias(object target, string? alias)
     {
@@ -32,36 +36,149 @@ public partial class SqlSegmentPreprocessor : ISqlSegmentPreprocessor
         }
     }
 
+    /// <summary>
+    /// A lightweight proxy that applies a forward-resolved alias without mutating the underlying AST reference.
+    /// </summary>
+    private class TemporaryAliasReference : ISqlReference, ISqlAliasable
+    {
+        private readonly ISqlReference _baseRef;
+        
+        public string? Alias { get; set; }
+        public string? FallbackAlias => _baseRef.FallbackAlias;
+        
+        public bool IsAliasQuoted { get; set; }
+        public ISqlFragment Source => _baseRef.Source; 
+
+        public TemporaryAliasReference(ISqlReference baseRef, string alias)
+        {
+            _baseRef = baseRef;
+            Alias = alias;
+            IsAliasQuoted = true; 
+        }
+
+        public string ToSql(ISqlContext context, SqlRenderMode renderMode = SqlRenderMode.Default)
+        {
+            if (!string.IsNullOrWhiteSpace(Alias)) return Alias;
+            return _baseRef.ToSql(context, renderMode);
+        }
+    }
+
+    /// <summary>
+    /// Prevents a Subquery AST node from double-rendering its own alias natively, 
+    /// while securely passing the alias mutation down to the underlying reference so Columns can resolve it!
+    /// </summary>
+    private class AliaslessReference : ISqlReference, ISqlAliasable
+    {
+        private readonly ISqlReference _baseRef;
+        public AliaslessReference(ISqlReference baseRef) { _baseRef = baseRef; }
+        
+        public string? Alias 
+        { 
+            get => null; // Blind the Subquery output!
+            set { if (_baseRef is ISqlAliasable a) a.Alias = value; } // Persist it for the Columns!
+        }
+        
+        public string? FallbackAlias => null; // Prevent "CategoryStats" from leaking natively!
+        
+        public bool IsAliasQuoted 
+        { 
+            get => false; 
+            set { } // FIX: Safely ignore the setter, this proxy suppresses the alias entirely!
+        }
+        
+        public ISqlFragment Source => _baseRef.Source; 
+
+        public string ToSql(ISqlContext context, SqlRenderMode renderMode = SqlRenderMode.Default)
+        {
+            return _baseRef.ToSql(context, renderMode);
+        }
+    }
+
     private static IReadOnlyList<SqlSegment>? ExtractInternalSegments(object obj)
     {
-        if (obj is ISqlSegmentContainer container)
+        if (obj is ISqlSegmentContainer container) return container.Segments;
+        if (obj is ISqlQuery query) return query.Segments; 
+
+        if (obj is ISqlEntityBase ent)
         {
-            return container.Segments;
+            if (ent is ISqlSegmentContainer entContainer) return entContainer.Segments;
+            if (ent is ISqlQuery entQuery) return entQuery.Segments;
+            
+            if (ent.Reference is ISqlSegmentContainer refContainer) return refContainer.Segments;
+            if (ent.Reference is ISqlQuery refQuery) return refQuery.Segments;
         }
+
         return null;
     }
 
-    private static SqlColumnReference ResolveDynamicColumn(SqlDynamicColumn dynCol, IReadOnlyList<SqlSegment> segments)
+    private static SqlColumnReference ResolveDynamicColumn(SqlDynamicColumnFragment dynCol, IReadOnlyList<SqlSegment> segments, ISqlContext context)
     {
         ISqlEntityBase? targetEntity = null;
+        string? forwardAlias = null;
+
         for (int i = 0; i < segments.Count; i++)
         {
-            if (segments[i].Value is ISqlEntityBase ent && ent.ModelType == dynCol.EntityType)
+            if (segments[i].Value is ISqlEntityBase ent && 
+                ent.ModelType == dynCol.EntityType && 
+                !(segments[i].Value is SqlDynamicColumnFragment))
             {
                 targetEntity = ent; 
-                break; 
+                string? tempAlias = null;
+
+                for (int j = i + 1; j < segments.Count; j++)
+                {
+                    if (segments[j].Type == SqlSegmentType.Literal && segments[j].Value is string text)
+                    {
+                        if (string.IsNullOrWhiteSpace(text)) continue; 
+
+                        var explicitMatch = ExplicitAliasRegex().Match(text);
+                        if (explicitMatch.Success)
+                        {
+                            tempAlias = explicitMatch.Groups[4].Value;
+                            break;
+                        }
+
+                        var implicitMatch = ImplicitAliasRegex().Match(text);
+                        if (implicitMatch.Success)
+                        {
+                            string upperWord = implicitMatch.Groups[2].Value.ToUpperInvariant();
+                            bool isIgnored = upperWord switch
+                            {
+                                "WHERE" or "JOIN" or "ON" or "SET" or "LEFT" or "RIGHT" or "INNER" or "OUTER" or "FULL" or "CROSS" or 
+                                "FROM" or "AS" or "INTO" or "ORDER" or "GROUP" or "BY" or "HAVING" or "LIMIT" or "VALUES" or 
+                                "RETURNING" or "OFFSET" or "FETCH" or "FOR" or "UNION" or "EXCEPT" or "INTERSECT" or 
+                                "SELECT" or "UPDATE" or "DELETE" or "INSERT" or "AND" or "OR" or "NOT" or "IS" or "NULL" or "ASC" or "DESC" => true,
+                                _ => false
+                            };
+                            if (!isIgnored) tempAlias = implicitMatch.Groups[2].Value;
+                        }
+                        break; 
+                    }
+                }
+
+                if (tempAlias != null)
+                {
+                    forwardAlias = tempAlias;
+                    break; 
+                }
             }
         }
 
         if (targetEntity == null)
             throw new InvalidOperationException($"Could not find registered entity of type '{dynCol.EntityType.Name}' in context.");
 
+        ISqlReference activeRef = targetEntity.Reference;
+        if (forwardAlias != null && string.IsNullOrWhiteSpace(activeRef.Alias))
+        {
+            activeRef = new TemporaryAliasReference(activeRef, context.Dialect.QuoteIdentifier(forwardAlias));
+        }
+
         var entityMeta = SqlMetadataRegistry.GetMetadata(dynCol.EntityType);
         var memberMeta = entityMeta.Columns.Keys.FirstOrDefault(k => k.Name.Equals(dynCol.PropertyName, StringComparison.OrdinalIgnoreCase));
         if (memberMeta == null)
             throw new ArgumentException($"Property '{dynCol.PropertyName}' not found.");
 
-        return new SqlColumnReference(targetEntity.Reference, entityMeta.Columns[memberMeta], memberMeta.Name);
+        return new SqlColumnReference(activeRef, entityMeta.Columns[memberMeta], memberMeta.Name);
     }
 
     /// <inheritdoc />
@@ -69,17 +186,40 @@ public partial class SqlSegmentPreprocessor : ISqlSegmentPreprocessor
     {
         var refined = new List<SqlSegment>(segments.Count + 10);
         
-        int parenDepth = 0;
         bool inString = false;
         bool inLineCmt = false;
         bool inBlockCmt = false;
         
+        int parenDepth = 0;
         int fromCount = 0;
         string? currentKeyword = null;
+        string? currentClauseTag = null;
         string? activeDmlKeyword = null;
         bool expectsAlias = false;
+        bool forceBaseNamePhase = false;
+        
         ISqlEntityBase? activeEntityTarget = null;
         object? lastAliasableTarget = null;
+        ISqlReference? lastEntityRef = null;
+
+        var kwStack = new List<string?>();
+        var clauseStack = new List<string?>();
+        var dmlStack = new List<string?>();
+        var fromStack = new List<int>();
+        var baseNameStack = new List<bool>();
+
+        void PopState()
+        {
+            if (parenDepth > 0)
+            {
+                parenDepth--; 
+                currentKeyword = kwStack[^1]; kwStack.RemoveAt(kwStack.Count - 1);
+                currentClauseTag = clauseStack[^1]; clauseStack.RemoveAt(clauseStack.Count - 1);
+                activeDmlKeyword = dmlStack[^1]; dmlStack.RemoveAt(dmlStack.Count - 1);
+                fromCount = fromStack[^1]; fromStack.RemoveAt(fromStack.Count - 1);
+                forceBaseNamePhase = baseNameStack[^1]; baseNameStack.RemoveAt(baseNameStack.Count - 1);
+            }
+        }
 
         for (int i = 0; i < segments.Count; i++)
         {
@@ -88,10 +228,13 @@ public partial class SqlSegmentPreprocessor : ISqlSegmentPreprocessor
             // ====================================================================
             // WHITESPACE-INSENSITIVE RECURSIVE SUBQUERY PASS
             // ====================================================================
-            if (segment.Value is ISqlFragment fragment && 
-                (fragment is ISqlQueryFragment || 
-                 fragment.GetType().Name.Contains("Subquery", StringComparison.OrdinalIgnoreCase) || 
-                 fragment.GetType().GetInterfaces().Any(i => i.Name.StartsWith("ISqlQueryFragment"))))
+            bool isSubquery = segment.Value is ISqlQueryFragment || 
+                              (segment.Value is ISqlEntityBase e && e.Reference is ISqlQueryFragment) ||
+                              segment.Value is ISqlQuery;
+                              
+            var innerSegments = isSubquery && segment.Value != null ? ExtractInternalSegments(segment.Value) : null;
+            
+            if (innerSegments != null)
             {
                 bool hasLeftParen = false;
                 for (int idx = refined.Count - 1; idx >= 0; idx--)
@@ -100,11 +243,7 @@ public partial class SqlSegmentPreprocessor : ISqlSegmentPreprocessor
                     {
                         int checkIdx = lText.Length - 1;
                         while (checkIdx >= 0 && char.IsWhiteSpace(lText[checkIdx])) checkIdx--;
-                        if (checkIdx >= 0)
-                        {
-                            if (lText[checkIdx] == '(') hasLeftParen = true;
-                            break;
-                        }
+                        if (checkIdx >= 0) { if (lText[checkIdx] == '(') hasLeftParen = true; break; }
                     }
                     else break;
                 }
@@ -116,34 +255,55 @@ public partial class SqlSegmentPreprocessor : ISqlSegmentPreprocessor
                     {
                         int checkIdx = 0;
                         while (checkIdx < rText.Length && char.IsWhiteSpace(rText[checkIdx])) checkIdx++;
-                        if (checkIdx < rText.Length)
-                        {
-                            if (rText[checkIdx] == ')') hasRightParen = true;
-                            break;
-                        }
+                        if (checkIdx < rText.Length) { if (rText[checkIdx] == ')') hasRightParen = true; break; }
                     }
                     else break;
                 }
 
-                var innerSegments = ExtractInternalSegments(fragment) ?? [];
                 var processedInner = Process(innerSegments, context).ToList();
-                var entityRef = (fragment as ISqlEntityBase)?.Reference;
+                var entityRef = (segment.Value as ISqlEntityBase)?.Reference;
                 
-                bool shouldExclude = (hasLeftParen && hasRightParen) || (fragment is ISqlQueryFragment qFrag && qFrag.ExcludeParentheses);
+                bool shouldExclude = (hasLeftParen && hasRightParen);
+                if (segment.Value is ISqlQueryFragment qFrag && qFrag.ExcludeParentheses) shouldExclude = true;
                 
-                var nestedFrag = new SqlNestedQueryFragment(processedInner, entityRef) { ExcludeParentheses = shouldExclude };
+                bool hasInlineAlias = false;
+                for (int n = i + 1; n < segments.Count; n++)
+                {
+                    if (segments[n].Type == SqlSegmentType.Literal && segments[n].Value is string nText)
+                    {
+                        if (string.IsNullOrWhiteSpace(nText)) continue;
+                        if (ExplicitAliasRegex().IsMatch(nText)) hasInlineAlias = true;
+                        else
+                        {
+                            var impMatch = ImplicitAliasRegex().Match(nText);
+                            if (impMatch.Success)
+                            {
+                                string w = impMatch.Groups[2].Value.ToUpperInvariant();
+                                bool isIgnored = w switch { "WHERE" or "JOIN" or "ON" or "SET" or "LEFT" or "RIGHT" or "INNER" or "OUTER" or "FULL" or "CROSS" or "FROM" or "ORDER" or "GROUP" or "BY" or "HAVING" or "LIMIT" or "VALUES" or "RETURNING" or "OFFSET" or "FETCH" or "FOR" or "UNION" or "EXCEPT" or "INTERSECT" or "SELECT" or "UPDATE" or "DELETE" or "INSERT" or "AND" or "OR" or "NOT" or "IS" or "NULL" or "ASC" or "DESC" => true, _ => false };
+                                if (!isIgnored) hasInlineAlias = true;
+                            }
+                        }
+                        break;
+                    }
+                }
+                
+                var safeRef = (hasInlineAlias && entityRef != null) ? new AliaslessReference(entityRef) : entityRef;
+                
+                var nestedFrag = new SqlNestedQueryFragment(processedInner, safeRef) { ExcludeParentheses = shouldExclude };
                 refined.Add(new SqlSegment(SqlSegmentType.Reference, nestedFrag, segment.RenderMode, segment.Tags ?? []));
                 expectsAlias = false;
 
-                if (fragment is ISqlEntityBase structuralEntity)
+                if (segment.Value is ISqlEntityBase structuralEntity)
                 {
                     activeEntityTarget = structuralEntity;
                     lastAliasableTarget = structuralEntity;
+                    lastEntityRef = safeRef; 
                 }
                 else
                 {
                     activeEntityTarget = nestedFrag;
                     lastAliasableTarget = nestedFrag;
+                    lastEntityRef = safeRef; 
                 }
 
                 continue;
@@ -156,7 +316,6 @@ public partial class SqlSegmentPreprocessor : ISqlSegmentPreprocessor
             {
                 expectsAlias = false;
 
-                // FIX: Immediately route projections to AliasOnly mode so they don't get trapped as Table Aliases!
                 if (segment.Type == SqlSegmentType.Projection || segment.Value is ISqlProjection)
                 {
                     refined.Add(new SqlSegment(segment.Type, segment.Value, SqlRenderMode.AliasOnly, segment.Tags ?? []));
@@ -221,10 +380,25 @@ public partial class SqlSegmentPreprocessor : ISqlSegmentPreprocessor
             // ====================================================================
             // 1. CONTEXT TARGET TRACKING & DYNAMIC PROJECTION PASS
             // ====================================================================
-            if (segment.Value is SqlDynamicColumn dynCol)
+            if (segment.Value is SqlDynamicColumnFragment dynCol)
             {
-                var colRef = ResolveDynamicColumn(dynCol, segments);
-                refined.Add(new SqlSegment(SqlSegmentType.Projection, colRef, segment.RenderMode, segment.Tags ?? []));
+                var colRef = ResolveDynamicColumn(dynCol, segments, context);
+                var mode = segment.RenderMode;
+                if (mode == null && forceBaseNamePhase) mode = SqlRenderMode.BaseName;
+                
+                refined.Add(new SqlSegment(SqlSegmentType.Projection, colRef, mode, segment.Tags ?? []));
+                continue;
+            }
+
+            if (segment.Value is SqlDynamicOrderFragment dynOrder)
+            {
+                var colRef = ResolveDynamicColumn(dynOrder.Column, segments, context);
+                
+                var resolvedFragment = dynOrder.Direction.HasValue 
+                    ? new SqlOrderFragment(colRef, dynOrder.Direction.Value)
+                    : new SqlOrderFragment(colRef);
+
+                refined.Add(new SqlSegment(SqlSegmentType.Raw, resolvedFragment, segment.RenderMode, segment.Tags ?? []));
                 continue;
             }
 
@@ -232,11 +406,15 @@ public partial class SqlSegmentPreprocessor : ISqlSegmentPreprocessor
             {
                 activeEntityTarget = structuralEntity1;
                 lastAliasableTarget = structuralEntity1;
+                lastEntityRef = structuralEntity1.Reference;
             }
             else if (segment.Type == SqlSegmentType.Projection)
             {
                 lastAliasableTarget = segment.Value;
-                refined.Add(segment);
+                var mode = segment.RenderMode;
+                if (mode == null && forceBaseNamePhase) mode = SqlRenderMode.BaseName;
+                
+                refined.Add(new SqlSegment(segment.Type, segment.Value, mode, segment.Tags ?? []));
                 continue;
             }
             else if (segment.Value != null)
@@ -246,6 +424,7 @@ public partial class SqlSegmentPreprocessor : ISqlSegmentPreprocessor
                 {
                     activeEntityTarget = wrappedEntity;
                     lastAliasableTarget = wrappedEntity;
+                    lastEntityRef = wrappedEntity.Reference;
                 }
             }
 
@@ -254,35 +433,41 @@ public partial class SqlSegmentPreprocessor : ISqlSegmentPreprocessor
             // ====================================================================
             if (segment.Type == SqlSegmentType.Literal && segment.Value is string text)
             {
-                if (refined.Count > 0 && refined[^1].Type == SqlSegmentType.Reference && refined[^1].Value is ISqlEntityBase prevEnt && prevEnt is not ISqlQueryFragment)
+                if (text.Contains(';')) forceBaseNamePhase = false;
+                
+                bool isAfterReference = refined.Count > 0 && refined[^1].Type == SqlSegmentType.Reference;
+                
+                if (isAfterReference)
                 {
                     var explicitAliasMatch = ExplicitAliasRegex().Match(text);
                     if (explicitAliasMatch.Success)
                     {
-                        string rawAlias = explicitAliasMatch.Groups[4].Value;
-                        string quotedAlias = context.Dialect.QuoteIdentifier(rawAlias);
-                        
-                        if (prevEnt.Reference != null) SetAlias(prevEnt.Reference, quotedAlias);
-                        
-                        if (explicitAliasMatch.Groups[1].Length > 0)
-                            refined.Add(new SqlSegment(SqlSegmentType.Literal, explicitAliasMatch.Groups[1].Value, segment.RenderMode, segment.Tags ?? []));
-                        
-                        string targetTag = SqlSegmentTag.TableAliasAsKeyword;
-                        if (currentKeyword == "SELECT" || currentKeyword == "SELECT DISTINCT") targetTag = "ColumnAliasAsKeyword";
-                        else if (activeDmlKeyword == "UPDATE" && currentKeyword == "UPDATE") targetTag = SqlSegmentTag.UpdateAsKeyword;
-                        else if (activeDmlKeyword == "DELETE" && (currentKeyword == "DELETE" || (currentKeyword == "FROM" && fromCount == 1))) targetTag = SqlSegmentTag.DeleteAsKeyword;
+                        string prefix = explicitAliasMatch.Groups[1].Value;
+                        string quotedAlias = context.Dialect.QuoteIdentifier(explicitAliasMatch.Groups[4].Value);
 
-                        if (targetTag == "ColumnAliasAsKeyword")
-                        {
-                            refined.Add(new SqlSegment(SqlSegmentType.Literal, explicitAliasMatch.Groups[2].Value, segment.RenderMode, segment.Tags ?? []));
-                        }
+                        string determinedTag = "ColumnAliasAsKeyword";
+                        if (activeDmlKeyword == "UPDATE" && currentClauseTag == SqlSegmentTag.UpdateKeyword) determinedTag = SqlSegmentTag.UpdateAsKeyword;
+                        else if (activeDmlKeyword == "DELETE" && (currentClauseTag == SqlSegmentTag.DeleteKeyword || (currentClauseTag == SqlSegmentTag.FromKeyword && fromCount == 1))) determinedTag = SqlSegmentTag.DeleteAsKeyword;
+                        else if (currentClauseTag == SqlSegmentTag.FromKeyword) determinedTag = SqlSegmentTag.TableAliasAsKeyword;
+
+                        foreach (char c in prefix) if (c == ')') PopState();
+                        
+                        if (lastEntityRef != null) SetAlias(lastEntityRef, quotedAlias);
+                        else if (lastAliasableTarget is ISqlEntityBase lastEnt) SetAlias(lastEnt.Reference, quotedAlias);
+                        else SetAlias(lastAliasableTarget, quotedAlias);
+                        
+                        if (prefix.Length > 0)
+                            refined.Add(new SqlSegment(SqlSegmentType.Literal, prefix, segment.RenderMode, segment.Tags ?? []));
+                        
+                        string keyword = explicitAliasMatch.Groups[2].Value; // "AS"
+                        if (determinedTag == "ColumnAliasAsKeyword")
+                            refined.Add(new SqlSegment(SqlSegmentType.Literal, keyword, segment.RenderMode, segment.Tags ?? []));
                         else
-                        {
-                            refined.Add(new SqlSegment(SqlSegmentType.Literal, explicitAliasMatch.Groups[2].Value, segment.RenderMode, [targetTag]));
-                        }
+                            refined.Add(new SqlSegment(SqlSegmentType.Literal, keyword, segment.RenderMode, [determinedTag]));
 
-                        if (explicitAliasMatch.Groups[3].Length > 0)
-                            refined.Add(new SqlSegment(SqlSegmentType.Literal, explicitAliasMatch.Groups[3].Value, segment.RenderMode, segment.Tags ?? []));
+                        string suffix = explicitAliasMatch.Groups[3].Value; // trailing whitespace
+                        if (suffix.Length > 0)
+                            refined.Add(new SqlSegment(SqlSegmentType.Literal, suffix, segment.RenderMode, segment.Tags ?? []));
 
                         refined.Add(new SqlSegment(SqlSegmentType.Raw, quotedAlias, null, segment.Tags ?? []));
                         
@@ -293,34 +478,41 @@ public partial class SqlSegmentPreprocessor : ISqlSegmentPreprocessor
                         var implicitAliasMatch = ImplicitAliasRegex().Match(text);
                         if (implicitAliasMatch.Success)
                         {
-                            string matchingWord = implicitAliasMatch.Groups[1].Value;
+                            string prefix = implicitAliasMatch.Groups[1].Value;
+                            string matchingWord = implicitAliasMatch.Groups[2].Value;
                             string upperWord = matchingWord.ToUpperInvariant();
-                            
-                            if (upperWord != "WHERE" && upperWord != "JOIN" && upperWord != "ON" && upperWord != "SET" && 
-                                upperWord != "LEFT" && upperWord != "RIGHT" && upperWord != "INNER" && upperWord != "FULL" && 
-                                upperWord != "CROSS" && upperWord != "FROM" && upperWord != "AS" && upperWord != "INTO" && 
-                                upperWord != "ORDER" && upperWord != "GROUP" && upperWord != "HAVING")
-                            {
-                                string quotedAlias = context.Dialect.QuoteIdentifier(matchingWord);
-                                if (prevEnt.Reference != null) SetAlias(prevEnt.Reference, quotedAlias);
-                                
-                                int spaceLen = implicitAliasMatch.Length - matchingWord.Length;
-                                if (spaceLen > 0)
-                                    refined.Add(new SqlSegment(SqlSegmentType.Literal, implicitAliasMatch.Value[..spaceLen], segment.RenderMode, segment.Tags ?? []));
-                                
-                                string targetTag = SqlSegmentTag.TableAliasAsKeyword;
-                                if (currentKeyword == "SELECT" || currentKeyword == "SELECT DISTINCT") targetTag = "ColumnAliasAsKeyword";
-                                else if (activeDmlKeyword == "UPDATE" && currentKeyword == "UPDATE") targetTag = SqlSegmentTag.UpdateAsKeyword;
-                                else if (activeDmlKeyword == "DELETE" && (currentKeyword == "DELETE" || (currentKeyword == "FROM" && fromCount == 1))) targetTag = SqlSegmentTag.DeleteAsKeyword;
 
-                                if (targetTag == "ColumnAliasAsKeyword")
-                                {
+                            bool isIgnoredKeyword = upperWord switch
+                            {
+                                "WHERE" or "JOIN" or "ON" or "SET" or "LEFT" or "RIGHT" or "INNER" or "OUTER" or "FULL" or "CROSS" or 
+                                "FROM" or "AS" or "INTO" or "ORDER" or "GROUP" or "BY" or "HAVING" or "LIMIT" or "VALUES" or 
+                                "RETURNING" or "OFFSET" or "FETCH" or "FOR" or "UNION" or "EXCEPT" or "INTERSECT" or 
+                                "SELECT" or "UPDATE" or "DELETE" or "INSERT" or "AND" or "OR" or "NOT" or "IS" or "NULL" or "ASC" or "DESC" => true,
+                                _ => false
+                            };
+
+                            if (!isIgnoredKeyword)
+                            {
+                                string determinedTag = "ColumnAliasAsKeyword";
+                                if (activeDmlKeyword == "UPDATE" && currentClauseTag == SqlSegmentTag.UpdateKeyword) determinedTag = SqlSegmentTag.UpdateAsKeyword;
+                                else if (activeDmlKeyword == "DELETE" && (currentClauseTag == SqlSegmentTag.DeleteKeyword || (currentClauseTag == SqlSegmentTag.FromKeyword && fromCount == 1))) determinedTag = SqlSegmentTag.DeleteAsKeyword;
+                                else if (currentClauseTag == SqlSegmentTag.FromKeyword) determinedTag = SqlSegmentTag.TableAliasAsKeyword;
+
+                                foreach (char c in prefix) if (c == ')') PopState();
+
+                                string quotedAlias = context.Dialect.QuoteIdentifier(matchingWord);
+                                
+                                if (lastEntityRef != null) SetAlias(lastEntityRef, quotedAlias);
+                                else if (lastAliasableTarget is ISqlEntityBase lastEnt) SetAlias(lastEnt.Reference, quotedAlias);
+                                else SetAlias(lastAliasableTarget, quotedAlias);
+                                
+                                if (prefix.Length > 0)
+                                    refined.Add(new SqlSegment(SqlSegmentType.Literal, prefix, segment.RenderMode, segment.Tags ?? []));
+                                
+                                if (determinedTag == "ColumnAliasAsKeyword")
                                     refined.Add(new SqlSegment(SqlSegmentType.Raw, quotedAlias, null, segment.Tags ?? []));
-                                }
                                 else
-                                {
-                                    refined.Add(new SqlSegment(SqlSegmentType.Raw, quotedAlias, null, [targetTag]));
-                                }
+                                    refined.Add(new SqlSegment(SqlSegmentType.Raw, quotedAlias, null, [determinedTag]));
 
                                 text = text.Substring(implicitAliasMatch.Length);
                             }
@@ -338,47 +530,125 @@ public partial class SqlSegmentPreprocessor : ISqlSegmentPreprocessor
                     if (c == '\'') { inString = true; continue; }
                     if (c == '/' && j + 1 < text.Length && text[j + 1] == '*') { inBlockCmt = true; j++; continue; }
                     if (c == '-' && j + 1 < text.Length && text[j + 1] == '-') { inLineCmt = true; j++; continue; }
-                    if (c == '(') { parenDepth++; continue; }
-                    if (c == ')') { parenDepth--; continue; }
+                    
+                    if (c == '(') 
+                    { 
+                        parenDepth++; 
+                        kwStack.Add(currentKeyword);
+                        clauseStack.Add(currentClauseTag);
+                        dmlStack.Add(activeDmlKeyword);
+                        fromStack.Add(fromCount);
+                        baseNameStack.Add(forceBaseNamePhase);
+                        continue; 
+                    }
+                    if (c == ')') 
+                    { 
+                        PopState();
+                        continue; 
+                    }
 
-                    if (parenDepth == 0)
+                    bool isWordBoundary = j == 0 || (!char.IsLetterOrDigit(text[j - 1]) && text[j - 1] != '_');
+                    if (isWordBoundary)
                     {
-                        bool isWordBoundary = j == 0 || (!char.IsLetterOrDigit(text[j - 1]) && text[j - 1] != '_');
-                        if (isWordBoundary)
+                        var span = text.AsSpan(j);
+                        static bool Match(ReadOnlySpan<char> s, string kw) => s.StartsWith(kw, StringComparison.OrdinalIgnoreCase) && (s.Length == kw.Length || (!char.IsLetterOrDigit(s[kw.Length]) && s[kw.Length] != '_'));
+
+                        string? matchedWord = null;
+                        string? targetTag = null;
+
+                        if (Match(span, "SELECT DISTINCT")) { matchedWord = "SELECT DISTINCT"; targetTag = SqlSegmentTag.SelectDistinctKeyword; }
+                        else if (Match(span, "SELECT"))     { matchedWord = "SELECT";   targetTag = SqlSegmentTag.SelectKeyword; }
+                        else if (Match(span, "UPDATE"))     { matchedWord = "UPDATE";   targetTag = SqlSegmentTag.UpdateKeyword; }
+                        else if (Match(span, "SET"))        { matchedWord = "SET";      targetTag = SqlSegmentTag.SetKeyword; }
+                        else if (Match(span, "INSERT"))     { matchedWord = "INSERT";   targetTag = SqlSegmentTag.InsertKeyword; }
+                        else if (Match(span, "INTO"))       { matchedWord = "INTO";     targetTag = SqlSegmentTag.IntoKeyword; }
+                        else if (Match(span, "VALUES"))     { matchedWord = "VALUES";   targetTag = SqlSegmentTag.InsertValuesKeyword; }
+                        else if (Match(span, "FROM"))       { matchedWord = "FROM";     targetTag = SqlSegmentTag.FromKeyword; }
+                        else if (Match(span, "INNER JOIN")) { matchedWord = "INNER JOIN"; targetTag = SqlSegmentTag.FromKeyword; }
+                        else if (Match(span, "LEFT JOIN"))  { matchedWord = "LEFT JOIN";  targetTag = SqlSegmentTag.FromKeyword; }
+                        else if (Match(span, "RIGHT JOIN")) { matchedWord = "RIGHT JOIN"; targetTag = SqlSegmentTag.FromKeyword; }
+                        else if (Match(span, "CROSS JOIN")) { matchedWord = "CROSS JOIN"; targetTag = SqlSegmentTag.FromKeyword; }
+                        else if (Match(span, "JOIN"))       { matchedWord = "JOIN";       targetTag = SqlSegmentTag.FromKeyword; }
+                        else if (Match(span, "WHERE"))      { matchedWord = "WHERE";    targetTag = SqlSegmentTag.WhereKeyword; }
+                        else if (Match(span, "ORDER BY"))   { matchedWord = "ORDER BY"; targetTag = SqlSegmentTag.WhereKeyword; } 
+                        else if (Match(span, "GROUP BY"))   { matchedWord = "GROUP BY"; targetTag = SqlSegmentTag.WhereKeyword; }
+                        else if (Match(span, "HAVING"))     { matchedWord = "HAVING";   targetTag = SqlSegmentTag.WhereKeyword; }
+                        else if (Match(span, "DELETE"))     { matchedWord = "DELETE";   targetTag = SqlSegmentTag.DeleteKeyword; }
+                        else if (Match(span, "LIMIT"))      { matchedWord = "LIMIT";    targetTag = SqlSegmentTag.Paging; }
+                        else if (Match(span, "RETURNING"))  { matchedWord = "RETURNING";targetTag = SqlSegmentTag.ReturningKeyword; }
+                        
+                        else if (Match(span, "WITH RECURSIVE"))
                         {
-                            var span = text.AsSpan(j);
-                            static bool Match(ReadOnlySpan<char> s, string kw) => s.StartsWith(kw, StringComparison.OrdinalIgnoreCase) && (s.Length == kw.Length || (!char.IsLetterOrDigit(s[kw.Length]) && s[kw.Length] != '_'));
-
-                            string? matchedWord = null;
-                            string? targetTag = null;
-
-                            if (Match(span, "SELECT DISTINCT")) { matchedWord = "SELECT DISTINCT"; targetTag = SqlSegmentTag.SelectDistinctKeyword; }
-                            else if (Match(span, "SELECT"))     { matchedWord = "SELECT";   targetTag = SqlSegmentTag.SelectKeyword; }
-                            else if (Match(span, "UPDATE"))     { matchedWord = "UPDATE";   targetTag = SqlSegmentTag.UpdateKeyword; }
-                            else if (Match(span, "SET"))        { matchedWord = "SET";      targetTag = SqlSegmentTag.SetKeyword; }
-                            else if (Match(span, "INSERT"))     { matchedWord = "INSERT";   targetTag = SqlSegmentTag.InsertKeyword; }
-                            else if (Match(span, "INTO"))       { matchedWord = "INTO";     targetTag = SqlSegmentTag.IntoKeyword; }
-                            else if (Match(span, "VALUES"))     { matchedWord = "VALUES";   targetTag = SqlSegmentTag.InsertValuesKeyword; }
-                            else if (Match(span, "FROM"))       { matchedWord = "FROM";     targetTag = SqlSegmentTag.FromKeyword; }
-                            else if (Match(span, "WHERE"))      { matchedWord = "WHERE";    targetTag = SqlSegmentTag.WhereKeyword; }
-                            else if (Match(span, "DELETE"))     { matchedWord = "DELETE";   targetTag = SqlSegmentTag.DeleteKeyword; }
-
-                            if (matchedWord != null)
+                            matchedWord = "WITH RECURSIVE";
+                            targetTag = null;
+                            
+                            // Abort if the user provides a raw text CTE target (e.g., "WITH RECURSIVE ExpensiveProducts AS")
+                            if (string.IsNullOrWhiteSpace(text.Substring(j + matchedWord.Length)))
                             {
-                                if (j > lastSplitIdx) refined.Add(new SqlSegment(SqlSegmentType.Literal, text[lastSplitIdx..j], segment.RenderMode, segment.Tags ?? []));
-                                refined.Add(new SqlSegment(SqlSegmentType.Literal, text.Substring(j, matchedWord.Length), null, targetTag != null ? [targetTag] : []));
-                                currentKeyword = matchedWord;
-                                
-                                if (matchedWord == "FROM") fromCount++;
-                                else if (matchedWord == "UPDATE" || matchedWord == "DELETE" || matchedWord == "SELECT" || matchedWord == "SELECT DISTINCT" || matchedWord == "INSERT") 
+                                int forward = i + 1;
+                                while (forward < segments.Count)
                                 {
-                                    activeDmlKeyword = matchedWord;
-                                    fromCount = 0;
+                                    if (segments[forward].Value is ISqlRoleable roleableTarget)
+                                    {
+                                        roleableTarget.Role = SqlEntityRole.Cte;
+                                        break;
+                                    }
+                                    if (segments[forward].Type == SqlSegmentType.Literal && !string.IsNullOrWhiteSpace(segments[forward].Value?.ToString()))
+                                        break; 
+                                    forward++;
                                 }
-
-                                j += matchedWord.Length - 1; 
-                                lastSplitIdx = j + 1;
                             }
+                        }
+                        else if (Match(span, "WITH"))
+                        {
+                            matchedWord = "WITH";
+                            targetTag = null;
+                            
+                            // Abort if the user provides a raw text CTE target (e.g., "WITH ExpensiveProducts AS")
+                            if (string.IsNullOrWhiteSpace(text.Substring(j + matchedWord.Length)))
+                            {
+                                int forward = i + 1;
+                                while (forward < segments.Count)
+                                {
+                                    if (segments[forward].Value is ISqlRoleable roleableTarget)
+                                    {
+                                        roleableTarget.Role = SqlEntityRole.Cte;
+                                        break;
+                                    }
+                                    if (segments[forward].Type == SqlSegmentType.Literal && !string.IsNullOrWhiteSpace(segments[forward].Value?.ToString()))
+                                        break; 
+                                    forward++;
+                                }
+                            }
+                        }
+
+                        if (matchedWord != null)
+                        {
+                            if (targetTag == SqlSegmentTag.InsertKeyword || targetTag == SqlSegmentTag.ReturningKeyword)
+                                forceBaseNamePhase = true;
+                            else if (targetTag == SqlSegmentTag.SelectKeyword || targetTag == SqlSegmentTag.SelectDistinctKeyword || 
+                                     targetTag == SqlSegmentTag.UpdateKeyword || targetTag == SqlSegmentTag.DeleteKeyword || 
+                                     targetTag == SqlSegmentTag.InsertValuesKeyword || targetTag == SqlSegmentTag.IntoKeyword || 
+                                     targetTag == SqlSegmentTag.SetKeyword || targetTag == SqlSegmentTag.WhereKeyword)
+                                forceBaseNamePhase = false;
+
+                            if (j > lastSplitIdx) refined.Add(new SqlSegment(SqlSegmentType.Literal, text[lastSplitIdx..j], segment.RenderMode, segment.Tags ?? []));
+                            
+                            var appliedTags = targetTag != null && parenDepth == 0 ? new[] { targetTag } : [];
+                            refined.Add(new SqlSegment(SqlSegmentType.Literal, text.Substring(j, matchedWord.Length), null, appliedTags));
+                            
+                            currentKeyword = matchedWord;
+                            currentClauseTag = targetTag;
+                            
+                            if (matchedWord == "FROM") fromCount++;
+                            else if (matchedWord == "UPDATE" || matchedWord == "DELETE" || matchedWord == "SELECT" || matchedWord == "SELECT DISTINCT" || matchedWord == "INSERT") 
+                            {
+                                activeDmlKeyword = matchedWord;
+                                fromCount = 0;
+                            }
+
+                            j += matchedWord.Length - 1; 
+                            lastSplitIdx = j + 1;
                         }
                     }
                 }
@@ -390,25 +660,24 @@ public partial class SqlSegmentPreprocessor : ISqlSegmentPreprocessor
                     if (trimmedText.EndsWith("AS", StringComparison.OrdinalIgnoreCase))
                     {
                         expectsAlias = trimmedText.Length == 2 || !char.IsLetterOrDigit(trimmedText[^3]);
-                        if (expectsAlias && parenDepth == 0)
+                        if (expectsAlias)
                         {
                             int asIdx = chunk.LastIndexOf("AS", StringComparison.OrdinalIgnoreCase);
-                            if (asIdx > 0) 
-                                refined.Add(new SqlSegment(SqlSegmentType.Literal, chunk[..asIdx], segment.RenderMode, segment.Tags ?? []));
+                            string prefix = chunk[..asIdx];
+                            
+                            if (prefix.Length > 0)
+                                refined.Add(new SqlSegment(SqlSegmentType.Literal, prefix, segment.RenderMode, segment.Tags ?? []));
 
-                            string targetTag = SqlSegmentTag.TableAliasAsKeyword;
-                            if (currentKeyword == "SELECT" || currentKeyword == "SELECT DISTINCT") targetTag = "ColumnAliasAsKeyword";
-                            else if (activeDmlKeyword == "UPDATE" && currentKeyword == "UPDATE") targetTag = SqlSegmentTag.UpdateAsKeyword;
-                            else if (activeDmlKeyword == "DELETE" && (currentKeyword == "DELETE" || (currentKeyword == "FROM" && fromCount == 1))) targetTag = SqlSegmentTag.DeleteAsKeyword;
+                            string determinedTag = "ColumnAliasAsKeyword";
+                            if (activeDmlKeyword == "UPDATE" && currentClauseTag == SqlSegmentTag.UpdateKeyword) determinedTag = SqlSegmentTag.UpdateAsKeyword;
+                            else if (activeDmlKeyword == "DELETE" && (currentClauseTag == SqlSegmentTag.DeleteKeyword || (currentClauseTag == SqlSegmentTag.FromKeyword && fromCount == 1))) determinedTag = SqlSegmentTag.DeleteAsKeyword;
+                            else if (currentClauseTag == SqlSegmentTag.FromKeyword) determinedTag = SqlSegmentTag.TableAliasAsKeyword;
 
-                            if (targetTag == "ColumnAliasAsKeyword")
-                            {
-                                refined.Add(new SqlSegment(SqlSegmentType.Literal, chunk.Substring(asIdx, 2), segment.RenderMode, segment.Tags ?? []));
-                            }
+                            string asKeyword = chunk.Substring(asIdx, 2); // Exact "AS"
+                            if (determinedTag == "ColumnAliasAsKeyword")
+                                refined.Add(new SqlSegment(SqlSegmentType.Literal, asKeyword, segment.RenderMode, segment.Tags ?? []));
                             else
-                            {
-                                refined.Add(new SqlSegment(SqlSegmentType.Literal, chunk.Substring(asIdx, 2), segment.RenderMode, [targetTag]));
-                            }
+                                refined.Add(new SqlSegment(SqlSegmentType.Literal, asKeyword, segment.RenderMode, [determinedTag]));
                             
                             string afterAs = chunk[(asIdx + 2)..];
                             if (afterAs.Length > 0) 
@@ -454,7 +723,9 @@ public partial class SqlSegmentPreprocessor : ISqlSegmentPreprocessor
                         continue;
                     }
 
-                    refined.Add(new SqlSegment(SqlSegmentType.Reference, entity, segment.RenderMode, segment.Tags ?? []));
+                    var mode = segment.RenderMode;
+                    if (mode == null && forceBaseNamePhase) mode = SqlRenderMode.BaseName;
+                    refined.Add(new SqlSegment(SqlSegmentType.Reference, entity, mode, segment.Tags ?? []));
                     continue;
                 }
 
@@ -493,27 +764,88 @@ public partial class SqlSegmentPreprocessor : ISqlSegmentPreprocessor
                     continue;
                 }
 
-                if (value != null && value.GetType().IsClass && value is not string && value is not IEnumerable && value is not ISqlFragment)
+                if (value != null && value.GetType().IsClass && value is not string && value is not ISqlFragment)
                 {
-                    if (activeEntityTarget == null) throw new InvalidOperationException($"DTO context missing for target mapping.");
-                    if (currentKeyword == "SET")
+                    bool isIterable = value is IEnumerable && value is not byte[];
+
+                    if (isIterable && currentKeyword != "INSERT" && currentKeyword != "VALUES")
                     {
-                        var assignments = Sql.BuildAssignments(activeEntityTarget, value, context);
-                        foreach (var a in assignments) if (a is ISqlParameterGenerator gen) gen.GenerateParameters(context);
-                        refined.Add(new SqlSegment(SqlSegmentType.Reference, new SqlSetFragment(assignments)));
-                        continue;
+                        // Proceed natively down to the standard Iterable handler
                     }
-                    if (currentKeyword == "INSERT" || currentKeyword == "VALUES")
+                    else
                     {
-                        var assignments = Sql.BuildAssignments(activeEntityTarget, value, context);
-                        foreach (var a in assignments) if (a is ISqlParameterGenerator gen) gen.GenerateParameters(context);
-                        refined.Add(new SqlSegment(SqlSegmentType.Reference, new SqlInsertValuesFragment(assignments)));
-                        continue;
+                        if (activeEntityTarget == null) throw new InvalidOperationException($"DTO context missing for target mapping.");
+                        
+                        if (currentKeyword == "SET")
+                        {
+                            var assignments = Sql.BuildAssignments(activeEntityTarget, value, context);
+                            foreach (var a in assignments) if (a is ISqlParameterGenerator gen) gen.GenerateParameters(context);
+                            refined.Add(new SqlSegment(SqlSegmentType.Reference, new SqlSetFragment(assignments), segment.RenderMode, segment.Tags ?? []));
+                            continue;
+                        }
+                        if (currentKeyword == "INSERT" || currentKeyword == "VALUES")
+                        {
+                            if (isIterable)
+                            {
+                                var bulkAssignments = new List<IReadOnlyList<ISqlAssignmentFragment>>();
+                                foreach (var item in (IEnumerable)value)
+                                {
+                                    var itemAssignments = Sql.BuildAssignments(activeEntityTarget, item, context);
+                                    foreach (var a in itemAssignments) if (a is ISqlParameterGenerator gen) gen.GenerateParameters(context);
+                                    bulkAssignments.Add(itemAssignments);
+                                }
+                                refined.Add(new SqlSegment(SqlSegmentType.Reference, new SqlInsertValuesFragment(bulkAssignments), segment.RenderMode, segment.Tags ?? []));
+                            }
+                            else
+                            {
+                                var assignments = Sql.BuildAssignments(activeEntityTarget, value, context);
+                                foreach (var a in assignments) if (a is ISqlParameterGenerator gen) gen.GenerateParameters(context);
+                                refined.Add(new SqlSegment(SqlSegmentType.Reference, new SqlInsertValuesFragment(assignments), segment.RenderMode, segment.Tags ?? []));
+                            }
+                            continue;
+                        }
                     }
                 }
 
                 if (value is IEnumerable databaseIterable && value is not string && value is not byte[])
                 {
+                    bool isFragmentCollection = false;
+                    foreach (var element in databaseIterable)
+                    {
+                        if (element is ISqlFragment) { isFragmentCollection = true; break; }
+                        if (element != null) break;
+                    }
+
+                    if (isFragmentCollection)
+                    {
+                        var fragments = new List<ISqlFragment>();
+                        foreach (var element in databaseIterable)
+                        {
+                            if (element is ISqlFragment frag)
+                            {
+                                if (frag is SqlDynamicOrderFragment innerDynOrder)
+                                {
+                                    var colRef = ResolveDynamicColumn(innerDynOrder.Column, segments, context);
+                                    if (innerDynOrder.Direction.HasValue)
+                                        fragments.Add(new SqlOrderFragment(colRef, innerDynOrder.Direction.Value));
+                                    else
+                                        fragments.Add(new SqlOrderFragment(colRef));
+                                }
+                                else if (frag is SqlDynamicColumnFragment innerDynCol)
+                                {
+                                    fragments.Add(ResolveDynamicColumn(innerDynCol, segments, context));
+                                }
+                                else
+                                {
+                                    fragments.Add(frag);
+                                }
+                            }
+                        }
+                        
+                        refined.Add(new SqlSegment(SqlSegmentType.Raw, new SqlCollectionFragment(fragments), segment.RenderMode, segment.Tags ?? []));
+                        continue;
+                    }
+
                     var parameterizedKeys = new List<string>();
                     foreach (var element in databaseIterable) parameterizedKeys.Add(context.AddParameter(element));
                     refined.Add(new SqlSegment(SqlSegmentType.Raw, new SqlRawCollectionFragment(parameterizedKeys), segment.RenderMode, segment.Tags ?? []));

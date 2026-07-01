@@ -28,6 +28,7 @@ public class MySqlDialect : SqlDialectBase
         {
             SqlFeature.ForUpdate,
             SqlFeature.MultiTableUpdate,
+            SqlFeature.MultiTableDelete,
             SqlFeature.UpdateAs,
             SqlFeature.UpdatableInlineViews,
             SqlFeature.CreateTableAsSelect,

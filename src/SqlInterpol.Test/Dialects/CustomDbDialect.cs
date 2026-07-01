@@ -21,6 +21,7 @@ public class CustomDbSqlDialect : SqlDialectBase
 
     public override IReadOnlySet<SqlFeature> SupportedFeatures { get; } = new HashSet<SqlFeature>
     {
+        SqlFeature.MultiTableDelete,
         SqlFeature.UpdatableInlineViews
     };
 

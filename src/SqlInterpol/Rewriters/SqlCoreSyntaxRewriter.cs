@@ -2,8 +2,8 @@ namespace SqlInterpol.Parsing;
 
 /// <summary>
 /// A foundational rewriter that applies core syntax transformations in a single linear pass. 
-/// It handles base-name phase switching, set operations (UNION, EXCEPT), lock hints (FOR UPDATE), 
-/// absorbs target alias bindings (DELETE AS, UPDATE AS), and sanitizes auto-aliases for standard DML.
+/// It handles set operations (UNION, EXCEPT), lock hints (FOR UPDATE), and 
+/// absorbs target alias bindings (DELETE AS, UPDATE AS).
 /// </summary>
 public class SqlCoreSyntaxRewriter : ISqlSegmentRewriter
 {
@@ -22,7 +22,6 @@ public class SqlCoreSyntaxRewriter : ISqlSegmentRewriter
     public IReadOnlyList<SqlSegment> Rewrite(IReadOnlyList<SqlSegment> segments, ISqlContext context)
     {
         var rewritten = new List<SqlSegment>(segments.Count);
-        bool forceBaseNamePhase = false;
 
         bool hasDelete = false, hasUpdate = false, hasDeleteAs = false, hasUpdateAs = false, hasFrom = false;
         foreach(var s in segments)
@@ -76,23 +75,9 @@ public class SqlCoreSyntaxRewriter : ISqlSegmentRewriter
         {
             var segment = segments[i];
             if (segment == null) continue;
-
-            if (segment.Type == SqlSegmentType.Literal && segment.Value is string litText && litText.Contains(';')) forceBaseNamePhase = false;
-            
-            if (segment.Tags != null)
-            {
-                foreach (var tag in segment.Tags)
-                {
-                    if (tag == SqlSegmentTag.FromKeyword || tag == SqlSegmentTag.UpdateKeyword || tag == SqlSegmentTag.IntoKeyword || tag == SqlSegmentTag.DeleteKeyword || tag == SqlSegmentTag.JoinKeyword)
-                        forceBaseNamePhase = true;
-                    else if (tag == SqlSegmentTag.SelectKeyword || tag == SqlSegmentTag.SelectDistinctKeyword || tag == SqlSegmentTag.SetKeyword || tag == SqlSegmentTag.WhereKeyword || tag == SqlSegmentTag.InsertValuesKeyword)
-                        forceBaseNamePhase = false;
-                }
-            }
             
             if (segment.HasTag(SqlSegmentTag.OnConflictKeyword) || (segment.Type == SqlSegmentType.Literal && segment.Value is string s1 && s1.Contains("ON CONFLICT", StringComparison.OrdinalIgnoreCase)))
             {
-                forceBaseNamePhase = true;
                 if (segment.Value is string text)
                 {
                     string clean = segment.HasTag(SqlSegmentTag.OnConflictKeyword) ? (text.EndsWith(" ") ? text[..^1] : text) : text;
@@ -103,7 +88,6 @@ public class SqlCoreSyntaxRewriter : ISqlSegmentRewriter
             }
             else if (segment.HasTag(SqlSegmentTag.DoUpdateSetKeyword) || (segment.Type == SqlSegmentType.Literal && segment.Value is string s2 && s2.Contains("DO UPDATE SET", StringComparison.OrdinalIgnoreCase)))
             {
-                forceBaseNamePhase = false; 
                 if (segment.Value is string text)
                 {
                     string clean = segment.HasTag(SqlSegmentTag.DoUpdateSetKeyword) && !text.TrimStart().StartsWith(')') ? ")\n" + text.TrimStart() : text;
@@ -209,7 +193,7 @@ public class SqlCoreSyntaxRewriter : ISqlSegmentRewriter
                     rewritten.Add(new SqlSegment(SqlSegmentType.Raw, new SqlUpdateAsFragment(targetEntity)));
                     
                     int lookahead = i + 1;
-                    while (lookahead < segments.Count && segments[lookahead]?.Type == SqlSegmentType.Literal && string.IsNullOrWhiteSpace(segments[lookahead]?.Value as string)) lookahead++;
+                    while (lookahead < segments.Count && segments[lookahead]?.Type == SqlSegmentType.Literal && stringIsNullOrWhiteSpace(segments[lookahead]?.Value as string)) lookahead++;
                     if (lookahead < segments.Count) lookahead++; 
                     i = lookahead - 1;
                     continue;
@@ -217,21 +201,6 @@ public class SqlCoreSyntaxRewriter : ISqlSegmentRewriter
                 else if (!context.Dialect.SupportedFeatures.Contains(SqlFeature.UpdateAs))
                 {
                     throw new SqlDialectException($"'UPDATE' with a target table alias is not supported by {context.Dialect.Kind}.");
-                }
-            }
-
-            if (forceBaseNamePhase)
-            {
-                // FIX: Respect explicitly supplied render modes (like 'Declaration' or 'AliasOnly') so AutoAliasing survives!
-                if ((segment.Type == SqlSegmentType.Projection || segment.Type == SqlSegmentType.Raw) && segment.Value is ISqlProjection proj) 
-                { 
-                    rewritten.Add(new SqlSegment(segment.Type, proj, segment.RenderMode ?? SqlRenderMode.BaseName, segment.Tags)); 
-                    continue; 
-                }
-                if ((segment.Type == SqlSegmentType.Reference || segment.Type == SqlSegmentType.Raw) && segment.Value is ISqlEntityBase entity) 
-                { 
-                    rewritten.Add(new SqlSegment(segment.Type, entity, segment.RenderMode ?? SqlRenderMode.BaseName, segment.Tags)); 
-                    continue; 
                 }
             }
 
@@ -252,5 +221,10 @@ public class SqlCoreSyntaxRewriter : ISqlSegmentRewriter
         }
 
         return rewritten;
+    }
+
+    private static bool stringIsNullOrWhiteSpace(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value);
     }
 }

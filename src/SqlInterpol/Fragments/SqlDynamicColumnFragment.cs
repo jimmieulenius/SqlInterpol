@@ -8,7 +8,7 @@ namespace SqlInterpol
     /// </remarks>
     /// <param name="entityType">The type of the target entity.</param>
     /// <param name="propertyName">The name of the target property.</param>
-    public class SqlDynamicColumn(Type entityType, string propertyName) : ISqlFragment
+    public class SqlDynamicColumnFragment(Type entityType, string propertyName) : ISqlFragment
     {
         /// <summary>
         /// Gets the compile-time type of the POCO entity model.

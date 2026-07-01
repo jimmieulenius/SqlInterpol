@@ -1,3 +1,5 @@
+using SqlInterpol.Parsing;
+
 namespace SqlInterpol;
 
 /// <summary>
@@ -40,21 +42,15 @@ public abstract class SqlEntity<T> : SqlEntityBase<T>, ISqlEntity<T>
     /// <summary>
     /// Renders this entity to a SQL string according to the specified <paramref name="mode"/>.
     /// </summary>
-    /// <param name="context">The active context providing dialect and options.</param>
-    /// <param name="mode">
-    /// Controls the output: <see cref="SqlRenderMode.Declaration"/> emits the full form
-    /// (e.g. <c>"Products" AS "p"</c>); <see cref="SqlRenderMode.BaseName"/> emits only the
-    /// qualified name; <see cref="SqlRenderMode.AliasOnly"/> emits only the alias;
-    /// default emits the reference form used in WHERE and SELECT clauses.
-    /// </param>
-    /// <returns>The SQL string for this entity in the requested mode.</returns>
     public override string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
     {
         return mode switch
         {
             SqlRenderMode.Declaration => RenderDeclaration(context),
             
-            SqlRenderMode.BaseName => context.Dialect.QuoteEntityName(Name, Schema),
+            SqlRenderMode.BaseName => Role == SqlEntityRole.Cte 
+                ? context.Dialect.QuoteIdentifier(Name) // CTEs are strictly schema-less
+                : context.Dialect.QuoteEntityName(Name, Schema),
             
             SqlRenderMode.AliasOnly => string.IsNullOrWhiteSpace(Reference.Alias) 
                 ? string.Empty 
@@ -68,7 +64,9 @@ public abstract class SqlEntity<T> : SqlEntityBase<T>, ISqlEntity<T>
 
     private string RenderDeclaration(ISqlContext context)
     {
-        var baseName = context.Dialect.QuoteEntityName(Name, Schema);
+        var baseName = Role == SqlEntityRole.Cte 
+            ? context.Dialect.QuoteIdentifier(Name)
+            : context.Dialect.QuoteEntityName(Name, Schema);
         
         if (string.IsNullOrWhiteSpace(Reference.Alias))
         {
@@ -91,6 +89,8 @@ public abstract class SqlEntity<T> : SqlEntityBase<T>, ISqlEntity<T>
                 : Reference.Alias;
         }
 
-        return context.Dialect.QuoteEntityName(Name, Schema);
+        return Role == SqlEntityRole.Cte 
+            ? context.Dialect.QuoteIdentifier(Name)
+            : context.Dialect.QuoteEntityName(Name, Schema);
     }
 }
