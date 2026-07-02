@@ -59,11 +59,11 @@ public partial class SqlSegmentPreprocessor
                 if (segments[n].Type == SqlSegmentType.Literal && segments[n].Value is string nText)
                 {
                     if (string.IsNullOrWhiteSpace(nText)) continue;
-                    if (ExplicitAliasRegex().IsMatch(nText)) hasInlineAlias = true;
-                    else
+                    
+                    // Centralized high-performance lookahead parsing via unified helper
+                    if (TryParseAlias(nText.AsSpan(), out _))
                     {
-                        var impMatch = ImplicitAliasRegex().Match(nText);
-                        if (impMatch.Success && !ReservedKeywords.Contains(impMatch.Groups[2].Value)) hasInlineAlias = true;
+                        hasInlineAlias = true;
                     }
                     break;
                 }

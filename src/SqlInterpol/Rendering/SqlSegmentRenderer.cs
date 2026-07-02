@@ -1,8 +1,3 @@
-using SqlInterpol.Parsing;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-
 namespace SqlInterpol;
 
 /// <summary>
@@ -177,17 +172,32 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
                 break;
         }
 
-        // =====================================================================
-        // FIX: Broaden auto-indentation to ANY ISqlFragment!
-        // This natively preserves the beautiful indentation of your fragments 
-        // without relying on C# margin-shifting hacks.
-        // =====================================================================
         if (segment.Value is ISqlFragment && segment.Type != SqlSegmentType.Projection && rendered != null)
         {
-            rendered = ApplyAutoIndentation(rendered, index, segments);
+            // Checks if the fragment is a native collection anywhere in its hierarchy to skip external indentation
+            if (!IsCollectionFragment(segment.Value.GetType()))
+            {
+                rendered = ApplyAutoIndentation(rendered, index, segments);
+            }
         }
 
         return rendered;
+    }
+
+    private static bool IsCollectionFragment(Type? type)
+    {
+        // FIX: Explicitly include SqlRawCollectionFragment!
+        if (type == typeof(SqlRawCollectionFragment)) return true;
+
+        while (type != null && type != typeof(object))
+        {
+            if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(SqlCollectionFragmentBase<>))
+            {
+                return true;
+            }
+            type = type.BaseType;
+        }
+        return false;
     }
 
     private string ApplyAutoIndentation(string rendered, int index, IReadOnlyList<SqlSegment> segments)

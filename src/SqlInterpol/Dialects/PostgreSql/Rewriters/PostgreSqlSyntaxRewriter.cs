@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using SqlInterpol.Parsing;
 
 namespace SqlInterpol.Dialects.PostgreSql;
@@ -28,7 +31,7 @@ public class PostgreSqlSyntaxRewriter : ISqlSegmentRewriter
             }
 
             bool isOnConflict = segment.HasTag(SqlSegmentTag.OnConflictKeyword) || 
-                               (segment.Type == SqlSegmentType.Literal && segment.Value is string s1 && s1.Contains("ON CONFLICT", StringComparison.OrdinalIgnoreCase));
+                               (segment.Type == SqlSegmentType.Literal && segment.Value is string s1 && SqlRewriterHelpers.ContainsKeyword(s1, SqlKeyword.OnConflict.Value));
 
             if (isOnConflict)
             {
@@ -36,15 +39,12 @@ public class PostgreSqlSyntaxRewriter : ISqlSegmentRewriter
                 int doIdx = -1;
                 int lookahead = 1;
 
-                // =====================================================================
-                // ROBUST AST HUNTING: Find the conflict columns and the DO keyword
-                // =====================================================================
                 while (i + lookahead < segments.Count)
                 {
                     var next = segments[i + lookahead];
                     
                     bool isDo = next.HasTag(SqlSegmentTag.DoUpdateSetKeyword) || 
-                                (next.Type == SqlSegmentType.Literal && next.Value is string s2 && s2.Contains("DO ", StringComparison.OrdinalIgnoreCase));
+                                (next.Type == SqlSegmentType.Literal && next.Value is string s2 && SqlRewriterHelpers.ContainsKeyword(s2, SqlKeyword.Do.Value));
 
                     if (isDo)
                     {
@@ -52,7 +52,6 @@ public class PostgreSqlSyntaxRewriter : ISqlSegmentRewriter
                         break;
                     }
 
-                    // Unwrap the column references so they render strictly as unqualified names!
                     if (next.Value is SqlColumnReferenceBase colRefBase)
                     {
                         conflictCols.Add(new SqlUnqualifiedColumn(colRefBase.ColumnName));
@@ -69,7 +68,7 @@ public class PostgreSqlSyntaxRewriter : ISqlSegmentRewriter
                 {
                     if (segment.Value is string text)
                     {
-                        int idx = text.LastIndexOf("ON CONFLICT", StringComparison.OrdinalIgnoreCase);
+                        int idx = text.LastIndexOf(SqlKeyword.OnConflict.Value, StringComparison.OrdinalIgnoreCase);
                         if (idx > 0)
                         {
                             var preceding = text[..idx].TrimEnd();
@@ -77,11 +76,9 @@ public class PostgreSqlSyntaxRewriter : ISqlSegmentRewriter
                         }
                     }
 
-                    // Inject the normalized ON CONFLICT target wrapped perfectly in parentheses!
                     rewritten.Add(new SqlSegment(SqlSegmentType.Literal, "\nON CONFLICT "));
                     rewritten.Add(new SqlSegment(SqlSegmentType.Raw, new PostgreSqlConflictTargetFragment(conflictCols)));
 
-                    // Jump the loop pointer forward to just before the DO keyword
                     i = doIdx - 1;
                     continue;
                 }
@@ -98,9 +95,6 @@ public class PostgreSqlSyntaxRewriter : ISqlSegmentRewriter
         return rewritten;
     }
 
-    // =========================================================================
-    // HELPERS
-    // =========================================================================
     private class SqlUnqualifiedColumn : ISqlProjection
     {
         private readonly string _columnName;

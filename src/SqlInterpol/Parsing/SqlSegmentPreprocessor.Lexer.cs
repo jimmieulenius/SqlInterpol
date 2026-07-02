@@ -1,11 +1,10 @@
+using System;
+using System.Collections.Generic;
+
 namespace SqlInterpol.Parsing;
 
 public partial class SqlSegmentPreprocessor
 {
-    private static bool Match(ReadOnlySpan<char> s, string kw) => 
-        s.StartsWith(kw, StringComparison.OrdinalIgnoreCase) && 
-        (s.Length == kw.Length || (!char.IsLetterOrDigit(s[kw.Length]) && s[kw.Length] != '_'));
-
     private void ProcessTextLiteral(SqlSegment segment, IReadOnlyList<SqlSegment> segments, int i, PreprocessorState state)
     {
         string text = (string)segment.Value!;
@@ -43,30 +42,31 @@ public partial class SqlSegmentPreprocessor
                 string? matchedWord = null;
                 string? targetTag = null;
 
-                if (Match(span, SqlKeyword.SelectDistinct.Value)) { matchedWord = SqlKeyword.SelectDistinct.Value; targetTag = SqlSegmentTag.SelectDistinctKeyword; }
-                else if (Match(span, SqlKeyword.Select.Value))     { matchedWord = SqlKeyword.Select.Value;   targetTag = SqlSegmentTag.SelectKeyword; }
-                else if (Match(span, SqlKeyword.Update.Value))     { matchedWord = SqlKeyword.Update.Value;   targetTag = SqlSegmentTag.UpdateKeyword; }
-                else if (Match(span, SqlKeyword.Set.Value))        { matchedWord = SqlKeyword.Set.Value;      targetTag = SqlSegmentTag.SetKeyword; }
-                else if (Match(span, SqlKeyword.Insert.Value))     { matchedWord = SqlKeyword.Insert.Value;   targetTag = SqlSegmentTag.InsertKeyword; }
-                else if (Match(span, SqlKeyword.Into.Value))       { matchedWord = SqlKeyword.Into.Value;     targetTag = SqlSegmentTag.IntoKeyword; }
-                else if (Match(span, SqlKeyword.Values.Value))     { matchedWord = SqlKeyword.Values.Value;   targetTag = SqlSegmentTag.InsertValuesKeyword; }
-                else if (Match(span, SqlKeyword.From.Value))       { matchedWord = SqlKeyword.From.Value;     targetTag = SqlSegmentTag.FromKeyword; }
-                else if (Match(span, SqlKeyword.InnerJoin.Value))  { matchedWord = SqlKeyword.InnerJoin.Value; targetTag = SqlSegmentTag.FromKeyword; }
-                else if (Match(span, SqlKeyword.LeftJoin.Value))   { matchedWord = SqlKeyword.LeftJoin.Value;  targetTag = SqlSegmentTag.FromKeyword; }
-                else if (Match(span, SqlKeyword.RightJoin.Value))  { matchedWord = SqlKeyword.RightJoin.Value; targetTag = SqlSegmentTag.FromKeyword; }
-                else if (Match(span, SqlKeyword.CrossJoin.Value))  { matchedWord = SqlKeyword.CrossJoin.Value; targetTag = SqlSegmentTag.FromKeyword; }
-                else if (Match(span, SqlKeyword.Join.Value))       { matchedWord = SqlKeyword.Join.Value;       targetTag = SqlSegmentTag.FromKeyword; }
-                else if (Match(span, SqlKeyword.Where.Value))      { matchedWord = SqlKeyword.Where.Value;    targetTag = SqlSegmentTag.WhereKeyword; }
-                else if (Match(span, SqlKeyword.OrderBy.Value))    { matchedWord = SqlKeyword.OrderBy.Value;   targetTag = SqlSegmentTag.WhereKeyword; } 
-                else if (Match(span, SqlKeyword.GroupBy.Value))    { matchedWord = SqlKeyword.GroupBy.Value;   targetTag = SqlSegmentTag.WhereKeyword; }
-                else if (Match(span, SqlKeyword.Having.Value))     { matchedWord = SqlKeyword.Having.Value;   targetTag = SqlSegmentTag.WhereKeyword; }
-                else if (Match(span, SqlKeyword.Delete.Value))     { matchedWord = SqlKeyword.Delete.Value;   targetTag = SqlSegmentTag.DeleteKeyword; }
-                else if (Match(span, SqlKeyword.Limit.Value))      { matchedWord = SqlKeyword.Limit.Value;    targetTag = SqlSegmentTag.Paging; }
-                else if (Match(span, SqlKeyword.Returning.Value))  { matchedWord = SqlKeyword.Returning.Value;targetTag = SqlSegmentTag.ReturningKeyword; }
-                else if (Match(span, SqlKeyword.ForUpdate.Value))  { matchedWord = SqlKeyword.ForUpdate.Value;  targetTag = SqlSegmentTag.ForUpdateKeyword; }
-                else if (Match(span, SqlKeyword.ForShare.Value))   { matchedWord = SqlKeyword.ForShare.Value;   targetTag = SqlSegmentTag.ForShareKeyword; }
+                // Centralized keyword boundary checking via MatchKeyword helper
+                if (MatchKeyword(span, SqlKeyword.SelectDistinct.Value)) { matchedWord = SqlKeyword.SelectDistinct.Value; targetTag = SqlSegmentTag.SelectDistinctKeyword; }
+                else if (MatchKeyword(span, SqlKeyword.Select.Value))     { matchedWord = SqlKeyword.Select.Value;   targetTag = SqlSegmentTag.SelectKeyword; }
+                else if (MatchKeyword(span, SqlKeyword.Update.Value))     { matchedWord = SqlKeyword.Update.Value;   targetTag = SqlSegmentTag.UpdateKeyword; }
+                else if (MatchKeyword(span, SqlKeyword.Set.Value))        { matchedWord = SqlKeyword.Set.Value;      targetTag = SqlSegmentTag.SetKeyword; }
+                else if (MatchKeyword(span, SqlKeyword.Insert.Value))     { matchedWord = SqlKeyword.Insert.Value;   targetTag = SqlSegmentTag.InsertKeyword; }
+                else if (MatchKeyword(span, SqlKeyword.Into.Value))       { matchedWord = SqlKeyword.Into.Value;     targetTag = SqlSegmentTag.IntoKeyword; }
+                else if (MatchKeyword(span, SqlKeyword.Values.Value))     { matchedWord = SqlKeyword.Values.Value;   targetTag = SqlSegmentTag.InsertValuesKeyword; }
+                else if (MatchKeyword(span, SqlKeyword.From.Value))       { matchedWord = SqlKeyword.From.Value;     targetTag = SqlSegmentTag.FromKeyword; }
+                else if (MatchKeyword(span, SqlKeyword.InnerJoin.Value))  { matchedWord = SqlKeyword.InnerJoin.Value; targetTag = SqlSegmentTag.FromKeyword; }
+                else if (MatchKeyword(span, SqlKeyword.LeftJoin.Value))   { matchedWord = SqlKeyword.LeftJoin.Value;  targetTag = SqlSegmentTag.FromKeyword; }
+                else if (MatchKeyword(span, SqlKeyword.RightJoin.Value))  { matchedWord = SqlKeyword.RightJoin.Value; targetTag = SqlSegmentTag.FromKeyword; }
+                else if (MatchKeyword(span, SqlKeyword.CrossJoin.Value))  { matchedWord = SqlKeyword.CrossJoin.Value; targetTag = SqlSegmentTag.FromKeyword; }
+                else if (MatchKeyword(span, SqlKeyword.Join.Value))       { matchedWord = SqlKeyword.Join.Value;       targetTag = SqlSegmentTag.FromKeyword; }
+                else if (MatchKeyword(span, SqlKeyword.Where.Value))      { matchedWord = SqlKeyword.Where.Value;    targetTag = SqlSegmentTag.WhereKeyword; }
+                else if (MatchKeyword(span, SqlKeyword.OrderBy.Value))    { matchedWord = SqlKeyword.OrderBy.Value;   targetTag = SqlSegmentTag.WhereKeyword; } 
+                else if (MatchKeyword(span, SqlKeyword.GroupBy.Value))    { matchedWord = SqlKeyword.GroupBy.Value;   targetTag = SqlSegmentTag.WhereKeyword; }
+                else if (MatchKeyword(span, SqlKeyword.Having.Value))     { matchedWord = SqlKeyword.Having.Value;   targetTag = SqlSegmentTag.WhereKeyword; }
+                else if (MatchKeyword(span, SqlKeyword.Delete.Value))     { matchedWord = SqlKeyword.Delete.Value;   targetTag = SqlSegmentTag.DeleteKeyword; }
+                else if (MatchKeyword(span, SqlKeyword.Limit.Value))      { matchedWord = SqlKeyword.Limit.Value;    targetTag = SqlSegmentTag.Paging; }
+                else if (MatchKeyword(span, SqlKeyword.Returning.Value))  { matchedWord = SqlKeyword.Returning.Value;targetTag = SqlSegmentTag.ReturningKeyword; }
+                else if (MatchKeyword(span, SqlKeyword.ForUpdate.Value))  { matchedWord = SqlKeyword.ForUpdate.Value;  targetTag = SqlSegmentTag.ForUpdateKeyword; }
+                else if (MatchKeyword(span, SqlKeyword.ForShare.Value))   { matchedWord = SqlKeyword.ForShare.Value;   targetTag = SqlSegmentTag.ForShareKeyword; }
                 
-                else if (Match(span, "WITH RECURSIVE"))
+                else if (MatchKeyword(span, "WITH RECURSIVE"))
                 {
                     matchedWord = "WITH RECURSIVE";
                     if (string.IsNullOrWhiteSpace(text.Substring(j + matchedWord.Length)))
@@ -80,7 +80,7 @@ public partial class SqlSegmentPreprocessor
                         }
                     }
                 }
-                else if (Match(span, SqlKeyword.With.Value))
+                else if (MatchKeyword(span, SqlKeyword.With.Value))
                 {
                     matchedWord = SqlKeyword.With.Value;
                     if (string.IsNullOrWhiteSpace(text.Substring(j + matchedWord.Length)))

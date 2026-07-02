@@ -28,7 +28,7 @@ public class SqlServerSyntaxRewriter : ISqlSegmentRewriter
             }
 
             bool isOnConflict = segment.HasTag(SqlSegmentTag.OnConflictKeyword) || 
-                (segment.Type == SqlSegmentType.Literal && segment.Value is string s1 && s1.Contains("ON CONFLICT", StringComparison.OrdinalIgnoreCase));
+                (segment.Type == SqlSegmentType.Literal && segment.Value is string s1 && SqlRewriterHelpers.ContainsKeyword(s1, SqlKeyword.OnConflict.Value));
 
             if (segment.Type == SqlSegmentType.Literal && segment.Value is string literalValue &&
                 literalValue.Contains("WITH RECURSIVE", StringComparison.OrdinalIgnoreCase))
@@ -46,10 +46,6 @@ public class SqlServerSyntaxRewriter : ISqlSegmentRewriter
                 SqlInsertValuesFragment? insertFrag = null;
                 int tableIndex = -1;
 
-                // =====================================================================
-                // FIX: ROBUST BACKWARD AST HUNTING
-                // Ignore all whitespace/literals and just grab the physical fragments
-                // =====================================================================
                 for (int j = rewritten.Count - 1; j >= 0; j--)
                 {
                     if (rewritten[j].Value is SqlInsertValuesFragment ins && insertFrag == null) 
@@ -65,10 +61,6 @@ public class SqlServerSyntaxRewriter : ISqlSegmentRewriter
                 SqlSetFragment? setFrag = null;
                 int lookahead = 1;
 
-                // =====================================================================
-                // FIX: ROBUST FORWARD AST HUNTING
-                // Scan forward until we hit the SET fragment, unwrapping any columns we find!
-                // =====================================================================
                 while (i + lookahead < segments.Count)
                 {
                     var next = segments[i + lookahead];
@@ -92,11 +84,10 @@ public class SqlServerSyntaxRewriter : ISqlSegmentRewriter
 
                 if (tableIndex > -1 && targetTable != null && insertFrag != null && conflictCols.Count > 0 && setFrag != null)
                 {
-                    // Find the exact location of the INSERT keyword
                     int insertKeywordIndex = tableIndex > 0 ? tableIndex - 1 : 0;
                     for (int k = tableIndex; k >= 0; k--)
                     {
-                        if (rewritten[k].Type == SqlSegmentType.Literal && (rewritten[k].Value as string)?.IndexOf("INSERT", StringComparison.OrdinalIgnoreCase) >= 0)
+                        if (rewritten[k].Type == SqlSegmentType.Literal && (rewritten[k].Value as string)?.IndexOf(SqlKeyword.Insert.Value, StringComparison.OrdinalIgnoreCase) >= 0)
                         {
                             insertKeywordIndex = k;
                             break;
@@ -111,9 +102,6 @@ public class SqlServerSyntaxRewriter : ISqlSegmentRewriter
                 }
             }
 
-            // =========================================================================
-            // Relocate and Transpile SqlLockFragment to SQL Server table HINTS
-            // =========================================================================
             if (segment.Type == SqlSegmentType.Raw && segment.Value is SqlLockFragment lockFrag)
             {
                 if (lastTableReferenceIndex > -1)
@@ -186,7 +174,7 @@ public class SqlServerSyntaxRewriter : ISqlSegmentRewriter
 
                             if (segment.Value is string text)
                             {
-                                int index = text.LastIndexOf("RETURNING", StringComparison.OrdinalIgnoreCase);
+                                int index = text.LastIndexOf(SqlKeyword.Returning.Value, StringComparison.OrdinalIgnoreCase);
                                 if (index > 0) 
                                 {
                                     var precedingText = text[..index].TrimEnd();
@@ -203,33 +191,24 @@ public class SqlServerSyntaxRewriter : ISqlSegmentRewriter
                 }
             }
 
-            if (segment.HasTag(SqlSegmentTag.Paging) && segment.Value is string textPaging)
+            if (segment.HasTag(SqlSegmentTag.Paging) && SqlRewriterHelpers.TryExtractPagingParameters(segments, i, out var limitParam, out var offsetParam, out int nextIndex))
             {
-                int p1Idx = i + 1;
-                while (p1Idx < segments.Count && segments[p1Idx].Type == SqlSegmentType.Literal && string.IsNullOrWhiteSpace(segments[p1Idx].Value as string)) p1Idx++;
-                
-                int p2Idx = p1Idx + 1;
-                while (p2Idx < segments.Count && segments[p2Idx].Type == SqlSegmentType.Literal && string.IsNullOrWhiteSpace(segments[p2Idx].Value as string)) p2Idx++;
-                
-                int p3Idx = p2Idx + 1;
-                while (p3Idx < segments.Count && segments[p3Idx].Type == SqlSegmentType.Literal && string.IsNullOrWhiteSpace(segments[p3Idx].Value as string)) p3Idx++;
-
-                if (p3Idx < segments.Count && segments[p1Idx].Type == SqlSegmentType.Parameter && segments[p3Idx].Type == SqlSegmentType.Parameter)
+                if (segment.Value is string textPaging)
                 {
-                    int index = textPaging.LastIndexOf(SqlKeyword.Limit, StringComparison.OrdinalIgnoreCase);
+                    int index = textPaging.LastIndexOf(SqlKeyword.Limit.Value, StringComparison.OrdinalIgnoreCase);
                     if (index > -1) rewritten.Add(new SqlSegment(SqlSegmentType.Literal, textPaging[..index]));
-
-                    rewritten.Add(new SqlSegment(SqlSegmentType.Literal, $"{SqlKeyword.Offset} "));
-                    rewritten.Add(segments[p3Idx]); 
-                    
-                    rewritten.Add(new SqlSegment(SqlSegmentType.Literal, " ROWS FETCH NEXT "));
-                    rewritten.Add(segments[p1Idx]); 
-                    
-                    rewritten.Add(new SqlSegment(SqlSegmentType.Literal, " ROWS ONLY"));
-
-                    i = p3Idx;
-                    continue;
                 }
+
+                rewritten.Add(new SqlSegment(SqlSegmentType.Literal, $"{SqlKeyword.Offset.Value} "));
+                rewritten.Add(offsetParam); 
+                
+                rewritten.Add(new SqlSegment(SqlSegmentType.Literal, " ROWS FETCH NEXT "));
+                rewritten.Add(limitParam); 
+                
+                rewritten.Add(new SqlSegment(SqlSegmentType.Literal, " ROWS ONLY"));
+
+                i = nextIndex;
+                continue;
             }
 
             rewritten.Add(segment);
@@ -276,30 +255,12 @@ public class SqlServerSyntaxRewriter : ISqlSegmentRewriter
         return rewritten;
     }
 
-    // =========================================================================
-    // HELPER: UNQUALIFIED COLUMN PROXY
-    // =========================================================================
-    /// <summary>
-    /// A lightweight proxy that strips the table entity from a projection 
-    /// so it renders as an unqualified column name (perfect for MERGE statements).
-    /// </summary>
     private class SqlUnqualifiedColumn : ISqlProjection
     {
         private readonly string _columnName;
-
-        // Dummy implementation to satisfy interface; the renderer never reads it for base name rendering
         public ISqlReference Reference => null!; 
-        
         public string PropertyName => _columnName;
-        
-        public SqlUnqualifiedColumn(string columnName)
-        {
-            _columnName = columnName;
-        }
-
-        public string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
-        {
-            return context.Dialect.QuoteIdentifier(_columnName);
-        }
+        public SqlUnqualifiedColumn(string columnName) => _columnName = columnName;
+        public string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default) => context.Dialect.QuoteIdentifier(_columnName);
     }
 }

@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using SqlInterpol.Parsing;
 
 namespace SqlInterpol.Dialects.MySql;
@@ -27,7 +30,7 @@ public class MySqlSyntaxRewriter : ISqlSegmentRewriter
             }
 
             bool isOnConflict = segment.HasTag(SqlSegmentTag.OnConflictKeyword) || 
-                               (segment.Type == SqlSegmentType.Literal && segment.Value is string s1 && s1.Contains("ON CONFLICT", StringComparison.OrdinalIgnoreCase));
+                               (segment.Type == SqlSegmentType.Literal && segment.Value is string s1 && SqlRewriterHelpers.ContainsKeyword(s1, SqlKeyword.OnConflict.Value));
 
             if (isOnConflict)
             {
@@ -53,7 +56,7 @@ public class MySqlSyntaxRewriter : ISqlSegmentRewriter
                 {
                     if (segment.Value is string text)
                     {
-                        int idx = text.LastIndexOf("ON CONFLICT", StringComparison.OrdinalIgnoreCase);
+                        int idx = text.LastIndexOf(SqlKeyword.OnConflict.Value, StringComparison.OrdinalIgnoreCase);
                         if (idx > 0)
                         {
                             var precedingText = text[..idx].TrimEnd();
@@ -64,7 +67,6 @@ public class MySqlSyntaxRewriter : ISqlSegmentRewriter
                         }
                     }
 
-                    // FIX: Removed the trailing space here!
                     rewritten.Add(new SqlSegment(SqlSegmentType.Literal, "\nON DUPLICATE KEY UPDATE"));
                     rewritten.Add(new SqlSegment(SqlSegmentType.Raw, new MySqlUpdateFragment(setFrag)));
 

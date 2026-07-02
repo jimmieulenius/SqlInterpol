@@ -1,7 +1,4 @@
-using System;
 using System.Buffers;
-using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.CompilerServices;
 
 namespace SqlInterpol.Parsing;
@@ -35,11 +32,6 @@ public ref struct SqlQueryInterpolatedStringHandler
     {
         if (value is ISqlFragment frag)
         {
-            // =================================================================
-            // AST UNROLLING WITH AUTO-INDENTATION
-            // Flatten segments into the master stream so the renderer sees them.
-            // If the outer query is indented, apply that padding to the unrolled literals!
-            // =================================================================
             if (frag is SqlSegmentCollectionFragment collection)
             {
                 string indent = "";
@@ -53,7 +45,6 @@ public ref struct SqlQueryInterpolatedStringHandler
                         {
                             int chars = 0;
                             int i = lastNewline + 1;
-                            // Use a zero-allocation while loop instead of LINQ for ref structs
                             while (i < prevText.Length && (prevText[i] == ' ' || prevText[i] == '\t')) 
                             {
                                 chars++;
@@ -109,11 +100,13 @@ public ref struct SqlQueryInterpolatedStringHandler
                         }
                         else if (format == "decl" || (format == null && _builder.Context.Options.EntityAutoAliasing))
                         {
+                            // =================================================================
+                            // FIX: Clean, strongly-typed alias assignment! No more reflection!
+                            // =================================================================
                             if (string.IsNullOrEmpty(queryEntityBase.Reference.Alias) && queryEntityBase.Reference is ISqlAliasable aliasable)
                             {
                                 aliasable.Alias = expression;
-                                var prop = aliasable.GetType().GetProperty("IsAliasQuoted");
-                                if (prop != null && prop.CanWrite) prop.SetValue(aliasable, true);
+                                aliasable.IsAliasQuoted = true; 
                             }
                             
                             var declFragment = new SqlSubqueryDeclarationFragment(queryEntity);
@@ -147,11 +140,14 @@ public ref struct SqlQueryInterpolatedStringHandler
                         if (format == "decl" || (format == null && _builder.Context.Options.EntityAutoAliasing))
                         {
                             mode = SqlRenderMode.Declaration;
+                            
+                            // =================================================================
+                            // FIX: Clean, strongly-typed alias assignment! No more reflection!
+                            // =================================================================
                             if (string.IsNullOrEmpty(standardEntityBase.Reference.Alias) && standardEntityBase.Reference is ISqlAliasable aliasable)
                             {
                                 aliasable.Alias = expression;
-                                var prop = aliasable.GetType().GetProperty("IsAliasQuoted");
-                                if (prop != null && prop.CanWrite) prop.SetValue(aliasable, true);
+                                aliasable.IsAliasQuoted = true;
                             }
                         }
 

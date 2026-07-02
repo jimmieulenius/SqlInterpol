@@ -138,7 +138,7 @@ public class CteTests
                     [
                         """
                         WITH <<CategoryStats>> AS (
-                            SELECT <<p>>.<<CategoryId>>, SUM(<<p>>.<<Price>>) AS TotalPrice
+                            SELECT <<p>>.<<CategoryId>>, SUM(<<p>>.<<Price>>) AS <<TotalPrice>>
                             FROM <<dbo>>.<<Products>> AS <<p>>
                             GROUP BY <<p>>.<<CategoryId>>
                         )
@@ -154,7 +154,7 @@ public class CteTests
                     [
                         """
                         WITH "CategoryStats" AS (
-                            SELECT "p"."CategoryId", SUM("p"."Price") AS TotalPrice
+                            SELECT "p"."CategoryId", SUM("p"."Price") AS "TotalPrice"
                             FROM "dbo"."Products" AS "p"
                             GROUP BY "p"."CategoryId"
                         )
@@ -170,7 +170,7 @@ public class CteTests
                     [
                         """
                         WITH `CategoryStats` AS (
-                            SELECT `p`.`CategoryId`, SUM(`p`.`Price`) AS TotalPrice
+                            SELECT `p`.`CategoryId`, SUM(`p`.`Price`) AS `TotalPrice`
                             FROM `dbo`.`Products` AS `p`
                             GROUP BY `p`.`CategoryId`
                         )
@@ -186,7 +186,7 @@ public class CteTests
                     [
                         """
                         WITH "CategoryStats" AS (
-                            SELECT "p"."CategoryId", SUM("p"."Price") AS TotalPrice
+                            SELECT "p"."CategoryId", SUM("p"."Price") AS "TotalPrice"
                             FROM "dbo"."Products" "p"
                             GROUP BY "p"."CategoryId"
                         )
@@ -202,7 +202,7 @@ public class CteTests
                     [
                         """
                         WITH "CategoryStats" AS (
-                            SELECT "p"."CategoryId", SUM("p"."Price") AS TotalPrice
+                            SELECT "p"."CategoryId", SUM("p"."Price") AS "TotalPrice"
                             FROM "dbo"."Products" AS "p"
                             GROUP BY "p"."CategoryId"
                         )
@@ -218,7 +218,7 @@ public class CteTests
                     [
                         """
                         WITH "CategoryStats" AS (
-                            SELECT "p"."CategoryId", SUM("p"."Price") AS TotalPrice
+                            SELECT "p"."CategoryId", SUM("p"."Price") AS "TotalPrice"
                             FROM "dbo"."Products" AS "p"
                             GROUP BY "p"."CategoryId"
                         )
@@ -234,7 +234,7 @@ public class CteTests
                     [
                         """
                         WITH [CategoryStats] AS (
-                            SELECT [p].[CategoryId], SUM([p].[Price]) AS TotalPrice
+                            SELECT [p].[CategoryId], SUM([p].[Price]) AS [TotalPrice]
                             FROM [dbo].[Products] AS [p]
                             GROUP BY [p].[CategoryId]
                         )

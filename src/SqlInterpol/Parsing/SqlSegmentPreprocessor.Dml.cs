@@ -66,20 +66,6 @@ public partial class SqlSegmentPreprocessor
         return false;
     }
 
-    private static bool ContainsKeyword(string text, string keyword)
-    {
-        int startIndex = 0;
-        while ((startIndex = text.IndexOf(keyword, startIndex, StringComparison.OrdinalIgnoreCase)) >= 0)
-        {
-            bool leftOk = startIndex == 0 || (!char.IsLetterOrDigit(text[startIndex - 1]) && text[startIndex - 1] != '_');
-            bool rightOk = startIndex + keyword.Length == text.Length || (!char.IsLetterOrDigit(text[startIndex + keyword.Length]) && text[startIndex + keyword.Length] != '_');
-            
-            if (leftOk && rightOk) return true;
-            startIndex += keyword.Length;
-        }
-        return false;
-    }
-
     private static bool IsInInsertColumnList(IReadOnlyList<SqlSegment> refinedSegments)
     {
         for (int i = refinedSegments.Count - 1; i >= 0; i--)
@@ -88,20 +74,18 @@ public partial class SqlSegmentPreprocessor
             {
                 if (string.IsNullOrWhiteSpace(text)) continue;
 
-                // If we hit any structural boundaries that come *after* an INSERT column list,
-                // we immediately know we are no longer in the target list context.
-                if (ContainsKeyword(text, "VALUES") || 
-                    ContainsKeyword(text, "SELECT") || 
-                    ContainsKeyword(text, "SET") || 
-                    ContainsKeyword(text, "UPDATE") || 
-                    ContainsKeyword(text, "FROM"))
+                // Modernized to use standard SqlKeyword constants instead of magic string literals
+                if (ContainsKeyword(text, SqlKeyword.Values.Value) || 
+                    ContainsKeyword(text, SqlKeyword.Select.Value) || 
+                    ContainsKeyword(text, SqlKeyword.Set.Value) || 
+                    ContainsKeyword(text, SqlKeyword.Update.Value) || 
+                    ContainsKeyword(text, SqlKeyword.From.Value))
                 {
                     return false;
                 }
 
-                // If we successfully trace backward to an INSERT statement without hitting a boundary, 
-                // we definitively prove this column is part of the INSERT target list.
-                if (ContainsKeyword(text, "INSERT"))
+                // Tracing backward to an INSERT statement definitively identifies an INSERT target column list context
+                if (ContainsKeyword(text, SqlKeyword.Insert.Value))
                 {
                     return true;
                 }

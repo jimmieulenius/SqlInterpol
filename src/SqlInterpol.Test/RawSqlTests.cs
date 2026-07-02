@@ -1,3 +1,4 @@
+using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
 
 namespace SqlInterpol.Test;
@@ -46,7 +47,7 @@ public class RawSqlTests
             SELECT 
                 {{p.Name}},
                 {{p.Price}},
-                AVG({{p.Price}}) OVER (PARTITION BY {{p.CategoryId}}) as AvgCategoryPrice
+                AVG({{p.Price}}) OVER (PARTITION BY {{p.CategoryId}}) AS AvgCategoryPrice
             FROM {{p}}
             """)
             .Build()
@@ -169,13 +170,25 @@ public class RawSqlTests
     public static TheoryData<SqlTestCase> WindowFunctionData =>
     [
         new SqlTestCase(
+            SqlDialectKind.CustomDb,
+            [
+                """
+                SELECT 
+                    <<dbo>>.<<Products>>.<<PROD_NAME>>,
+                    <<dbo>>.<<Products>>.<<Price>>,
+                    AVG(<<dbo>>.<<Products>>.<<Price>>) OVER (PARTITION BY <<dbo>>.<<Products>>.<<CategoryId>>) AS <<AvgCategoryPrice>>
+                FROM <<dbo>>.<<Products>>
+                """
+            ]
+        ),
+        new SqlTestCase(
             SqlDialectKind.Firebird,
             [
                 """
                 SELECT 
                     "dbo"."Products"."PROD_NAME",
                     "dbo"."Products"."Price",
-                    AVG("dbo"."Products"."Price") OVER (PARTITION BY "dbo"."Products"."CategoryId") as AvgCategoryPrice
+                    AVG("dbo"."Products"."Price") OVER (PARTITION BY "dbo"."Products"."CategoryId") AS "AvgCategoryPrice"
                 FROM "dbo"."Products"
                 """
             ]
@@ -187,7 +200,7 @@ public class RawSqlTests
                 SELECT 
                     `dbo`.`Products`.`PROD_NAME`,
                     `dbo`.`Products`.`Price`,
-                    AVG(`dbo`.`Products`.`Price`) OVER (PARTITION BY `dbo`.`Products`.`CategoryId`) as AvgCategoryPrice
+                    AVG(`dbo`.`Products`.`Price`) OVER (PARTITION BY `dbo`.`Products`.`CategoryId`) AS `AvgCategoryPrice`
                 FROM `dbo`.`Products`
                 """
             ]
@@ -199,7 +212,7 @@ public class RawSqlTests
                 SELECT 
                     "dbo"."Products"."PROD_NAME",
                     "dbo"."Products"."Price",
-                    AVG("dbo"."Products"."Price") OVER (PARTITION BY "dbo"."Products"."CategoryId") as AvgCategoryPrice
+                    AVG("dbo"."Products"."Price") OVER (PARTITION BY "dbo"."Products"."CategoryId") AS "AvgCategoryPrice"
                 FROM "dbo"."Products"
                 """
             ]
@@ -211,7 +224,7 @@ public class RawSqlTests
                 SELECT 
                     "dbo"."Products"."PROD_NAME",
                     "dbo"."Products"."Price",
-                    AVG("dbo"."Products"."Price") OVER (PARTITION BY "dbo"."Products"."CategoryId") as AvgCategoryPrice
+                    AVG("dbo"."Products"."Price") OVER (PARTITION BY "dbo"."Products"."CategoryId") AS "AvgCategoryPrice"
                 FROM "dbo"."Products"
                 """
             ]
@@ -223,7 +236,7 @@ public class RawSqlTests
                 SELECT 
                     "dbo"."Products"."PROD_NAME",
                     "dbo"."Products"."Price",
-                    AVG("dbo"."Products"."Price") OVER (PARTITION BY "dbo"."Products"."CategoryId") as AvgCategoryPrice
+                    AVG("dbo"."Products"."Price") OVER (PARTITION BY "dbo"."Products"."CategoryId") AS "AvgCategoryPrice"
                 FROM "dbo"."Products"
                 """
             ]
@@ -235,7 +248,7 @@ public class RawSqlTests
                 SELECT 
                     [dbo].[Products].[PROD_NAME],
                     [dbo].[Products].[Price],
-                    AVG([dbo].[Products].[Price]) OVER (PARTITION BY [dbo].[Products].[CategoryId]) as AvgCategoryPrice
+                    AVG([dbo].[Products].[Price]) OVER (PARTITION BY [dbo].[Products].[CategoryId]) AS [AvgCategoryPrice]
                 FROM [dbo].[Products]
                 """
             ]

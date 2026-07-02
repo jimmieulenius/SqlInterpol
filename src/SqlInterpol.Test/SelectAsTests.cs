@@ -78,7 +78,7 @@ public class SelectAsTests
             [
                 """
                 SELECT
-                    <<dbo>>.<<Products>>.<<Id>> AS ProductId
+                    <<dbo>>.<<Products>>.<<Id>> AS <<ProductId>>
                 FROM <<dbo>>.<<Products>>
                 """
             ]
@@ -88,7 +88,7 @@ public class SelectAsTests
             [
                 """
                 SELECT
-                    "dbo"."Products"."Id" AS ProductId
+                    "dbo"."Products"."Id" AS "ProductId"
                 FROM "dbo"."Products"
                 """
             ]
@@ -98,7 +98,7 @@ public class SelectAsTests
             [
                 """
                 SELECT
-                    `dbo`.`Products`.`Id` AS ProductId
+                    `dbo`.`Products`.`Id` AS `ProductId`
                 FROM `dbo`.`Products`
                 """
             ]
@@ -108,7 +108,7 @@ public class SelectAsTests
             [
                 """
                 SELECT
-                    "dbo"."Products"."Id" AS ProductId
+                    "dbo"."Products"."Id" AS "ProductId"
                 FROM "dbo"."Products"
                 """
             ]
@@ -118,7 +118,7 @@ public class SelectAsTests
             [
                 """
                 SELECT
-                    "dbo"."Products"."Id" AS ProductId
+                    "dbo"."Products"."Id" AS "ProductId"
                 FROM "dbo"."Products"
                 """
             ]
@@ -128,7 +128,7 @@ public class SelectAsTests
             [
                 """
                 SELECT
-                    "dbo"."Products"."Id" AS ProductId
+                    "dbo"."Products"."Id" AS "ProductId"
                 FROM "dbo"."Products"
                 """
             ]
@@ -138,7 +138,7 @@ public class SelectAsTests
             [
                 """
                 SELECT
-                    [dbo].[Products].[Id] AS ProductId
+                    [dbo].[Products].[Id] AS [ProductId]
                 FROM [dbo].[Products]
                 """
             ]

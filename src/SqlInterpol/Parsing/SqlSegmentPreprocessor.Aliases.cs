@@ -1,28 +1,7 @@
-using System;
-using System.Collections.Frozen;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text.RegularExpressions;
-
 namespace SqlInterpol.Parsing;
 
 public partial class SqlSegmentPreprocessor
 {
-    [GeneratedRegex(@"^(\s*\)*\s*)(AS)(\s+)([a-zA-Z0-9_]+)", RegexOptions.IgnoreCase)]
-    private static partial Regex ExplicitAliasRegex();
-
-    [GeneratedRegex(@"^(\s*\)*\s+)([a-zA-Z0-9_]+)", RegexOptions.IgnoreCase)]
-    private static partial Regex ImplicitAliasRegex();
-
-    // =====================================================================
-    // FIX: Add OVER and other common clause continuations to ReservedKeywords!
-    // This prevents the lexer from mistaking `) OVER` as an implicit column alias.
-    // =====================================================================
-    private static readonly FrozenSet<string> ReservedKeywords = SqlKeyword.AllKeywords
-        .SelectMany(k => k.Value.Split(' ', StringSplitOptions.RemoveEmptyEntries))
-        .Concat(new[] { "OVER", "WITH", "WINDOW", "AND", "OR", "IN", "IS", "NOT", "LIKE", "ASC", "DESC" })
-        .ToFrozenSet(StringComparer.OrdinalIgnoreCase);
-
     private static void SetAlias(object? target, string? alias)
     {
         if (target is ISqlAliasable aliasableTarget) aliasableTarget.Alias = alias;
@@ -69,17 +48,10 @@ public partial class SqlSegmentPreprocessor
                     {
                         if (string.IsNullOrWhiteSpace(text)) continue; 
 
-                        var explicitMatch = ExplicitAliasRegex().Match(text);
-                        if (explicitMatch.Success)
+                        // High-Performance centralized peeking! No duplication.
+                        if (TryParseAlias(text.AsSpan(), out var parseResult))
                         {
-                            tempAlias = explicitMatch.Groups[4].Value;
-                            break;
-                        }
-
-                        var implicitMatch = ImplicitAliasRegex().Match(text);
-                        if (implicitMatch.Success && !ReservedKeywords.Contains(implicitMatch.Groups[2].Value))
-                        {
-                            tempAlias = implicitMatch.Groups[2].Value;
+                            tempAlias = parseResult.Identifier.ToString();
                         }
                         break; 
                     }
@@ -112,49 +84,46 @@ public partial class SqlSegmentPreprocessor
 
     private bool TryExtractInlineAlias(ref string text, SqlSegment segment, PreprocessorState state)
     {
-        var explicitMatch = ExplicitAliasRegex().Match(text);
-        if (explicitMatch.Success)
-        {
-            string prefix = explicitMatch.Groups[1].Value;
-            string quotedAlias = state.Context.Dialect.QuoteIdentifier(explicitMatch.Groups[4].Value);
-            string determinedTag = DetermineAliasTag(state);
+        if (string.IsNullOrEmpty(text)) return false;
 
-            foreach (char c in prefix) if (c == ')') state.PopState();
-            ApplyAliasToTarget(quotedAlias, state);
-            
-            if (prefix.Length > 0) state.Refined.Add(new SqlSegment(SqlSegmentType.Literal, prefix, segment.RenderMode, segment.Tags));
-            
-            string keyword = explicitMatch.Groups[2].Value; 
+        // Zero-allocation structural scanning via the shared state machine helper
+        if (!TryParseAlias(text.AsSpan(), out var parseResult))
+        {
+            return false;
+        }
+
+        string prefix = text[..parseResult.PrefixLength];
+        string identifier = parseResult.Identifier.ToString();
+        string quotedAlias = state.Context.Dialect.QuoteIdentifier(identifier);
+        string determinedTag = DetermineAliasTag(state);
+
+        foreach (char c in prefix) if (c == ')') state.PopState();
+        ApplyAliasToTarget(quotedAlias, state);
+
+        if (prefix.Length > 0) 
+            state.Refined.Add(new SqlSegment(SqlSegmentType.Literal, prefix, segment.RenderMode, segment.Tags));
+
+        if (parseResult.IsExplicit)
+        {
+            string keyword = text.Substring(parseResult.PrefixLength, 2);
             state.Refined.Add(new SqlSegment(SqlSegmentType.Literal, keyword, segment.RenderMode, determinedTag == "ColumnAliasAsKeyword" ? segment.Tags : [determinedTag]));
-
-            string suffix = explicitMatch.Groups[3].Value; 
-            if (suffix.Length > 0) state.Refined.Add(new SqlSegment(SqlSegmentType.Literal, suffix, segment.RenderMode, segment.Tags));
-
+            
+            int wsLength = parseResult.IdentifierStart - (parseResult.PrefixLength + 2);
+            if (wsLength > 0)
+            {
+                string wsAfterAs = text.Substring(parseResult.PrefixLength + 2, wsLength);
+                state.Refined.Add(new SqlSegment(SqlSegmentType.Literal, wsAfterAs, segment.RenderMode, segment.Tags));
+            }
+            
             state.Refined.Add(new SqlSegment(SqlSegmentType.Raw, quotedAlias, null, segment.Tags));
-            text = text.Substring(explicitMatch.Length);
-            return true;
         }
-
-        var implicitMatch = ImplicitAliasRegex().Match(text);
-        if (implicitMatch.Success && !ReservedKeywords.Contains(implicitMatch.Groups[2].Value))
+        else
         {
-            string prefix = implicitMatch.Groups[1].Value;
-            string matchingWord = implicitMatch.Groups[2].Value;
-            string determinedTag = DetermineAliasTag(state);
-
-            foreach (char c in prefix) if (c == ')') state.PopState();
-
-            string quotedAlias = state.Context.Dialect.QuoteIdentifier(matchingWord);
-            ApplyAliasToTarget(quotedAlias, state);
-            
-            if (prefix.Length > 0) state.Refined.Add(new SqlSegment(SqlSegmentType.Literal, prefix, segment.RenderMode, segment.Tags));
-            
             state.Refined.Add(new SqlSegment(SqlSegmentType.Raw, quotedAlias, null, determinedTag == "ColumnAliasAsKeyword" ? segment.Tags : [determinedTag]));
-
-            text = text.Substring(implicitMatch.Length);
-            return true;
         }
-        return false;
+
+        text = text.Substring(parseResult.TotalLength);
+        return true;
     }
 
     private bool ProcessHoleBoundAlias(SqlSegment segment, PreprocessorState state)
