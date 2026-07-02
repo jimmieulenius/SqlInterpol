@@ -177,7 +177,12 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
                 break;
         }
 
-        if (segment.Value is ISqlQueryFragment && segment.Type != SqlSegmentType.Projection && rendered != null)
+        // =====================================================================
+        // FIX: Broaden auto-indentation to ANY ISqlFragment!
+        // This natively preserves the beautiful indentation of your fragments 
+        // without relying on C# margin-shifting hacks.
+        // =====================================================================
+        if (segment.Value is ISqlFragment && segment.Type != SqlSegmentType.Projection && rendered != null)
         {
             rendered = ApplyAutoIndentation(rendered, index, segments);
         }

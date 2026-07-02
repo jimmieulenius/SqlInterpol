@@ -9,13 +9,14 @@ public class FromSubqueryTests
     [MemberData(nameof(From_SubqueryData))]
     public void From_Subquery(SqlTestCase testCase)
     {
+        // Act
         testCase.Action(() =>
         {
             var db = testCase.CreateBuilder();
 
             db.Entity<CategoryStats>(out var stats)
                 .Entity<Product>(out var p, "p")
-                .Subquery(
+                .Query(
                     stats,
                     () => db.Append($"""
                     SELECT
@@ -39,6 +40,7 @@ public class FromSubqueryTests
                 """).Build();
         });
 
+        // Assert
         testCase.Assert();
     }
 
@@ -46,6 +48,7 @@ public class FromSubqueryTests
     [MemberData(nameof(From_SubqueryData))]
     public void From_Subquery_AutoAliasing(SqlTestCase testCase)
     {
+        // Act
         testCase.Action(() =>
         {
             var db = testCase.CreateBuilder();
@@ -53,7 +56,7 @@ public class FromSubqueryTests
 
             db.Entity<CategoryStats>(out var stats)
               .Entity<Product>(out var p)
-              .Subquery(
+              .Query(
                   stats,
                   () => db.Append($"""
                       SELECT
@@ -75,6 +78,7 @@ public class FromSubqueryTests
                 """).Build();
         });
 
+        // Assert
         testCase.Assert();
     }
 

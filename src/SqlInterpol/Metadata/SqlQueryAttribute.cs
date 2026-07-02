@@ -1,6 +1,6 @@
 namespace SqlInterpol;
 
 [AttributeUsage(AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
-public sealed class SqlFragmentAttribute : Attribute
+public sealed class SqlQueryAttribute : Attribute
 {
 }

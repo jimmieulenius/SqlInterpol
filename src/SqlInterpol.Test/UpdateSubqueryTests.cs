@@ -20,7 +20,7 @@ public class UpdateSubqueryTests
             .Entity<OrderStatsModel>(out var stats)
             .Append($$"""
                 UPDATE (
-                    {{db.Subquery(stats, () => db.Append($$"""
+                    {{db.Query(stats, () => db.Append($$"""
                         SELECT CategoryId, MAX(Price) AS max_price FROM Products GROUP BY CategoryId
                         """))}}
                 ) AS {{"stats"}}
@@ -48,7 +48,7 @@ public class UpdateSubqueryTests
             .Entity<Product>(out var p)
             .Append($$"""
                 UPDATE (
-                    {{db.Subquery(stats, () => db.Append($$"""
+                    {{db.Query(stats, () => db.Append($$"""
                         SELECT
                             {{p.CategoryId}} AS {{stats.CategoryId}},
                             MAX({{p.Price}}) AS {{stats.MaxPrice}}

@@ -6,13 +6,13 @@ using Microsoft.CodeAnalysis.Text;
 namespace SqlInterpol.Generators;
 
 [Generator]
-public class SqlFragmentGenerator : IIncrementalGenerator
+public class SqlQueryGenerator : IIncrementalGenerator
 {
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         var methodDeclarations = context.SyntaxProvider
             .ForAttributeWithMetadataName(
-                "SqlInterpol.SqlFragmentAttribute",
+                "SqlInterpol.SqlQueryAttribute",
                 predicate: static (s, _) => s is MethodDeclarationSyntax,
                 transform: static (ctx, _) => ctx.TargetSymbol as IMethodSymbol)
             .Where(static m => m is not null);
@@ -33,8 +33,8 @@ public class SqlFragmentGenerator : IIncrementalGenerator
             var diagnostic = Diagnostic.Create(
                 new DiagnosticDescriptor(
                     id: "SQLGEN001",
-                    title: "Invalid SqlFragment Container",
-                    messageFormat: "The class '{0}' must be static to contain a [SqlFragment] method",
+                    title: "Invalid SqlQuery Container",
+                    messageFormat: "The class '{0}' must be static to contain a [SqlQuery] method",
                     category: "Usage",
                     defaultSeverity: DiagnosticSeverity.Error,
                     isEnabledByDefault: true),
@@ -51,7 +51,7 @@ public class SqlFragmentGenerator : IIncrementalGenerator
             var diagnostic = Diagnostic.Create(
                 new DiagnosticDescriptor(
                     id: "SQLGEN002",
-                    title: "Invalid SqlFragment Signature",
+                    title: "Invalid SqlQuery Signature",
                     messageFormat: "The method '{0}' cannot be an extension method. Remove the 'this' modifier from the first parameter. The source generator will automatically emit the 'this' modifier on the generated public wrapper.",
                     category: "Usage",
                     defaultSeverity: DiagnosticSeverity.Error,

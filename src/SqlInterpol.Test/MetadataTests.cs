@@ -1,68 +1,71 @@
-// using SqlInterpol.Test.Dialects;
-// using SqlInterpol.Test.Models;
+using System;
+using SqlInterpol.Parsing;
+using SqlInterpol.Test.Models;
+using Xunit;
 
-// namespace SqlInterpol.Test;
+namespace SqlInterpol.Test;
 
-// public class MetadataTests
-// {
-//     [Theory]
-//     [MemberData(nameof(MetadataErrorData))]
-//     public void Metadata_ValidationRules(SqlErrorTestCase testCase)
-//     {
-//         // Act
-//         var exception = Record.Exception(() => 
-//         {
-//             string matchingMsg = testCase.ExpectedMessageSubstring;
+public class MetadataTests
+{
+    [Fact]
+    public void GetColumnName_ThrowsArgumentException_WhenExpressionIsInvalid()
+    {
+        // Act & Assert
+        var exception = Assert.Throws<ArgumentException>(() => 
+            SqlMetadataRegistry.GetColumnName<Product>(x => x.Id.ToString())
+        );
 
-//             if (matchingMsg.Contains("valid property selector"))
-//             {
-//                 // Triggers internal SqlExpressionHelper.GetMember validation implicitly via GetColumnName
-//                 SqlMetadataRegistry.GetColumnName<Product>(x => x.Id.ToString());
-//             }
-//             else if (string.IsNullOrEmpty(matchingMsg))
-//             {
-//                 SqlMetadataRegistry.GetEntityName(null!);
-//             }
-//             else if (matchingMsg.Contains("must implement"))
-//             {
-//                 SqlMetadataRegistry.GetEntityName(new InvalidDummyEntity());
-//             }
-//             else if (matchingMsg.Contains("not found on MetadataErrorModel"))
-//             {
-//                 SqlMetadataRegistry.GetColumnName<MetadataErrorModel>(x => x.UnmappedProperty);
-//             }
-//         });
+        Assert.Contains("is not a valid property selector", exception.Message);
+    }
 
-//         // Assert
-//         testCase.AssertException(exception);
-//     }
+    [Fact]
+    public void GetEntityName_ThrowsArgumentNullException_WhenEntityIsNull()
+    {
+        // Act & Assert
+        Assert.Throws<ArgumentNullException>(() => 
+            SqlMetadataRegistry.GetEntityName(null!)
+        );
+    }
 
-//     public static TheoryData<SqlErrorTestCase> MetadataErrorData =>
-//     [
-//         new SqlErrorTestCase(SqlDialectKind.CustomDb, typeof(ArgumentException), "is not a valid property selector"),
-//         new SqlErrorTestCase(SqlDialectKind.CustomDb, typeof(ArgumentNullException), ""),
-//         new SqlErrorTestCase(SqlDialectKind.CustomDb, typeof(ArgumentException), "must implement ISqlEntityBase<T>"),
-//         new SqlErrorTestCase(SqlDialectKind.CustomDb, typeof(ArgumentException), "Property 'UnmappedProperty' not found on MetadataErrorModel")
-//     ];
+    [Fact]
+    public void GetEntityName_ThrowsArgumentException_WhenEntityMissingGenericInterface()
+    {
+        // Act & Assert
+        var exception = Assert.Throws<ArgumentException>(() => 
+            SqlMetadataRegistry.GetEntityName(new InvalidDummyEntity())
+        );
 
-//     private class InvalidDummyEntity : ISqlEntityBase 
-//     {
-//         public ISqlReference this[string columnName] => throw new NotImplementedException();
+        Assert.Contains("must implement ISqlEntityBase<T>", exception.Message);
+    }
 
-//         public ISqlReference Reference => throw new NotImplementedException();
+    [Fact]
+    public void GetColumnName_ThrowsArgumentException_WhenPropertyIsIgnored()
+    {
+        // Act & Assert
+        var exception = Assert.Throws<ArgumentException>(() => 
+            SqlMetadataRegistry.GetColumnName<MetadataErrorModel>(x => x.UnmappedProperty)
+        );
 
-//         public ISqlDeclaration Declaration => throw new NotImplementedException();
+        Assert.Equal("Property 'UnmappedProperty' not found on 'MetadataErrorModel'.", exception.Message);
+    }
 
-//         public ISqlFragment Column(string name) => throw new NotImplementedException();
+    private class InvalidDummyEntity : ISqlEntityBase 
+    {
+        public ISqlReference this[string columnName] => throw new NotImplementedException();
+        public ISqlReference Reference => throw new NotImplementedException();
+        public ISqlDeclaration Declaration => throw new NotImplementedException();
+        public SqlEntityRole Role => throw new NotImplementedException();
+        public Type ModelType => throw new NotImplementedException();
 
-//         public string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default) => throw new NotImplementedException();
-//     }
+        public ISqlFragment Column(string name) => throw new NotImplementedException();
+        public string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default) => throw new NotImplementedException();
+    }
 
-//     private class MetadataErrorModel
-//     {
-//         public int Id { get; set; }
+    private class MetadataErrorModel
+    {
+        public int Id { get; set; }
         
-//         [SqlIgnore]
-//         public string UnmappedProperty { get; set; } = "";
-//     }
-// }
+        [SqlIgnore]
+        public string UnmappedProperty { get; set; } = "";
+    }
+}

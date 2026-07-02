@@ -16,19 +16,19 @@ public class SelectSubqueryTests
         var db1 = testCase.CreateBuilder();
         var db2 = testCase.CreateBuilder();
         
-        // Act - Executes both scenarios back-to-back to satisfy the strict multi-query test case verification matrix
+        // Act
         testCase.Action(() => 
         {
             // Scenario 1: 'prod' table alias
-            db1.Entity<Product>(out var p1);
-
-            var categorySubquery1 = db1.Entity<Category>(out var c1).Subquery(c1, sub => 
-                sub.Append($$"""
-                SELECT
-                    {{c1.Name}}
-                FROM {{c1}}
-                WHERE {{c1.Id}} = {{p1.CategoryId}} AND {{c1.IsActive}} = {{activeStatus}}
-                """));
+            db1.Entity<Product>(out var p1)
+               .Entity<Category>(out var c1)
+               // FIX: Use the 'out var' parameter to capture the actual ISqlQuery AST node!
+               .Query(c1, out var categorySubquery1, () => db1.Append($$"""
+                    SELECT
+                        {{c1.Name}}
+                    FROM {{c1}}
+                    WHERE {{c1.Id}} = {{p1.CategoryId}} AND {{c1.IsActive}} = {{activeStatus}}
+                    """));
 
             var result1 = db1.Append($$"""
                 SELECT 
@@ -41,15 +41,15 @@ public class SelectSubqueryTests
                 """).Build();
 
             // Scenario 2: 'second_prod' table alias (Guarantees no cross-statement alias leakage)
-            db2.Entity<Product>(out var p2);
-
-            var categorySubquery2 = db2.Entity<Category>(out var c2).Subquery(c2, sub => 
-                sub.Append($$"""
-                SELECT
-                    {{c2.Name}}
-                FROM {{c2}}
-                WHERE {{c2.Id}} = {{p2.CategoryId}} AND {{c2.IsActive}} = {{activeStatus}}
-                """));
+            db2.Entity<Product>(out var p2)
+               .Entity<Category>(out var c2)
+               // FIX: Same here, capture the query explicitly
+               .Query(c2, out var categorySubquery2, () => db2.Append($$"""
+                    SELECT
+                        {{c2.Name}}
+                    FROM {{c2}}
+                    WHERE {{c2.Id}} = {{p2.CategoryId}} AND {{c2.IsActive}} = {{activeStatus}}
+                    """));
 
             var result2 = db2.Append($$"""
                 SELECT 
@@ -64,7 +64,7 @@ public class SelectSubqueryTests
             return [result1, result2];
         });
 
-        // Assert - Validates generated query layouts and nested scopes natively
+        // Assert
         testCase.Assert();
     }
 
@@ -337,7 +337,7 @@ public class SelectSubqueryTests
 
 internal static partial class SelectSubqueryTestHelper
 {
-    [SqlFragment]
+    [SqlQuery]
     internal static ISqlQuery<Category> BuildCategorySubquery(
         SqlBuilder db,
         Product p,
@@ -345,7 +345,7 @@ internal static partial class SelectSubqueryTestHelper
     {
         return db
             .Entity<Category>(out var c)
-            .Subquery(c, sub => sub.Append($$"""
+            .Query(c, () => db.Append($$"""
                 SELECT
                     {{c.Name}}
                 FROM {{c}}

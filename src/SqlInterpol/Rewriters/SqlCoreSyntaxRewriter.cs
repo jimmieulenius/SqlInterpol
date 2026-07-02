@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+
 namespace SqlInterpol.Parsing;
 
 /// <summary>
@@ -15,6 +18,34 @@ public class SqlCoreSyntaxRewriter : ISqlSegmentRewriter
         if (target is ISqlAliasable aliasable)
         {
             aliasable.Alias = alias;
+        }
+    }
+
+    // NEW: Sweeps backward and prunes standalone space segments or trims trailing spaces 
+    // from literals right before a table lock hint is injected.
+    private static void TrimPrecedingWhitespace(List<SqlSegment> list)
+    {
+        while (list.Count > 0)
+        {
+            var last = list[^1];
+            if (last.Type == SqlSegmentType.Literal && last.Value is string s)
+            {
+                if (string.IsNullOrWhiteSpace(s) && !s.Contains('\n') && !s.Contains('\r'))
+                {
+                    list.RemoveAt(list.Count - 1);
+                    continue;
+                }
+                else
+                {
+                    var trimmed = s.TrimEnd(' ', '\t');
+                    if (trimmed.Length != s.Length)
+                    {
+                        list[^1] = new SqlSegment(SqlSegmentType.Literal, s[..trimmed.Length], last.RenderMode, last.Tags);
+                    }
+                    break;
+                }
+            }
+            break;
         }
     }
 
@@ -97,23 +128,35 @@ public class SqlCoreSyntaxRewriter : ISqlSegmentRewriter
             }
             else if (segment.HasTag(SqlSegmentTag.ForUpdateKeyword) && segment.Value is string updateText)
             {
+                TrimPrecedingWhitespace(rewritten);
+
                 int idx = updateText.IndexOf("FOR UPDATE", StringComparison.OrdinalIgnoreCase);
                 if (idx > -1)
                 {
-                    rewritten.Add(new SqlSegment(SqlSegmentType.Literal, updateText[..idx].TrimEnd(' ', '\t')));
+                    var leading = updateText[..idx].TrimEnd(' ', '\t');
+                    if (leading.Length > 0) rewritten.Add(new SqlSegment(SqlSegmentType.Literal, leading));
+                    
                     rewritten.Add(new SqlSegment(SqlSegmentType.Raw, new SqlLockFragment(SqlLockMode.Update)));
-                    rewritten.Add(new SqlSegment(SqlSegmentType.Literal, updateText[(idx + 10)..]));
+                    
+                    var trailing = updateText[(idx + 10)..];
+                    if (trailing.Length > 0) rewritten.Add(new SqlSegment(SqlSegmentType.Literal, trailing));
                     continue;
                 }
             }
             else if (segment.HasTag(SqlSegmentTag.ForShareKeyword) && segment.Value is string shareText)
             {
+                TrimPrecedingWhitespace(rewritten);
+
                 int idx = shareText.IndexOf("FOR SHARE", StringComparison.OrdinalIgnoreCase);
                 if (idx > -1)
                 {
-                    rewritten.Add(new SqlSegment(SqlSegmentType.Literal, shareText[..idx].TrimEnd(' ', '\t')));
+                    var leading = shareText[..idx].TrimEnd(' ', '\t');
+                    if (leading.Length > 0) rewritten.Add(new SqlSegment(SqlSegmentType.Literal, leading));
+                    
                     rewritten.Add(new SqlSegment(SqlSegmentType.Raw, new SqlLockFragment(SqlLockMode.Share)));
-                    rewritten.Add(new SqlSegment(SqlSegmentType.Literal, shareText[(idx + 9)..]));
+                    
+                    var trailing = shareText[(idx + 9)..];
+                    if (trailing.Length > 0) rewritten.Add(new SqlSegment(SqlSegmentType.Literal, trailing));
                     continue;
                 }
             }

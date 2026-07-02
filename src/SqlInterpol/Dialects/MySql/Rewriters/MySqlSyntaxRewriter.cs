@@ -31,43 +31,48 @@ public class MySqlSyntaxRewriter : ISqlSegmentRewriter
 
             if (isOnConflict)
             {
-                int doUpdateIdx = -1;
-                for (int j = i + 1; j < segments.Count; j++)
+                SqlSetFragment? setFrag = null;
+                int setFragIndex = -1;
+                int lookahead = 1;
+
+                while (i + lookahead < segments.Count)
                 {
-                    var next = segments[j];
-                    bool isDoUpdate = next.HasTag(SqlSegmentTag.DoUpdateSetKeyword) || 
-                                     (next.Type == SqlSegmentType.Literal && next.Value is string s2 && s2.Contains("DO UPDATE", StringComparison.OrdinalIgnoreCase));
-                    if (isDoUpdate) { doUpdateIdx = j; break; }
+                    var next = segments[i + lookahead];
+                    
+                    if (next.Value is SqlSetFragment sf)
+                    {
+                        setFrag = sf;
+                        setFragIndex = i + lookahead;
+                        break;
+                    }
+                    
+                    lookahead++;
                 }
 
-                if (doUpdateIdx > -1)
+                if (setFrag != null)
                 {
                     if (segment.Value is string text)
                     {
                         int idx = text.LastIndexOf("ON CONFLICT", StringComparison.OrdinalIgnoreCase);
-                        if (idx > -1) rewritten.Add(new SqlSegment(SqlSegmentType.Literal, text[..idx]));
+                        if (idx > 0)
+                        {
+                            var precedingText = text[..idx].TrimEnd();
+                            if (precedingText.Length > 0)
+                            {
+                                rewritten.Add(new SqlSegment(SqlSegmentType.Literal, precedingText));
+                            }
+                        }
                     }
 
-                    rewritten.Add(new SqlSegment(SqlSegmentType.Literal, "ON DUPLICATE KEY UPDATE"));
+                    // FIX: Removed the trailing space here!
+                    rewritten.Add(new SqlSegment(SqlSegmentType.Literal, "\nON DUPLICATE KEY UPDATE"));
+                    rewritten.Add(new SqlSegment(SqlSegmentType.Raw, new MySqlUpdateFragment(setFrag)));
 
-                    int setLookahead = 1;
-                    while (doUpdateIdx + setLookahead < segments.Count && 
-                           segments[doUpdateIdx + setLookahead].Type == SqlSegmentType.Literal && 
-                           string.IsNullOrWhiteSpace(segments[doUpdateIdx + setLookahead].Value as string))
-                    {
-                        setLookahead++;
-                    }
-
-                    i = doUpdateIdx + setLookahead - 1; 
-                    
-                    if (i + 1 < segments.Count && segments[i + 1].Value is SqlSetFragment setFrag)
-                    {
-                        rewritten.Add(new SqlSegment(SqlSegmentType.Raw, new MySqlUpdateFragment(setFrag)));
-                        i++; 
-                    }
+                    i = setFragIndex; 
                     continue;
                 }
             }
+            
             rewritten.Add(segment);
         }
 
@@ -77,7 +82,9 @@ public class MySqlSyntaxRewriter : ISqlSegmentRewriter
             rewritten.Add(new SqlSegment(SqlSegmentType.Literal, "\nFOR SHARE"));
 
         int upAsIdx = rewritten.FindIndex(s => s.Type == SqlSegmentType.Raw && s.Value is SqlUpdateAsFragment);
-        if (upAsIdx > -1)
+        bool isAlreadyElevated = rewritten.Any(s => s.Type == SqlSegmentType.Raw && (s.Value is SqlUpdateCteFragment || s.Value is SqlUpdateSubqueryFragment));
+
+        if (upAsIdx > -1 && !isAlreadyElevated)
         {
             var upAsFrag = (SqlUpdateAsFragment)rewritten[upAsIdx].Value!;
             var targetEntity = upAsFrag.Target;

@@ -46,7 +46,6 @@ public class PostgreSqlDialect : SqlDialectBase
     /// </summary>
     public override SqlInterpolOptions GetDefaultOptions()
     {
-        // FIX: Use the 'with' expression for init-only properties!
         var options = base.GetDefaultOptions() with { ParameterIndexStart = 1 };
         options.Rewriters.Add(new PostgreSqlSyntaxRewriter());
         return options;

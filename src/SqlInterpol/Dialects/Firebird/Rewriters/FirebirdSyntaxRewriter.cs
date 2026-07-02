@@ -1,6 +1,6 @@
 using SqlInterpol.Parsing;
 
-namespace SqlInterpol.Dialects.Firebird; // Hidden from root IntelliSense
+namespace SqlInterpol.Dialects.Firebird;
 
 public class FirebirdSyntaxRewriter : ISqlSegmentRewriter
 {
@@ -15,13 +15,15 @@ public class FirebirdSyntaxRewriter : ISqlSegmentRewriter
         {
             var segment = segments[i];
 
-            if (segment.Type == SqlSegmentType.Raw && segment.Value is SqlLockFragment lockFrag)
+            // FIX: Only intercept and defer FOR UPDATE locks. Let FOR SHARE locks pass through 
+            // so the global capabilities pipeline can catch and reject them natively!
+            if (segment.Type == SqlSegmentType.Raw && segment.Value is SqlLockFragment lockFrag && lockFrag.Mode == SqlLockMode.Update)
             {
                 deferredLock = lockFrag.Mode;
                 continue;
             }
 
-            // FIX: Restored Paging syntax rewriter and safely scan past structural whitespace!
+            // Restored Paging syntax rewriter and safely scan past structural whitespace!
             if (segment.HasTag(SqlSegmentTag.Paging) && segment.Value is string pagingValue)
             {
                 int p1Idx = i + 1;
@@ -35,7 +37,7 @@ public class FirebirdSyntaxRewriter : ISqlSegmentRewriter
 
                 if (p3Idx < segments.Count && segments[p1Idx].Type == SqlSegmentType.Parameter && segments[p3Idx].Type == SqlSegmentType.Parameter)
                 {
-                    int index = pagingValue.LastIndexOf(SqlKeyword.Limit, System.StringComparison.OrdinalIgnoreCase);
+                    int index = pagingValue.LastIndexOf(SqlKeyword.Limit, StringComparison.OrdinalIgnoreCase);
                     if (index > -1) rewritten.Add(new SqlSegment(SqlSegmentType.Literal, pagingValue[..index]));
 
                     rewritten.Add(new SqlSegment(SqlSegmentType.Literal, "FIRST "));

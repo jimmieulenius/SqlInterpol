@@ -1,7 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Text.RegularExpressions;
-using Xunit;
 using SqlInterpol.Parsing;
 using SqlInterpol.Test.Models;
 using SqlInterpol.Test.Dialects;

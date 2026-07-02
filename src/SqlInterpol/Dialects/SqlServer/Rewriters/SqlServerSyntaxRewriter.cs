@@ -4,7 +4,8 @@ namespace SqlInterpol.Dialects.SqlServer;
 
 /// <summary>
 /// A structural rewriter that transpiles generic Upserts into MERGE statements, maps UPDATE AS fragments, 
-/// handles SQL Server's custom OUTPUT inserted.* logic, and transpiles LIMIT/OFFSET paging.
+/// handles SQL Server's custom OUTPUT inserted.* logic, transposing FOR UPDATE/SHARE locking hints, 
+/// and transpiles LIMIT/OFFSET paging.
 /// </summary>
 public class SqlServerSyntaxRewriter : ISqlSegmentRewriter
 {
@@ -15,10 +16,16 @@ public class SqlServerSyntaxRewriter : ISqlSegmentRewriter
     public IReadOnlyList<SqlSegment> Rewrite(IReadOnlyList<SqlSegment> segments, ISqlContext context)
     {
         var rewritten = new List<SqlSegment>(segments.Count);
+        int lastTableReferenceIndex = -1;
 
         for (int i = 0; i < segments.Count; i++)
         {
             var segment = segments[i];
+
+            if (segment.Type == SqlSegmentType.Reference && segment.Value is ISqlEntityBase)
+            {
+                lastTableReferenceIndex = rewritten.Count;
+            }
 
             bool isOnConflict = segment.HasTag(SqlSegmentTag.OnConflictKeyword) || 
                 (segment.Type == SqlSegmentType.Literal && segment.Value is string s1 && s1.Contains("ON CONFLICT", StringComparison.OrdinalIgnoreCase));
@@ -39,39 +46,45 @@ public class SqlServerSyntaxRewriter : ISqlSegmentRewriter
                 SqlInsertValuesFragment? insertFrag = null;
                 int tableIndex = -1;
 
+                // =====================================================================
+                // FIX: ROBUST BACKWARD AST HUNTING
+                // Ignore all whitespace/literals and just grab the physical fragments
+                // =====================================================================
                 for (int j = rewritten.Count - 1; j >= 0; j--)
                 {
-                    if (rewritten[j].Value is SqlInsertValuesFragment ins) insertFrag = ins;
-                    else if (rewritten[j].Value is ISqlEntityBase t && insertFrag != null) { targetTable = t; tableIndex = j; break; }
+                    if (rewritten[j].Value is SqlInsertValuesFragment ins && insertFrag == null) 
+                        insertFrag = ins;
+                    else if (rewritten[j].Value is ISqlEntityBase t && targetTable == null) 
+                    { 
+                        targetTable = t; 
+                        tableIndex = j; 
+                    }
                 }
 
                 var conflictCols = new List<ISqlProjection>();
                 SqlSetFragment? setFrag = null;
                 int lookahead = 1;
 
+                // =====================================================================
+                // FIX: ROBUST FORWARD AST HUNTING
+                // Scan forward until we hit the SET fragment, unwrapping any columns we find!
+                // =====================================================================
                 while (i + lookahead < segments.Count)
                 {
                     var next = segments[i + lookahead];
                     
-                    bool isDoUpdate = next.HasTag(SqlSegmentTag.DoUpdateSetKeyword) || 
-                                      (next.Type == SqlSegmentType.Literal && next.Value is string s2 && s2.Contains("DO UPDATE", StringComparison.OrdinalIgnoreCase));
-
-                    if (next.Value is ISqlProjection p) conflictCols.Add(p);
-                    else if (isDoUpdate)
+                    if (next.Value is SqlColumnReferenceBase colRefBase)
                     {
-                        int setLookahead = 1;
-                        while (i + lookahead + setLookahead < segments.Count && 
-                               segments[i + lookahead + setLookahead].Type == SqlSegmentType.Literal && 
-                               string.IsNullOrWhiteSpace(segments[i + lookahead + setLookahead].Value as string))
-                        {
-                            setLookahead++;
-                        }
-
-                        if (i + lookahead + setLookahead < segments.Count && segments[i + lookahead + setLookahead].Value is SqlSetFragment sf)
-                        {
-                            setFrag = sf;
-                            lookahead += setLookahead;
-                        }
+                        conflictCols.Add(new SqlUnqualifiedColumn(colRefBase.ColumnName));
+                    }
+                    else if (next.Value is ISqlProjection p)
+                    {
+                        conflictCols.Add(p);
+                    }
+                    else if (next.Value is SqlSetFragment sf)
+                    {
+                        setFrag = sf;
+                        lookahead++;
                         break;
                     }
                     lookahead++;
@@ -79,13 +92,55 @@ public class SqlServerSyntaxRewriter : ISqlSegmentRewriter
 
                 if (tableIndex > -1 && targetTable != null && insertFrag != null && conflictCols.Count > 0 && setFrag != null)
                 {
+                    // Find the exact location of the INSERT keyword
                     int insertKeywordIndex = tableIndex > 0 ? tableIndex - 1 : 0;
+                    for (int k = tableIndex; k >= 0; k--)
+                    {
+                        if (rewritten[k].Type == SqlSegmentType.Literal && (rewritten[k].Value as string)?.IndexOf("INSERT", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            insertKeywordIndex = k;
+                            break;
+                        }
+                    }
+
                     rewritten.RemoveRange(insertKeywordIndex, rewritten.Count - insertKeywordIndex);
                     rewritten.Add(new SqlSegment(SqlSegmentType.Raw, new SqlServerMergeFragment(targetTable, insertFrag, conflictCols, setFrag)));
 
-                    i += lookahead; 
+                    i += (lookahead - 1); 
                     continue;
                 }
+            }
+
+            // =========================================================================
+            // Relocate and Transpile SqlLockFragment to SQL Server table HINTS
+            // =========================================================================
+            if (segment.Type == SqlSegmentType.Raw && segment.Value is SqlLockFragment lockFrag)
+            {
+                if (lastTableReferenceIndex > -1)
+                {
+                    string hint = lockFrag.Mode switch
+                    {
+                        SqlLockMode.Update => " WITH (UPDLOCK)",
+                        SqlLockMode.Share => " WITH (ROWLOCK, HOLDLOCK)",
+                        SqlLockMode.NoLock => " WITH (NOLOCK)",
+                        _ => ""
+                    };
+
+                    if (!string.IsNullOrEmpty(hint))
+                    {
+                        for (int k = rewritten.Count - 1; k > lastTableReferenceIndex; k--)
+                        {
+                            if (rewritten[k].Type == SqlSegmentType.Literal && string.IsNullOrWhiteSpace(rewritten[k].Value as string))
+                            {
+                                rewritten.RemoveAt(k);
+                            }
+                        }
+
+                        rewritten.Insert(lastTableReferenceIndex + 1, new SqlSegment(SqlSegmentType.Literal, hint));
+                        lastTableReferenceIndex = -1; 
+                    }
+                }
+                continue; 
             }
 
             if (segment.HasTag(SqlSegmentTag.ReturningKeyword))
@@ -117,10 +172,29 @@ public class SqlServerSyntaxRewriter : ISqlSegmentRewriter
                         {
                             rewritten[j] = new SqlSegment(SqlSegmentType.Raw, new SqlServerInsertValuesFragment(insertFrag, projections));
                             
+                            for (int k = rewritten.Count - 1; k > j; k--)
+                            {
+                                if (rewritten[k].Type == SqlSegmentType.Literal && string.IsNullOrWhiteSpace(rewritten[k].Value as string))
+                                {
+                                    rewritten.RemoveAt(k);
+                                }
+                                else
+                                {
+                                    break;
+                                }
+                            }
+
                             if (segment.Value is string text)
                             {
                                 int index = text.LastIndexOf("RETURNING", StringComparison.OrdinalIgnoreCase);
-                                if (index > 0) rewritten.Add(new SqlSegment(SqlSegmentType.Literal, text[..index].TrimEnd()));
+                                if (index > 0) 
+                                {
+                                    var precedingText = text[..index].TrimEnd();
+                                    if (precedingText.Length > 0)
+                                    {
+                                        rewritten.Add(new SqlSegment(SqlSegmentType.Literal, precedingText));
+                                    }
+                                }
                             }
                             i += (lookaheadOffset - 1); 
                             goto NextSegment; 
@@ -129,7 +203,6 @@ public class SqlServerSyntaxRewriter : ISqlSegmentRewriter
                 }
             }
 
-            // FIX: Restored Paging syntax rewriter and safely scan past structural whitespace!
             if (segment.HasTag(SqlSegmentTag.Paging) && segment.Value is string textPaging)
             {
                 int p1Idx = i + 1;
@@ -201,5 +274,32 @@ public class SqlServerSyntaxRewriter : ISqlSegmentRewriter
         }
 
         return rewritten;
+    }
+
+    // =========================================================================
+    // HELPER: UNQUALIFIED COLUMN PROXY
+    // =========================================================================
+    /// <summary>
+    /// A lightweight proxy that strips the table entity from a projection 
+    /// so it renders as an unqualified column name (perfect for MERGE statements).
+    /// </summary>
+    private class SqlUnqualifiedColumn : ISqlProjection
+    {
+        private readonly string _columnName;
+
+        // Dummy implementation to satisfy interface; the renderer never reads it for base name rendering
+        public ISqlReference Reference => null!; 
+        
+        public string PropertyName => _columnName;
+        
+        public SqlUnqualifiedColumn(string columnName)
+        {
+            _columnName = columnName;
+        }
+
+        public string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
+        {
+            return context.Dialect.QuoteIdentifier(_columnName);
+        }
     }
 }

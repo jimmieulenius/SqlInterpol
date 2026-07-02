@@ -1,226 +1,199 @@
-// using SqlInterpol.Test.Dialects;
-// using SqlInterpol.Test.Models;
+using SqlInterpol.Test.Dialects;
+using SqlInterpol.Test.Models;
 
-// namespace SqlInterpol.Test;
+namespace SqlInterpol.Test;
 
-// public class LockTests
-// {
-//     [Theory]
-//     [MemberData(nameof(SelectWithForUpdateData))]
-//     public void Select_WithForUpdate(SqlTestCase testCase)
-//     {
-//         // Arrange
-//         var db = testCase.CreateBuilder();
-//         int id = 5;
+public class LockTests
+{
+    [Theory]
+    [MemberData(nameof(SelectWithForUpdateData))]
+    public void Select_WithForUpdate(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        int id = 5;
 
-//         // Act
-//         var result = db.Query<Product>(p => db.Append($$"""
-//             SELECT {{p[x => x.Id]}}, {{p[x => x.Name]}}
-//             FROM {{p}} FOR UPDATE
-//             WHERE {{p[x => x.Id]}} = {{id}}
-//             """)).Build();
+        // Act - Zero-allocation properties and fluent target tracking
+        testCase.Action(() => db.Entity<Product>(out var p)
+            .Append($$"""
+            SELECT {{p.Id}}, {{p.Name}}
+            FROM {{p}} FOR UPDATE
+            WHERE {{p.Id}} = {{id}}
+            """)
+            .Build()
+        );
 
-//         // Assert
-//         testCase.AssertSql(result.Sql);
-        
-//         Assert.Single(result.Parameters);
-//         Assert.Equal(5, result.Parameters.First().Value);
-//     }
+        // Assert - Handles both string verification and exception assertions natively
+        testCase.Assert();
+    }
 
-//     [Theory]
-//     [MemberData(nameof(SelectWithForShareData))]
-//     public void Select_WithForShare(SqlTestCase testCase)
-//     {
-//         // Arrange
-//         var db = testCase.CreateBuilder();
-//         int id = 5;
+    [Theory]
+    [MemberData(nameof(SelectWithForShareData))]
+    public void Select_WithForShare(SqlTestCase testCase)
+    {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        int id = 5;
 
-//         // Act
-//         var result = db.Query<Product>(p => db.Append($$"""
-//             SELECT {{p[x => x.Id]}}, {{p[x => x.Name]}}
-//             FROM {{p}} FOR SHARE
-//             WHERE {{p[x => x.Id]}} = {{id}}
-//             """)).Build();
+        // Act
+        testCase.Action(() => db.Entity<Product>(out var p)
+            .Append($$"""
+            SELECT {{p.Id}}, {{p.Name}}
+            FROM {{p}} FOR SHARE
+            WHERE {{p.Id}} = {{id}}
+            """)
+            .Build()
+        );
 
-//         // Assert
-//         testCase.AssertSql(result.Sql);
-//     }
+        // Assert
+        testCase.Assert();
+    }
 
-//     [Theory]
-//     [MemberData(nameof(UnsupportedForUpdateData))]
-//     public void Select_WithForUpdate_ThrowsException_ForUnsupportedDialect(SqlErrorTestCase testCase)
-//     {
-//         // Arrange
-//         var db = testCase.CreateBuilder();
-//         int id = 5;
+    public static TheoryData<SqlTestCase> SelectWithForUpdateData
+    {
+        get
+        {
+            object?[] expectedParams = [5];
 
-//         // Act
-//         var exception = Record.Exception(() => 
-//         {
-//             db.Query<Product>(p => db.Append($$"""
-//                 SELECT {{p[x => x.Id]}}
-//                 FROM {{p}} FOR UPDATE
-//                 WHERE {{p[x => x.Id]}} = {{id}}
-//                 """)).Build();
-//         });
+            return
+            [
+                new SqlTestCase(
+                    SqlDialectKind.CustomDb,
+                    expectedExceptionType: typeof(SqlDialectException),
+                    expectedExceptionMessage: $"Dialect capabilities validation failed:{Environment.NewLine}- 'FOR UPDATE' is not supported by CustomDb."
+                ),
+                new SqlTestCase(
+                    SqlDialectKind.Firebird,
+                    [
+                        """
+                        SELECT "dbo"."Products"."Id", "dbo"."Products"."PROD_NAME"
+                        FROM "dbo"."Products"
+                        WHERE "dbo"."Products"."Id" = @p0
+                        WITH LOCK
+                        """
+                    ],
+                    expectedParameters: expectedParams
+                ),
+                new SqlTestCase(
+                    SqlDialectKind.MySql,
+                    [
+                        """
+                        SELECT `dbo`.`Products`.`Id`, `dbo`.`Products`.`PROD_NAME`
+                        FROM `dbo`.`Products`
+                        WHERE `dbo`.`Products`.`Id` = @p0
+                        FOR UPDATE
+                        """
+                    ],
+                    expectedParameters: expectedParams
+                ),
+                new SqlTestCase(
+                    SqlDialectKind.Oracle,
+                    [
+                        """
+                        SELECT "dbo"."Products"."Id", "dbo"."Products"."PROD_NAME"
+                        FROM "dbo"."Products"
+                        WHERE "dbo"."Products"."Id" = :0
+                        FOR UPDATE
+                        """
+                    ],
+                    expectedParameters: expectedParams
+                ),
+                new SqlTestCase(
+                    SqlDialectKind.PostgreSql,
+                    [
+                        """
+                        SELECT "dbo"."Products"."Id", "dbo"."Products"."PROD_NAME"
+                        FROM "dbo"."Products"
+                        WHERE "dbo"."Products"."Id" = $1
+                        FOR UPDATE
+                        """
+                    ],
+                    expectedParameters: expectedParams
+                ),
+                new SqlTestCase(
+                    SqlDialectKind.SqLite,
+                    expectedExceptionType: typeof(SqlDialectException),
+                    expectedExceptionMessage: $"Dialect capabilities validation failed:{Environment.NewLine}- 'FOR UPDATE' is not supported by SqLite."
+                ),
+                new SqlTestCase(
+                    SqlDialectKind.SqlServer,
+                    [
+                        """
+                        SELECT [dbo].[Products].[Id], [dbo].[Products].[PROD_NAME]
+                        FROM [dbo].[Products] WITH (UPDLOCK)
+                        WHERE [dbo].[Products].[Id] = @p0
+                        """
+                    ],
+                    expectedParameters: expectedParams
+                )
+            ];
+        }
+    }
 
-//         // Assert
-//         testCase.AssertException(exception);
-//     }
+    public static TheoryData<SqlTestCase> SelectWithForShareData
+    {
+        get
+        {
+            object?[] expectedParams = [5];
 
-//     [Theory]
-//     [MemberData(nameof(UnsupportedForShareData))]
-//     public void Select_WithForShare_ThrowsException_ForUnsupportedDialect(SqlErrorTestCase testCase)
-//     {
-//         // Arrange
-//         var db = testCase.CreateBuilder();
-//         int id = 5;
-
-//         // Act
-//         var exception = Record.Exception(() => 
-//         {
-//             db.Query<Product>(p => db.Append($$"""
-//                 SELECT {{p[x => x.Id]}}
-//                 FROM {{p}} FOR SHARE
-//                 WHERE {{p[x => x.Id]}} = {{id}}
-//                 """)).Build();
-//         });
-
-//         // Assert
-//         testCase.AssertException(exception);
-//     }
-
-//     // --- TEST DATA ---
-
-//     public static TheoryData<SqlTestCase> SelectWithForUpdateData =>
-//     [
-//         new SqlTestCase(
-//             SqlDialectKind.Firebird,
-//             [
-//                 """
-//                 SELECT "dbo"."Products"."Id", "dbo"."Products"."PROD_NAME"
-//                 FROM "dbo"."Products"
-//                 WHERE "dbo"."Products"."Id" = @p0
-//                 WITH LOCK
-//                 """
-//             ]
-//         ),
-//         new SqlTestCase(
-//             SqlDialectKind.MySql,
-//             [
-//                 """
-//                 SELECT `dbo`.`Products`.`Id`, `dbo`.`Products`.`PROD_NAME`
-//                 FROM `dbo`.`Products`
-//                 WHERE `dbo`.`Products`.`Id` = @p0
-//                 FOR UPDATE
-//                 """
-//             ]
-//         ),
-//         new SqlTestCase(
-//             SqlDialectKind.Oracle,
-//             [
-//                 """
-//                 SELECT "dbo"."Products"."Id", "dbo"."Products"."PROD_NAME"
-//                 FROM "dbo"."Products"
-//                 WHERE "dbo"."Products"."Id" = :0
-//                 FOR UPDATE
-//                 """
-//             ]
-//         ),
-//         new SqlTestCase(
-//             SqlDialectKind.PostgreSql,
-//             [
-//                 """
-//                 SELECT "dbo"."Products"."Id", "dbo"."Products"."PROD_NAME"
-//                 FROM "dbo"."Products"
-//                 WHERE "dbo"."Products"."Id" = $1
-//                 FOR UPDATE
-//                 """
-//             ]
-//         ),
-//         new SqlTestCase(
-//             SqlDialectKind.SqlServer,
-//             [
-//                 """
-//                 SELECT [dbo].[Products].[Id], [dbo].[Products].[PROD_NAME]
-//                 FROM [dbo].[Products] WITH (UPDLOCK)
-//                 WHERE [dbo].[Products].[Id] = @p0
-//                 """
-//             ]
-//         )
-//     ];
-
-//     public static TheoryData<SqlTestCase> SelectWithForShareData =>
-//     [
-//         new SqlTestCase(
-//             SqlDialectKind.MySql,
-//             [
-//                 """
-//                 SELECT `dbo`.`Products`.`Id`, `dbo`.`Products`.`PROD_NAME`
-//                 FROM `dbo`.`Products`
-//                 WHERE `dbo`.`Products`.`Id` = @p0
-//                 FOR SHARE
-//                 """
-//             ]
-//         ),
-//         new SqlTestCase(
-//             SqlDialectKind.PostgreSql,
-//             [
-//                 """
-//                 SELECT "dbo"."Products"."Id", "dbo"."Products"."PROD_NAME"
-//                 FROM "dbo"."Products"
-//                 WHERE "dbo"."Products"."Id" = $1
-//                 FOR SHARE
-//                 """
-//             ]
-//         ),
-//         new SqlTestCase(
-//             SqlDialectKind.SqlServer,
-//             [
-//                 """
-//                 SELECT [dbo].[Products].[Id], [dbo].[Products].[PROD_NAME]
-//                 FROM [dbo].[Products] WITH (ROWLOCK, HOLDLOCK)
-//                 WHERE [dbo].[Products].[Id] = @p0
-//                 """
-//             ]
-//         )
-//     ];
-
-//     public static TheoryData<SqlErrorTestCase> UnsupportedForUpdateData =>
-//     [
-//         new SqlErrorTestCase(
-//             SqlDialectKind.CustomDb,
-//             typeof(SqlDialectException),
-//             "'FOR UPDATE' is not supported"
-//         ),
-//         new SqlErrorTestCase(
-//             SqlDialectKind.SqLite,
-//             typeof(SqlDialectException),
-//             "'FOR UPDATE' is not supported"
-//         )
-//     ];
-
-//     public static TheoryData<SqlErrorTestCase> UnsupportedForShareData =>
-//     [
-//         new SqlErrorTestCase(
-//             SqlDialectKind.CustomDb,
-//             typeof(SqlDialectException),
-//             "'FOR SHARE' is not supported"
-//         ),
-//         new SqlErrorTestCase(
-//             SqlDialectKind.Firebird,
-//             typeof(SqlDialectException),
-//             "'FOR SHARE' is not supported"
-//         ),
-//         new SqlErrorTestCase(
-//             SqlDialectKind.Oracle,
-//             typeof(SqlDialectException),
-//             "'FOR SHARE' is not supported"
-//         ),
-//         new SqlErrorTestCase(
-//             SqlDialectKind.SqLite,
-//             typeof(SqlDialectException),
-//             "'FOR SHARE' is not supported"
-//         )
-//     ];
-// }
+            return
+            [
+                new SqlTestCase(
+                    SqlDialectKind.CustomDb,
+                    expectedExceptionType: typeof(SqlDialectException),
+                    expectedExceptionMessage: $"Dialect capabilities validation failed:{Environment.NewLine}- 'FOR SHARE' is not supported by CustomDb."
+                ),
+                new SqlTestCase(
+                    SqlDialectKind.Firebird,
+                    expectedExceptionType: typeof(SqlDialectException),
+                    expectedExceptionMessage: $"Dialect capabilities validation failed:{Environment.NewLine}- 'FOR SHARE' is not supported by Firebird."
+                ),
+                new SqlTestCase(
+                    SqlDialectKind.MySql,
+                    [
+                        """
+                        SELECT `dbo`.`Products`.`Id`, `dbo`.`Products`.`PROD_NAME`
+                        FROM `dbo`.`Products`
+                        WHERE `dbo`.`Products`.`Id` = @p0
+                        FOR SHARE
+                        """
+                    ],
+                    expectedParameters: expectedParams
+                ),
+                new SqlTestCase(
+                    SqlDialectKind.Oracle,
+                    expectedExceptionType: typeof(SqlDialectException),
+                    expectedExceptionMessage: $"Dialect capabilities validation failed:{Environment.NewLine}- 'FOR SHARE' is not supported by Oracle."
+                ),
+                new SqlTestCase(
+                    SqlDialectKind.PostgreSql,
+                    [
+                        """
+                        SELECT "dbo"."Products"."Id", "dbo"."Products"."PROD_NAME"
+                        FROM "dbo"."Products"
+                        WHERE "dbo"."Products"."Id" = $1
+                        FOR SHARE
+                        """
+                    ],
+                    expectedParameters: expectedParams
+                ),
+                new SqlTestCase(
+                    SqlDialectKind.SqLite,
+                    expectedExceptionType: typeof(SqlDialectException),
+                    expectedExceptionMessage: $"Dialect capabilities validation failed:{Environment.NewLine}- 'FOR SHARE' is not supported by SqLite."
+                ),
+                new SqlTestCase(
+                    SqlDialectKind.SqlServer,
+                    [
+                        """
+                        SELECT [dbo].[Products].[Id], [dbo].[Products].[PROD_NAME]
+                        FROM [dbo].[Products] WITH (ROWLOCK, HOLDLOCK)
+                        WHERE [dbo].[Products].[Id] = @p0
+                        """
+                    ],
+                    expectedParameters: expectedParams
+                )
+            ];
+        }
+    }
+}

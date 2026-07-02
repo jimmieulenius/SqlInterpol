@@ -5,11 +5,6 @@ namespace SqlInterpol;
 /// </summary>
 public interface ISqlQuery : ISqlQueryFragment
 {
-    /// <summary>
-    /// Compiles the query into its final executable SQL string and parameter mapping state.
-    /// </summary>
-    /// <returns>The compiled <see cref="SqlQueryResult"/> ready for execution via ADO.NET, Dapper, or EF Core.</returns>
-    SqlQueryResult Build();
 }
 
 /// <summary>

@@ -13,9 +13,9 @@ public class CteTests
     {
         // Arrange
         var db = testCase.CreateBuilder();
-        var innerQuery = db
+        db
             .Entity<Product>(out var p)
-            .Subquery(p, sub => sub.Append($$"""
+            .Query(p, out var innerQuery, () => db.Append($$"""
                 SELECT {{p.CategoryId}}, SUM({{p.Price}}) AS TotalPrice
                 FROM {{p}} AS {{"p"}}
                 GROUP BY {{p.CategoryId}}
@@ -53,7 +53,7 @@ public class CteTests
         // Define the inner query for the CTE
         var innerQuery = db
             .Entity<Product>(out var p)
-            .Subquery(p, sub => sub.Append($$"""
+            .Query(p, () => db.Append($$"""
                 SELECT {{p.CategoryId}}, SUM({{p.Price}}) AS TotalPrice
                 FROM {{p}}
                 GROUP BY {{p.CategoryId}}

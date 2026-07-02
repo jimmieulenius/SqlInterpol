@@ -17,27 +17,32 @@ public sealed class SqlTestCase : SqlTestCaseBase
     public Type? ExpectedExceptionType { get; private set; }
     public string? ExpectedExceptionMessage { get; private set; }
 
+    public string? Id { get; private set; }
+
     // Required for xUnit deserialization
     public SqlTestCase() { }
 
     /// <summary>
     /// Creates a test case that expects a successful SQL string generation.
     /// </summary>
-    public SqlTestCase(SqlDialectKind dialect, string[] expectedSql, object?[]? expectedParameters = null) : base(dialect)
+    public SqlTestCase(SqlDialectKind dialect, string[] expectedSql, object?[]? expectedParameters = null, string? id = null) : base(dialect)
     {
         ExpectedSql = expectedSql ?? throw new ArgumentNullException(nameof(expectedSql));
         if (expectedSql.Length == 0) throw new ArgumentException("ExpectedSql cannot be empty.", nameof(expectedSql));
         
         ExpectedParameters = expectedParameters ?? [];
+        Id = id;
+
     }
 
     /// <summary>
     /// Creates a test case that expects an exception to be thrown for an unsupported dialect or invalid syntax.
     /// </summary>
-    public SqlTestCase(SqlDialectKind dialect, Type expectedExceptionType, string? expectedExceptionMessage = null) : base(dialect)
+    public SqlTestCase(SqlDialectKind dialect, Type expectedExceptionType, string? expectedExceptionMessage = null, string? id = null) : base(dialect)
     {
         ExpectedExceptionType = expectedExceptionType ?? throw new ArgumentNullException(nameof(expectedExceptionType));
         ExpectedExceptionMessage = expectedExceptionMessage;
+        Id = id;
     }
 
     public override void Serialize(IXunitSerializationInfo info)
@@ -47,6 +52,7 @@ public sealed class SqlTestCase : SqlTestCaseBase
         info.AddValue(nameof(ExpectedExceptionType), ExpectedExceptionType?.AssemblyQualifiedName);
         info.AddValue(nameof(ExpectedExceptionMessage), ExpectedExceptionMessage);
         info.AddValue(nameof(ExpectedParameters), ExpectedParameters);
+        info.AddValue(nameof(Id), Id);
     }
 
     public override void Deserialize(IXunitSerializationInfo info)
@@ -62,9 +68,21 @@ public sealed class SqlTestCase : SqlTestCaseBase
         }
 
         ExpectedExceptionMessage = info.GetValue<string>(nameof(ExpectedExceptionMessage));
+        Id = info.GetValue<string>(nameof(Id));
     }
 
-    public override string ToString() => Dialect.Value;
+    public override string ToString()
+    {
+        var name = Dialect.ToString();
+
+        // If an ID was provided, append it! (e.g., "CustomDb_1")
+        if (!string.IsNullOrWhiteSpace(Id))
+        {
+            name += $"_{Id}";
+        }
+
+        return name;
+    }
 }
 
 public sealed class SqlTestCaseAssert(SqlTestCase testCase)

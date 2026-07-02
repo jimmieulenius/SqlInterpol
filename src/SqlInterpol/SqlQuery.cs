@@ -1,15 +1,12 @@
-using System.Linq.Expressions;
 using SqlInterpol.Parsing;
 
 namespace SqlInterpol;
 
 /// <summary>
-/// A compiled SQL query produced by <see cref="SqlBuilder.Query(Action)"/>, holding the
-/// captured <see cref="SqlSegment"/> list ready for rendering or further composition.
+/// A captured SQL query holding a stateless <see cref="SqlSegment"/> list ready for contextual rendering.
 /// </summary>
-public class SqlQuery(SqlBuilder builder, IReadOnlyList<SqlSegment> segments) : ISqlQuery
+public class SqlQuery(IReadOnlyList<SqlSegment> segments) : ISqlQuery
 {
-    public SqlBuilder Builder { get; } = builder;
     public IReadOnlyList<SqlSegment> Segments { get; } = segments;
     
     /// <inheritdoc />
@@ -18,16 +15,31 @@ public class SqlQuery(SqlBuilder builder, IReadOnlyList<SqlSegment> segments) : 
     /// <inheritdoc />
     public string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
     {
-        var sql = Builder.Build(this).Sql;
-        
-        // Deferred rendering naturally respects the AST state!
-        if (ExcludeParentheses) return sql;
-        
-        return $"({sql})";
-    }
+        // 1. Compile the isolated segments using the provided outer context safely
+        var preprocessor = context.Options.Preprocessor ?? SqlSegmentPreprocessor.Instance;
+        var renderer = context.Options.Renderer ?? SqlSegmentRenderer.Instance;
+        var pipeline = new SqlCompilationPipeline(preprocessor, context.Options.Rewriters);
+        var compiledSegments = pipeline.Compile(Segments, context);
 
-    /// <inheritdoc />
-    public SqlQueryResult Build() => Builder.Build(this);
+        // 2. Render to text
+        var vsb = new ValueStringBuilder(stackalloc char[2048]);
+        try
+        {
+            for (int i = 0; i < compiledSegments.Count; i++)
+            {
+                vsb.Append(renderer.Render(context, compiledSegments[i], i, compiledSegments) ?? string.Empty);
+            }
+            
+            var sql = vsb.ToString();
+            
+            if (ExcludeParentheses) return sql;
+            return $"({sql})";
+        }
+        finally
+        {
+            vsb.Dispose();
+        }
+    }
 }
 
 /// <summary>
@@ -35,8 +47,6 @@ public class SqlQuery(SqlBuilder builder, IReadOnlyList<SqlSegment> segments) : 
 /// </summary>
 public class SqlQuery<T> : SqlEntityBase<T>, ISqlQuery<T>
 {
-    public SqlBuilder Builder { get; }
-    
     /// <inheritdoc />
     public IReadOnlyList<SqlSegment> Segments => _innerQuery.Segments;
     
@@ -49,9 +59,8 @@ public class SqlQuery<T> : SqlEntityBase<T>, ISqlQuery<T>
 
     private readonly ISqlQuery _innerQuery;
 
-    public SqlQuery(SqlBuilder builder, ISqlQuery innerQuery, string? alias)
+    public SqlQuery(ISqlQuery innerQuery, string? alias)
     {
-        Builder = builder;
         _innerQuery = innerQuery;
 
         Reference = new SqlEntityReference(this)
@@ -63,16 +72,6 @@ public class SqlQuery<T> : SqlEntityBase<T>, ISqlQuery<T>
         Declaration = new SqlDeclaration(this);
     }
 
-    [Obsolete("Use the zero-allocation out var syntax and direct POCO property access.")]
-    public new ISqlProjection this[Expression<Func<T, object?>> expression]
-    {
-        get
-        {
-            var member = SqlExpressionHelper.GetProperty(expression);
-            return new SqlRawColumnReference(Reference, member.Name);
-        }
-    }
-
     /// <inheritdoc />
     public override string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
     {
@@ -82,18 +81,33 @@ public class SqlQuery<T> : SqlEntityBase<T>, ISqlQuery<T>
         if (mode == SqlRenderMode.AliasOnly) return escapedAlias;
         if (mode == SqlRenderMode.AsAlias) return context.Dialect.ApplyAlias("", escapedAlias).Trim();
 
-        var innerSql = Builder.Build(_innerQuery).Sql;
+        var preprocessor = context.Options.Preprocessor ?? SqlSegmentPreprocessor.Instance;
+        var renderer = context.Options.Renderer ?? SqlSegmentRenderer.Instance;
+        var pipeline = new SqlCompilationPipeline(preprocessor, context.Options.Rewriters);
+        var compiledSegments = pipeline.Compile(Segments, context);
 
-        if (ExcludeParentheses) return innerSql;
-
-        return mode switch
+        var vsb = new ValueStringBuilder(stackalloc char[2048]);
+        try
         {
-            SqlRenderMode.Declaration => context.Dialect.ApplyAlias($"({innerSql})", escapedAlias),
-            SqlRenderMode.BaseName => $"({innerSql})",
-            _ => $"({innerSql})"
-        };
-    }
+            for (int i = 0; i < compiledSegments.Count; i++)
+            {
+                vsb.Append(renderer.Render(context, compiledSegments[i], i, compiledSegments) ?? string.Empty);
+            }
+            
+            var innerSql = vsb.ToString();
 
-    /// <inheritdoc />
-    public SqlQueryResult Build() => Builder.Build(_innerQuery);
+            if (ExcludeParentheses) return innerSql;
+
+            return mode switch
+            {
+                SqlRenderMode.Declaration => context.Dialect.ApplyAlias($"({innerSql})", escapedAlias),
+                SqlRenderMode.BaseName => $"({innerSql})",
+                _ => $"({innerSql})"
+            };
+        }
+        finally
+        {
+            vsb.Dispose();
+        }
+    }
 }

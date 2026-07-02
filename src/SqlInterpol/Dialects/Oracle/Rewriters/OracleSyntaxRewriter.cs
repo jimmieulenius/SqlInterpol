@@ -25,7 +25,9 @@ public class OracleSyntaxRewriter : ISqlSegmentRewriter
         {
             var segment = segments[i];
 
-            if (segment.Type == SqlSegmentType.Raw && segment.Value is SqlLockFragment lockFrag)
+            // FIX: Only intercept and defer FOR UPDATE locks. Let FOR SHARE locks pass through 
+            // so the global capabilities pipeline can catch and reject them natively!
+            if (segment.Type == SqlSegmentType.Raw && segment.Value is SqlLockFragment lockFrag && lockFrag.Mode == SqlLockMode.Update)
             {
                 deferredLock = lockFrag.Mode;
                 continue;
@@ -35,7 +37,6 @@ public class OracleSyntaxRewriter : ISqlSegmentRewriter
             // RECURSIVE DRILLING PASS
             // ====================================================================
             
-            // Safely unwrap and drill into subqueries hidden by higher-level DML layout AST nodes!
             if (segment.Value is SqlUpdateSubqueryFragment updateSubquery && updateSubquery.Subquery is SqlNestedQueryFragment subNested)
             {
                 var rewrittenInner = Rewrite(subNested.Segments.ToList(), context).ToList();
@@ -98,39 +99,38 @@ public class OracleSyntaxRewriter : ISqlSegmentRewriter
             if (segment.HasTag(SqlSegmentTag.TableAliasAsKeyword))
             {
                 droppedAs = true;
-                continue; // Drops table-bound "AS" keywords at any nesting layer
+                continue; 
             }
 
             if (segment.Type == SqlSegmentType.Literal && segment.Value is string literalValue)
             {
                 var newValue = literalValue;
 
-                // Collapse the ghost space left behind by the dropped AS keyword
                 if (droppedAs)
                 {
                     if (newValue.StartsWith(" ")) newValue = newValue[1..];
                     droppedAs = false;
                 }
 
+                // FIX: Use the state-aware replacement to protect strings and comments!
                 if (newValue.Contains("WITH RECURSIVE", StringComparison.OrdinalIgnoreCase))
-                    newValue = newValue.Replace("WITH RECURSIVE", "WITH", StringComparison.OrdinalIgnoreCase);
+                    newValue = SqlSegmentPreprocessor.SafeReplaceKeyword(newValue, "WITH RECURSIVE", "WITH");
 
                 if (newValue.Contains("EXCEPT", StringComparison.OrdinalIgnoreCase))
-                    newValue = Regex.Replace(newValue, @"(?i)\bEXCEPT\b", "MINUS");
+                    newValue = SqlSegmentPreprocessor.SafeReplaceKeyword(newValue, "EXCEPT", "MINUS");
 
                 if (!ReferenceEquals(newValue, literalValue))
                     segment = new SqlSegment(SqlSegmentType.Literal, newValue, segment.RenderMode, segment.Tags);
             }
             else if (droppedAs)
             {
-                // Reset the flag if the next item isn't a text literal
                 droppedAs = false;
             }
 
             rewritten.Add(segment);
         }
 
-        if (deferredLock == SqlLockMode.Update || deferredLock == SqlLockMode.Share)
+        if (deferredLock == SqlLockMode.Update)
         {
             rewritten.Add(new SqlSegment(SqlSegmentType.Literal, "\nFOR UPDATE"));
         }

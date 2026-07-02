@@ -1,12 +1,14 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using SqlInterpol.Parsing;
 
-namespace SqlInterpol.Dialects.PostgreSql;
+namespace SqlInterpol.Dialects.SqLite;
 
 /// <summary>
-/// A structural rewriter that safely repositions deferred locks for PostgreSQL 
-/// and normalizes ON CONFLICT clauses.
+/// A structural rewriter that normalizes ON CONFLICT clauses for SQLite.
 /// </summary>
-public class PostgreSqlSyntaxRewriter : ISqlSegmentRewriter
+public class SqLiteSyntaxRewriter : ISqlSegmentRewriter
 {
     /// <inheritdoc />
     public bool IsApplicable(ISqlCompilationState state) => true;
@@ -15,17 +17,10 @@ public class PostgreSqlSyntaxRewriter : ISqlSegmentRewriter
     public IReadOnlyList<SqlSegment> Rewrite(IReadOnlyList<SqlSegment> segments, ISqlContext context)
     {
         var rewritten = new List<SqlSegment>(segments.Count);
-        SqlLockMode? deferredLock = null;
 
         for (int i = 0; i < segments.Count; i++)
         {
             var segment = segments[i];
-
-            if (segment.Type == SqlSegmentType.Raw && segment.Value is SqlLockFragment lockFrag)
-            {
-                deferredLock = lockFrag.Mode;
-                continue; 
-            }
 
             bool isOnConflict = segment.HasTag(SqlSegmentTag.OnConflictKeyword) || 
                                (segment.Type == SqlSegmentType.Literal && segment.Value is string s1 && s1.Contains("ON CONFLICT", StringComparison.OrdinalIgnoreCase));
@@ -79,7 +74,7 @@ public class PostgreSqlSyntaxRewriter : ISqlSegmentRewriter
 
                     // Inject the normalized ON CONFLICT target wrapped perfectly in parentheses!
                     rewritten.Add(new SqlSegment(SqlSegmentType.Literal, "\nON CONFLICT "));
-                    rewritten.Add(new SqlSegment(SqlSegmentType.Raw, new PostgreSqlConflictTargetFragment(conflictCols)));
+                    rewritten.Add(new SqlSegment(SqlSegmentType.Raw, new SqLiteConflictTargetFragment(conflictCols)));
 
                     // Jump the loop pointer forward to just before the DO keyword
                     i = doIdx - 1;
@@ -89,11 +84,6 @@ public class PostgreSqlSyntaxRewriter : ISqlSegmentRewriter
 
             rewritten.Add(segment);
         }
-
-        if (deferredLock == SqlLockMode.Update)
-            rewritten.Add(new SqlSegment(SqlSegmentType.Literal, "\nFOR UPDATE"));
-        else if (deferredLock == SqlLockMode.Share)
-            rewritten.Add(new SqlSegment(SqlSegmentType.Literal, "\nFOR SHARE"));
 
         return rewritten;
     }
@@ -110,10 +100,10 @@ public class PostgreSqlSyntaxRewriter : ISqlSegmentRewriter
         public string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default) => context.Dialect.QuoteIdentifier(_columnName);
     }
 
-    private class PostgreSqlConflictTargetFragment : ISqlFragment
+    private class SqLiteConflictTargetFragment : ISqlFragment
     {
         private readonly IReadOnlyList<ISqlProjection> _columns;
-        public PostgreSqlConflictTargetFragment(IReadOnlyList<ISqlProjection> columns) => _columns = columns;
+        public SqLiteConflictTargetFragment(IReadOnlyList<ISqlProjection> columns) => _columns = columns;
 
         public string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
         {

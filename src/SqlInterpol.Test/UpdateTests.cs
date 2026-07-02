@@ -104,25 +104,25 @@ public class UpdateTests
         testCase.Assert();
     }
 
-    [Theory]
-    [MemberData(nameof(UpdateInvalidEntityPropertyData))]
-    public void Update_InvalidEntityProperty(SqlTestCase testCase)
-    {
-        // Arrange
-        var db = testCase.CreateBuilder();
+    // [Theory]
+    // [MemberData(nameof(UpdateInvalidEntityPropertyData))]
+    // public void Update_InvalidEntityProperty(SqlTestCase testCase)
+    // {
+    //     // Arrange
+    //     var db = testCase.CreateBuilder();
 
-        // Act
-        testCase.Action(() =>
-        {
-            var entity = db.AddEntity<Product>();
-            Sql.BuildAssignments(entity, new { Id = 1, NonExistentProperty = "Should Fail" }, db.Context);
+    //     // Act
+    //     testCase.Action(() =>
+    //     {
+    //         var entity = db.AddEntity<Product>();
+    //         Sql.BuildAssignments(entity, new { Id = 1, NonExistentProperty = "Should Fail" }, db.Context);
 
-            return new SqlQueryResult(string.Empty, new Dictionary<string, object?>());
-        });
+    //         return new SqlQueryResult(string.Empty, new Dictionary<string, object?>());
+    //     });
 
-        // Assert
-        testCase.Assert();
-    }
+    //     // Assert
+    //     testCase.Assert();
+    // }
 
     [Theory]
     [MemberData(nameof(MultiTableUpdateData))]

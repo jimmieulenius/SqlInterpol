@@ -6,11 +6,6 @@ namespace SqlInterpol;
 public interface ISqlQueryFragment : ISqlFragment, ISqlSegmentContainer
 {
     /// <summary>
-    /// Gets the ordered list of SQL segments that make up this query fragment snapshot.
-    /// </summary>
-    IReadOnlyList<SqlSegment> Segments { get; }
-
-    /// <summary>
     /// Gets or sets a value indicating whether the outer structural parentheses should be omitted during rendering.
     /// </summary>
     bool ExcludeParentheses { get; set; }

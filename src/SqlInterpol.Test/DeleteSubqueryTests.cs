@@ -5,7 +5,6 @@ namespace SqlInterpol.Test;
 
 public class DeleteSubqueryTests
 {
-    // Shared test data at the class level ensures zero drift between execution and assertions!
     private const string Status = "Cancelled";
 
     [Theory]

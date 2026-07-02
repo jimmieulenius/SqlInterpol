@@ -1,4 +1,5 @@
 using SqlInterpol.Dialects;
+using SqlInterpol.Dialects.SqLite;
 
 namespace SqlInterpol;
 
@@ -20,7 +21,9 @@ public class SqLiteDialect : SqlDialectBase
 
     public override SqlInterpolOptions GetDefaultOptions() 
     { 
-        return base.GetDefaultOptions() with { ParameterIndexStart = 1 };
+        var options = base.GetDefaultOptions() with { ParameterIndexStart = 1 };
+        options.Rewriters.Add(new SqLiteSyntaxRewriter());
+        return options;
     }
 
     public override string RenderFragment(ISqlFragment fragment, ISqlContext context)

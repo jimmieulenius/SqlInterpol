@@ -102,7 +102,7 @@ public static class SqlMetadataRegistry
             return columnName;
         }
 
-        throw new ArgumentException($"Property '{member.Name}' not found on {typeof(T).Name}");
+        throw new ArgumentException($"Property '{member.Name}' not found on '{typeof(T).Name}'.");
     }
 
     /// <summary>

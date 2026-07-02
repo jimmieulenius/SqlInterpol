@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using SqlInterpol.Parsing;
 
@@ -107,11 +109,48 @@ public partial class SqlBuilder : ISqlEntityRegistry
     }
 
     /// <summary>
+    /// Parses an inline interpolated SQL string into a frozen, lightweight AST fragment
+    /// without modifying this builder's master statement stream.
+    /// </summary>
+    /// <param name="handler">The compiler-routed interpolation handler tracking the token stream.</param>
+    public ISqlFragment Fragment([InterpolatedStringHandlerArgument("")] ref SqlQueryInterpolatedStringHandler handler)
+    {
+        var segments = new List<SqlSegment>();
+        
+        // Slices the parsed tokens out of the zero-allocation handler
+        handler.TransferSegments(segments);
+        
+        return new SqlSegmentCollectionFragment(segments);
+    }
+
+    /// <summary>
+    /// Builds a frozen AST fragment imperatively via a callback. Perfect for dynamic loops
+    /// (e.g., building a variable WHERE filter list) while sharing the parent's entity scopes.
+    /// </summary>
+    /// <param name="buildAction">The delegate used to conditionally append fragments.</param>
+    public ISqlFragment Fragment(Action<SqlBuilder> buildAction)
+    {
+        // 1. Create an isolated sub-builder sharing the exact same execution context
+        var subBuilder = new SqlBuilder(this.Context.Dialect, this.Context.Options);
+        
+        // 2. Clone the current scoped variables so local table aliases map flawlessly
+        foreach (var kvp in this.ScopedVariables)
+        {
+            subBuilder.ScopedVariables[kvp.Key] = kvp.Value;
+        }
+
+        // 3. Execute the user's dynamic structure rules
+        buildAction(subBuilder);
+
+        // 4. Extract the isolated segments and freeze them into an immutable collection
+        // Note: Assumes your SqlBuilder exposes its internal segment list via a method like GetSegments()
+        return new SqlSegmentCollectionFragment(subBuilder.Segments);
+    }
+
+    /// <summary>
     /// Captures the SQL written by <paramref name="action"/> into an isolated buildable <see cref="ISqlQuery"/> scope,
     /// without affecting the segments accumulated on the outer builder.
     /// </summary>
-    /// <param name="action">The action that appends SQL to the builder.</param>
-    /// <returns>An executable <see cref="ISqlQuery"/> holding the segments written inside <paramref name="action"/>.</returns>
     public ISqlQuery Query(Action action)
     {
         var mainSegments = _segments;
@@ -127,7 +166,8 @@ public partial class SqlBuilder : ISqlEntityRegistry
             _segments = mainSegments;
         }
 
-        return new SqlQuery(this, scopedSegments);
+        // Clean, stateless AST node creation!
+        return new SqlQuery(scopedSegments);
     }
 
     /// <summary>
@@ -185,9 +225,8 @@ public partial class SqlBuilder : ISqlEntityRegistry
                 if (getters != null && getters.TryGetValue(argName, out var getter))
                 {
                     object? val = getter(arguments!);
-                    string paramKey = Context.AddParameter(val);
-                    
-                    resolvedSegments[i] = new SqlSegment(SqlSegmentType.Raw, paramKey);
+                    // Process as Unresolved so standard parameter routing kicks in
+                    resolvedSegments[i] = new SqlSegment(SqlSegmentType.Unresolved, val);
                     resolved = true;
                 }
 
