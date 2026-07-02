@@ -1,7 +1,6 @@
-using System;
-using System.Collections.Generic;
+using SqlInterpol.Parsing;
 
-namespace SqlInterpol.Parsing;
+namespace SqlInterpol;
 
 /// <summary>
 /// A foundational rewriter that applies core syntax transformations in a single linear pass. 

@@ -1,51 +1,50 @@
-using System;
-using System.Collections.Generic;
 using SqlInterpol.Parsing;
+using SqlInterpol.Rewriters;
 
 namespace SqlInterpol.Dialects.Firebird;
 
-public class FirebirdSyntaxRewriter : ISqlSegmentRewriter
+public class FirebirdSyntaxRewriter : SqlSyntaxRewriterBase
 {
-    public bool IsApplicable(ISqlCompilationState state) => true;
+    private SqlLockMode? _deferredLock;
 
-    public IReadOnlyList<SqlSegment> Rewrite(IReadOnlyList<SqlSegment> segments, ISqlContext context)
+    public override IReadOnlyList<SqlSegment> Rewrite(IReadOnlyList<SqlSegment> segments, ISqlContext context)
     {
-        var rewritten = new List<SqlSegment>(segments.Count);
-        SqlLockMode? deferredLock = null;
+        _deferredLock = null; // Ensure clean state per pass
+        return base.Rewrite(segments, context);
+    }
 
-        for (int i = 0; i < segments.Count; i++)
+    protected override bool TryRewriteLock(SqlLockFragment lockFrag, IReadOnlyList<SqlSegment> segments, List<SqlSegment> rewritten, ref int i)
+    {
+        if (lockFrag.Mode == SqlLockMode.Update)
         {
-            var segment = segments[i];
+            _deferredLock = lockFrag.Mode;
+            return true;
+        }
+        return false;
+    }
 
-            if (segment.Type == SqlSegmentType.Raw && segment.Value is SqlLockFragment lockFrag && lockFrag.Mode == SqlLockMode.Update)
-            {
-                deferredLock = lockFrag.Mode;
-                continue;
-            }
+    protected override bool TryRewritePaging(SqlSegment segment, IReadOnlyList<SqlSegment> segments, List<SqlSegment> rewritten, ref int i)
+    {
+        if (!segment.HasTag(SqlSegmentTag.Paging) || !SqlRewriterHelpers.TryExtractPagingParameters(segments, i, out var limitParam, out var offsetParam, out int nextIndex)) return false;
 
-            if (segment.HasTag(SqlSegmentTag.Paging) && SqlRewriterHelpers.TryExtractPagingParameters(segments, i, out var limitParam, out var offsetParam, out int nextIndex))
-            {
-                if (segment.Value is string pagingValue)
-                {
-                    int index = pagingValue.LastIndexOf(SqlKeyword.Limit.Value, StringComparison.OrdinalIgnoreCase);
-                    if (index > -1) rewritten.Add(new SqlSegment(SqlSegmentType.Literal, pagingValue[..index]));
-                }
-
-                rewritten.Add(new SqlSegment(SqlSegmentType.Literal, "FIRST "));
-                rewritten.Add(limitParam); 
-                rewritten.Add(new SqlSegment(SqlSegmentType.Literal, " SKIP "));
-                rewritten.Add(offsetParam); 
-
-                i = nextIndex;
-                continue;
-            }
-
-            rewritten.Add(segment);
+        if (segment.Value is string pagingValue)
+        {
+            int index = pagingValue.LastIndexOf(SqlKeyword.Limit.Value, StringComparison.OrdinalIgnoreCase);
+            if (index > -1) rewritten.Add(new SqlSegment(SqlSegmentType.Literal, pagingValue[..index]));
         }
 
-        if (deferredLock == SqlLockMode.Update)
-            rewritten.Add(new SqlSegment(SqlSegmentType.Literal, "\nWITH LOCK"));
+        rewritten.Add(new SqlSegment(SqlSegmentType.Literal, "FIRST "));
+        rewritten.Add(limitParam); 
+        rewritten.Add(new SqlSegment(SqlSegmentType.Literal, " SKIP "));
+        rewritten.Add(offsetParam); 
 
-        return rewritten;
+        i = nextIndex;
+        return true;
+    }
+
+    protected override void ApplyDeferredTransforms(List<SqlSegment> rewritten, ISqlContext context)
+    {
+        if (_deferredLock == SqlLockMode.Update) rewritten.Add(new SqlSegment(SqlSegmentType.Literal, "\nWITH LOCK"));
+        base.ApplyDeferredTransforms(rewritten, context);
     }
 }
