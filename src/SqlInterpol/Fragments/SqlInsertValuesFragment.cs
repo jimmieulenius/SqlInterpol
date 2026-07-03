@@ -5,7 +5,7 @@ namespace SqlInterpol;
 /// for single- or multi-row INSERT statements.
 /// </summary>
 public class SqlInsertValuesFragment
-    : ISqlFragment, ISqlParameterGenerator, ISqlSwappableFragment
+    : ISqlFragment, ISqlParameterGenerator
 {
     private readonly List<List<ISqlAssignmentFragment>> _bulkAssignments;
 
@@ -72,24 +72,24 @@ public class SqlInsertValuesFragment
         return $"({cols}){Environment.NewLine}{SqlKeyword.Values} {string.Join(separator, valuesBlocks.Select(v => $"({v})"))}";
     }
 
-    /// <inheritdoc />
-    public ISqlFragment Swap(
-        Dictionary<ISqlReference, ISqlEntityBase> entityMap, 
-        IReadOnlyDictionary<string, Func<object, object?>>? argumentGetters, 
-        object? arguments)
-    {
-        var mappedBulkAssignments = new List<List<ISqlAssignmentFragment>>(_bulkAssignments.Count);
+    // /// <inheritdoc />
+    // public ISqlFragment Swap(
+    //     Dictionary<ISqlReference, ISqlEntityBase> entityMap, 
+    //     IReadOnlyDictionary<string, Func<object, object?>>? argumentGetters, 
+    //     object? arguments)
+    // {
+    //     var mappedBulkAssignments = new List<List<ISqlAssignmentFragment>>(_bulkAssignments.Count);
         
-        foreach (var row in _bulkAssignments)
-        {
-            var mappedRow = new List<ISqlAssignmentFragment>(row.Count);
-            foreach (var assignment in row)
-            {
-                mappedRow.Add(SqlTemplateMapper.MapAssignment(assignment, entityMap, argumentGetters, arguments));
-            }
-            mappedBulkAssignments.Add(mappedRow);
-        }
+    //     foreach (var row in _bulkAssignments)
+    //     {
+    //         var mappedRow = new List<ISqlAssignmentFragment>(row.Count);
+    //         foreach (var assignment in row)
+    //         {
+    //             mappedRow.Add(SqlTemplateMapper.MapAssignment(assignment, entityMap, argumentGetters, arguments));
+    //         }
+    //         mappedBulkAssignments.Add(mappedRow);
+    //     }
 
-        return new SqlInsertValuesFragment(mappedBulkAssignments);
-    }
+    //     return new SqlInsertValuesFragment(mappedBulkAssignments);
+    // }
 }

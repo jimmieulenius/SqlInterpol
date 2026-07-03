@@ -1,4 +1,4 @@
-using System.Linq.Expressions;
+using System.Collections.Generic;
 
 namespace SqlInterpol;
 
@@ -8,88 +8,28 @@ namespace SqlInterpol;
 public static partial class SqlBuilderExtensions
 {
     /// <summary>
-    /// Appends a highly-optimized, globally cached INSERT statement. 
-    /// Supports both full entities and partial DTOs seamlessly via type inference.
+    /// Appends a highly-optimized, globally cached INSERT statement natively formatted for the active dialect. 
+    /// Supports a single item, comma-separated inline items, or a pre-allocated array via params.
     /// </summary>
     public static SqlBuilder AppendInsert<TEntity, TDto>(
         this SqlBuilder builder, 
-        ISqlEntityBase<TEntity> entity, 
-        TDto payload)
+        TEntity entity, 
+        params TDto[] payloads)
     {
-        return builder.Append(SqlTemplate.Insert<TEntity, TDto>(), entity, payload);
+        var template = SqlCrudTemplateCache.GetInsertTemplate<TEntity, TDto>(builder.Context.Dialect);
+        return builder.Append(template, payloads);
     }
 
     /// <summary>
-    /// Appends a highly-optimized, globally cached UPDATE statement utilizing a key lambda selector.
-    /// Supports both full entities and partial DTOs seamlessly via type inference.
+    /// Appends a highly-optimized, globally cached INSERT statement natively formatted for the active dialect. 
+    /// Supports both single-item inserts and multi-row bulk inserts seamlessly.
     /// </summary>
-    public static SqlBuilder AppendUpdate<TEntity, TDto>(
+    public static SqlBuilder AppendInsert<TEntity, TDto>(
         this SqlBuilder builder, 
-        ISqlEntityBase<TEntity> entity, 
-        TDto payload, 
-        Expression<Func<TDto, object>> keySelector)
+        TEntity entity, 
+        IEnumerable<TDto> payloads)
     {
-        return builder.Append(SqlTemplate.Update<TEntity, TDto>(keySelector), entity, payload);
-    }
-
-    /// <summary>
-    /// Appends a highly-optimized, globally cached UPDATE statement utilizing explicitly named key property strings.
-    /// </summary>
-    public static SqlBuilder AppendUpdate<TEntity, TDto>(
-        this SqlBuilder builder, 
-        ISqlEntityBase<TEntity> entity, 
-        TDto payload, 
-        params string[] keyPropertyNames)
-    {
-        return builder.Append(SqlTemplate.Update<TEntity, TDto>(keyPropertyNames), entity, payload);
-    }
-
-    /// <summary>
-    /// Appends a globally cached universal UPSERT statement utilizing a key lambda selector.
-    /// Supports both full entities and partial DTOs seamlessly via type inference.
-    /// </summary>
-    public static SqlBuilder AppendUpsert<TEntity, TDto>(
-        this SqlBuilder builder, 
-        ISqlEntityBase<TEntity> entity, 
-        TDto payload, 
-        Expression<Func<TDto, object>> keySelector)
-    {
-        return builder.Append(SqlTemplate.Upsert<TEntity, TDto>(keySelector), entity, payload);
-    }
-
-    /// <summary>
-    /// Appends a globally cached universal UPSERT statement utilizing explicitly named key property strings.
-    /// </summary>
-    public static SqlBuilder AppendUpsert<TEntity, TDto>(
-        this SqlBuilder builder, 
-        ISqlEntityBase<TEntity> entity, 
-        TDto payload, 
-        params string[] keyPropertyNames)
-    {
-        return builder.Append(SqlTemplate.Upsert<TEntity, TDto>(keyPropertyNames), entity, payload);
-    }
-
-    /// <summary>
-    /// Appends a highly-optimized, globally cached DELETE statement utilizing a key lambda selector.
-    /// </summary>
-    public static SqlBuilder AppendDelete<TEntity, TDto>(
-        this SqlBuilder builder, 
-        ISqlEntityBase<TEntity> entity, 
-        TDto payload, 
-        Expression<Func<TDto, object>> keySelector)
-    {
-        return builder.Append(SqlTemplate.Delete<TEntity, TDto>(keySelector), entity, payload);
-    }
-
-    /// <summary>
-    /// Appends a highly-optimized, globally cached DELETE statement utilizing explicitly named key property strings.
-    /// </summary>
-    public static SqlBuilder AppendDelete<TEntity, TDto>(
-        this SqlBuilder builder, 
-        ISqlEntityBase<TEntity> entity, 
-        TDto payload, 
-        params string[] keyPropertyNames)
-    {
-        return builder.Append(SqlTemplate.Delete<TEntity, TDto>(keyPropertyNames), entity, payload);
+        var template = SqlCrudTemplateCache.GetInsertTemplate<TEntity, TDto>(builder.Context.Dialect);
+        return builder.Append(template, payloads);
     }
 }

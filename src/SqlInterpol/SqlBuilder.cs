@@ -148,6 +148,73 @@ public partial class SqlBuilder : ISqlEntityRegistry
     }
 
     /// <summary>
+    /// Compiles an interpolated SQL string into a high-performance, reusable <see cref="ISqlTemplate"/>.
+    /// The resulting template bypasses AST compilation during execution, natively injecting arguments in O(1) time.
+    /// </summary>
+    public ISqlTemplate Template([InterpolatedStringHandlerArgument("")] ref SqlQueryInterpolatedStringHandler handler)
+    {
+        var segments = new List<SqlSegment>();
+        handler.TransferSegments(segments);
+
+        var preprocessor = Context.Options.Preprocessor ?? SqlSegmentPreprocessor.Instance;
+        var pipeline = new SqlCompilationPipeline(preprocessor, Context.Options.Rewriters);
+        
+        var compiledSegments = pipeline.Compile(segments, Context);
+
+        var vsb = new SqlInterpol.Parsing.ValueStringBuilder(stackalloc char[2048]);
+        try
+        {
+            var templateArgs = new List<SqlTemplateArgument>();
+            int holeIndex = 0;
+
+            for (int i = 0; i < compiledSegments.Count; i++)
+            {
+                var segment = compiledSegments[i];
+                
+                if (segment.Type == SqlSegmentType.Raw && segment.Value is SqlArgumentFragment argFrag)
+                {
+                    // Convert Sql.Arg("name") into a {X} format hole
+                    vsb.Append($"{{{holeIndex++}}}");
+                    templateArgs.Add(new SqlTemplateArgument(argFrag.Name));
+                }
+                else if (segment.Type == SqlSegmentType.Unresolved || segment.Type == SqlSegmentType.Parameter)
+                {
+                    // Convert statically captured local variables into a {X} format hole seamlessly
+                    vsb.Append($"{{{holeIndex++}}}");
+                    templateArgs.Add(new SqlTemplateArgument(segment.Value));
+                }
+                else
+                {
+                    // Render structural text, fully escaping braces to prevent string.Format crashes
+                    CurrentRenderIndex = i;
+                    var rendered = Renderer.Render(Context, segment, i, compiledSegments);
+                    if (rendered != null)
+                    {
+                        rendered = rendered.Replace("{", "{{").Replace("}", "}}");
+                        vsb.Append(rendered);
+                    }
+                }
+            }
+
+            return new SqlTemplate(vsb.ToString(), templateArgs.ToArray());
+        }
+        finally
+        {
+            vsb.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Compiles an interpolated SQL string into a high-performance, reusable <see cref="ISqlTemplate"/>,
+    /// assigning it to the output parameter and returning the builder to allow fluent chaining.
+    /// </summary>
+    public SqlBuilder Template(out ISqlTemplate template, [InterpolatedStringHandlerArgument("")] ref SqlQueryInterpolatedStringHandler handler)
+    {
+        template = Template(ref handler);
+        return this;
+    }
+
+    /// <summary>
     /// Captures the SQL written by <paramref name="action"/> into an isolated buildable <see cref="ISqlQuery"/> scope,
     /// without affecting the segments accumulated on the outer builder.
     /// </summary>

@@ -4,7 +4,7 @@ namespace SqlInterpol;
 /// Renders a SET clause for UPDATE statements, joining column-value assignments
 /// with layout-aware formatting.
 /// </summary>
-public class SqlSetFragment : ISqlFragment, ISqlParameterGenerator, ISqlSwappableFragment
+public class SqlSetFragment : ISqlFragment, ISqlParameterGenerator
 {
     private readonly SqlCollectionFragment _collection;
 
@@ -46,19 +46,19 @@ public class SqlSetFragment : ISqlFragment, ISqlParameterGenerator, ISqlSwappabl
         return $"{SqlKeyword.Set} {assignmentsSql}";
     }
 
-    /// <inheritdoc />
-    public ISqlFragment Swap(
-        Dictionary<ISqlReference, ISqlEntityBase> entityMap, 
-        IReadOnlyDictionary<string, Func<object, object?>>? argumentGetters, 
-        object? arguments)
-    {
-        var mappedAssignments = new List<ISqlAssignmentFragment>(Assignments.Count);
+    // /// <inheritdoc />
+    // public ISqlFragment Swap(
+    //     Dictionary<ISqlReference, ISqlEntityBase> entityMap, 
+    //     IReadOnlyDictionary<string, Func<object, object?>>? argumentGetters, 
+    //     object? arguments)
+    // {
+    //     var mappedAssignments = new List<ISqlAssignmentFragment>(Assignments.Count);
         
-        foreach (var assignment in Assignments)
-        {
-            mappedAssignments.Add(SqlTemplateMapper.MapAssignment(assignment, entityMap, argumentGetters, arguments));
-        }
+    //     foreach (var assignment in Assignments)
+    //     {
+    //         mappedAssignments.Add(SqlTemplateMapper.MapAssignment(assignment, entityMap, argumentGetters, arguments));
+    //     }
 
-        return new SqlSetFragment(mappedAssignments);
-    }
+    //     return new SqlSetFragment(mappedAssignments);
+    // }
 }
