@@ -9,9 +9,20 @@ public partial class SqlSegmentPreprocessor
 
     private static void ApplyAliasToTarget(string quotedAlias, PreprocessorState state)
     {
-        if (state.LastEntityRef != null) SetAlias(state.LastEntityRef, quotedAlias);
-        else if (state.LastAliasableTarget is ISqlEntityBase lastEnt) SetAlias(lastEnt.Reference, quotedAlias);
-        else SetAlias(state.LastAliasableTarget, quotedAlias);
+        // FIX: Prioritize the immediate LastAliasableTarget! 
+        // Previously, LastEntityRef was blindly hijacking aliases meant for columns.
+        if (state.LastAliasableTarget is ISqlEntityBase lastEnt) 
+        {
+            SetAlias(lastEnt.Reference, quotedAlias);
+        }
+        else if (state.LastAliasableTarget != null)
+        {
+            SetAlias(state.LastAliasableTarget, quotedAlias);
+        }
+        else if (state.LastEntityRef != null) 
+        {
+            SetAlias(state.LastEntityRef, quotedAlias);
+        }
     }
 
     private static string DetermineAliasTag(PreprocessorState state)
@@ -48,7 +59,6 @@ public partial class SqlSegmentPreprocessor
                     {
                         if (string.IsNullOrWhiteSpace(text)) continue; 
 
-                        // High-Performance centralized peeking! No duplication.
                         if (TryParseAlias(text.AsSpan(), out var parseResult))
                         {
                             tempAlias = parseResult.Identifier.ToString();
@@ -86,21 +96,55 @@ public partial class SqlSegmentPreprocessor
     {
         if (string.IsNullOrEmpty(text)) return false;
 
-        // Zero-allocation structural scanning via the shared state machine helper
         if (!TryParseAlias(text.AsSpan(), out var parseResult))
         {
+            // FIX: If we found non-whitespace text that could not be parsed as an alias 
+            // (e.g., punctuation like '(' or ',' or DDL keywords), the alias opportunity is DEAD.
+            var trimmed = text.AsSpan().TrimStart();
+            if (trimmed.Length > 0)
+            {
+                // Preserve dangling "AS " so hole-bound aliases still work!
+                if (!trimmed.StartsWith("AS ", StringComparison.OrdinalIgnoreCase) && 
+                    !trimmed.StartsWith("AS\n", StringComparison.OrdinalIgnoreCase) &&
+                    !trimmed.Equals("AS", StringComparison.OrdinalIgnoreCase))
+                {
+                    state.LastAliasableTarget = null;
+                    state.LastEntityRef = null;
+                }
+            }
             return false;
         }
 
         string prefix = text[..parseResult.PrefixLength];
+        
+        // FIX: Check for structural boundaries IN THE PREFIX before the alias!
+        // If the prefix contains a comma or parenthesis before the alias string, 
+        // the target we were tracking is no longer legally aliasable.
+        bool boundaryCrossed = false;
+        foreach (char c in prefix) 
+        {
+            if (c == ')') state.PopState();
+            if (c == '(' || c == ',' || c == ';') boundaryCrossed = true;
+        }
+
+        if (boundaryCrossed)
+        {
+            // We crossed a structural boundary. Abort extraction.
+            state.LastAliasableTarget = null;
+            state.LastEntityRef = null;
+            return false; 
+        }
+
         string identifier = parseResult.Identifier.ToString();
         string quotedAlias = state.Context.Dialect.QuoteIdentifier(identifier);
         string determinedTag = DetermineAliasTag(state);
 
-        foreach (char c in prefix) if (c == ')') state.PopState();
         ApplyAliasToTarget(quotedAlias, state);
 
-        // Detect if the target node is already configured to natively output its own alias declaration!
+        // FIX: Clear tracking immediately after applying so it doesn't absorb multiple aliases!
+        state.LastAliasableTarget = null;
+        state.LastEntityRef = null;
+
         bool isTargetSelfDeclaring = state.Refined.Count > 0 && 
             (state.Refined[^1].RenderMode == SqlRenderMode.Declaration || state.Refined[^1].Value is ISqlDeclaration);
 
@@ -109,8 +153,6 @@ public partial class SqlSegmentPreprocessor
         {
             if (isTargetSelfDeclaring)
             {
-                // FIX: Preserve structural characters like ')' but trim the trailing whitespace 
-                // so we don't leave a dangling space after the self-declared entity
                 string structuralPrefix = prefix.TrimEnd(' ', '\t', '\r', '\n');
                 if (structuralPrefix.Length > 0)
                     state.Refined.Add(new SqlSegment(SqlSegmentType.Literal, structuralPrefix, segment.RenderMode, segment.Tags));
@@ -121,7 +163,6 @@ public partial class SqlSegmentPreprocessor
             }
         }
 
-        // Skip adding duplicate explicit alias tokens if the target handles it internally
         if (!isTargetSelfDeclaring)
         {
             if (parseResult.IsExplicit)
@@ -188,6 +229,10 @@ public partial class SqlSegmentPreprocessor
         if (!string.IsNullOrWhiteSpace(customAliasString))
         {
             state.Refined.Add(new SqlSegment(SqlSegmentType.Raw, customAliasString, null, segment.Tags));
+            
+            // FIX: Clear tracking after applying hole-bound alias!
+            state.LastAliasableTarget = null;
+            state.LastEntityRef = null;
             return true;
         }
 

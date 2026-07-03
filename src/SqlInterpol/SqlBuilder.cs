@@ -101,8 +101,6 @@ public partial class SqlBuilder : ISqlEntityRegistry
     public virtual SqlBuilder Clear()
     {
         _segments.Clear();
-        _entities.Clear();       
-        ScopedVariables.Clear(); 
         Context.Reset();
 
         return this;
