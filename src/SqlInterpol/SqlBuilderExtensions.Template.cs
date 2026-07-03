@@ -1,5 +1,10 @@
+using System;
+
 namespace SqlInterpol;
 
+/// <summary>
+/// Provides extension methods for appending pre-compiled SQL templates to a <see cref="SqlBuilder"/>.
+/// </summary>
 public static partial class SqlBuilderExtensions
 {
     /// <summary>
@@ -10,8 +15,9 @@ public static partial class SqlBuilderExtensions
     {
         string renderedText = template.Render(builder.Context, arguments);
         
-        // Bypasses AST compilation! Drops the template output directly into the stream as a block literal.
-        builder.AppendSegment(new SqlSegment(SqlSegmentType.Literal, renderedText));
+        // CRITICAL FIX: Use SqlSegmentType.Raw + SqlRawFragment to completely bypass the Lexer.
+        // Using 'Literal' accidentally feeds the rendered string back into the preprocessor!
+        builder.AppendSegment(new SqlSegment(SqlSegmentType.Raw, new SqlRawFragment(renderedText)));
         
         return builder;
     }
@@ -22,6 +28,10 @@ public static partial class SqlBuilderExtensions
     public static SqlBuilder AppendLine(this SqlBuilder builder, ISqlTemplate template, object? arguments = null)
     {
         builder.Append(template, arguments);
-        return builder.AppendLine();
+        
+        // Append line using Raw to maintain Lexer-bypass integrity
+        builder.AppendSegment(new SqlSegment(SqlSegmentType.Raw, new SqlRawFragment(Environment.NewLine)));
+        
+        return builder;
     }
 }

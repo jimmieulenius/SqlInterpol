@@ -100,26 +100,48 @@ public partial class SqlSegmentPreprocessor
         foreach (char c in prefix) if (c == ')') state.PopState();
         ApplyAliasToTarget(quotedAlias, state);
 
-        if (prefix.Length > 0) 
-            state.Refined.Add(new SqlSegment(SqlSegmentType.Literal, prefix, segment.RenderMode, segment.Tags));
+        // Detect if the target node is already configured to natively output its own alias declaration!
+        bool isTargetSelfDeclaring = state.Refined.Count > 0 && 
+            (state.Refined[^1].RenderMode == SqlRenderMode.Declaration || state.Refined[^1].Value is ISqlDeclaration);
 
-        if (parseResult.IsExplicit)
+        // Emit the prefix (e.g., leading spaces or parentheses before the AS)
+        if (prefix.Length > 0) 
         {
-            string keyword = text.Substring(parseResult.PrefixLength, 2);
-            state.Refined.Add(new SqlSegment(SqlSegmentType.Literal, keyword, segment.RenderMode, determinedTag == "ColumnAliasAsKeyword" ? segment.Tags : [determinedTag]));
-            
-            int wsLength = parseResult.IdentifierStart - (parseResult.PrefixLength + 2);
-            if (wsLength > 0)
+            if (isTargetSelfDeclaring)
             {
-                string wsAfterAs = text.Substring(parseResult.PrefixLength + 2, wsLength);
-                state.Refined.Add(new SqlSegment(SqlSegmentType.Literal, wsAfterAs, segment.RenderMode, segment.Tags));
+                // FIX: Preserve structural characters like ')' but trim the trailing whitespace 
+                // so we don't leave a dangling space after the self-declared entity
+                string structuralPrefix = prefix.TrimEnd(' ', '\t', '\r', '\n');
+                if (structuralPrefix.Length > 0)
+                    state.Refined.Add(new SqlSegment(SqlSegmentType.Literal, structuralPrefix, segment.RenderMode, segment.Tags));
             }
-            
-            state.Refined.Add(new SqlSegment(SqlSegmentType.Raw, quotedAlias, null, segment.Tags));
+            else
+            {
+                state.Refined.Add(new SqlSegment(SqlSegmentType.Literal, prefix, segment.RenderMode, segment.Tags));
+            }
         }
-        else
+
+        // Skip adding duplicate explicit alias tokens if the target handles it internally
+        if (!isTargetSelfDeclaring)
         {
-            state.Refined.Add(new SqlSegment(SqlSegmentType.Raw, quotedAlias, null, determinedTag == "ColumnAliasAsKeyword" ? segment.Tags : [determinedTag]));
+            if (parseResult.IsExplicit)
+            {
+                string keyword = text.Substring(parseResult.PrefixLength, 2);
+                state.Refined.Add(new SqlSegment(SqlSegmentType.Literal, keyword, segment.RenderMode, determinedTag == "ColumnAliasAsKeyword" ? segment.Tags : [determinedTag]));
+                
+                int wsLength = parseResult.IdentifierStart - (parseResult.PrefixLength + 2);
+                if (wsLength > 0)
+                {
+                    string wsAfterAs = text.Substring(parseResult.PrefixLength + 2, wsLength);
+                    state.Refined.Add(new SqlSegment(SqlSegmentType.Literal, wsAfterAs, segment.RenderMode, segment.Tags));
+                }
+                
+                state.Refined.Add(new SqlSegment(SqlSegmentType.Raw, quotedAlias, null, segment.Tags));
+            }
+            else
+            {
+                state.Refined.Add(new SqlSegment(SqlSegmentType.Raw, quotedAlias, null, determinedTag == "ColumnAliasAsKeyword" ? segment.Tags : [determinedTag]));
+            }
         }
 
         text = text.Substring(parseResult.TotalLength);

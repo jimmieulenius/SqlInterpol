@@ -154,6 +154,28 @@ public class FromAsTests
     }
 
     [Theory]
+    [MemberData(nameof(From_EntityAutoAliasingManualOverrideData))]
+    public void From_EntityAutoAliasing_ManualOverride(SqlTestCase testCase)
+    {
+        testCase.Action(() =>
+        {
+            var db = testCase.CreateBuilder();
+            db.Context.Options.EntityAutoAliasing = true;
+
+            return db
+                .Entity<Product>(out var prod)
+                .Append($$"""
+                    SELECT
+                        {{prod.Id}}
+                    FROM {{prod}} AS p
+                    """)
+                .Build();
+        });
+
+        testCase.Assert();
+    }
+
+    [Theory]
     [MemberData(nameof(From_AutoAliasingInceptionData))]
     public void From_AutoAliasing_Inception(SqlTestCase testCase)
     {
@@ -680,6 +702,80 @@ public class FromAsTests
                 SELECT
                     [prod].[Id]
                 FROM [dbo].[Products] AS [prod]
+                """
+            ]
+        )
+    ];
+
+    public static TheoryData<SqlTestCase> From_EntityAutoAliasingManualOverrideData =>
+    [
+        new SqlTestCase(
+            SqlDialectKind.CustomDb,
+            [
+                """
+                SELECT
+                    <<p>>.<<Id>>
+                FROM <<dbo>>.<<Products>> AS <<p>>
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Firebird,
+            [
+                """
+                SELECT
+                    "p"."Id"
+                FROM "dbo"."Products" AS "p"
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.MySql, 
+            [
+                """
+                SELECT
+                    `p`.`Id`
+                FROM `dbo`.`Products` AS `p`
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.Oracle, 
+            [
+                """
+                SELECT
+                    "p"."Id"
+                FROM "dbo"."Products" "p"
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.PostgreSql, 
+            [
+                """
+                SELECT
+                    "p"."Id"
+                FROM "dbo"."Products" AS "p"
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqLite,
+            [
+                """
+                SELECT
+                    "p"."Id"
+                FROM "dbo"."Products" AS "p"
+                """
+            ]
+        ),
+        new SqlTestCase(
+            SqlDialectKind.SqlServer,
+            [
+                """
+                SELECT
+                    [p].[Id]
+                FROM [dbo].[Products] AS [p]
                 """
             ]
         )
