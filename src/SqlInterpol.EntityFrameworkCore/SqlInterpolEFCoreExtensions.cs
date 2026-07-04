@@ -103,7 +103,7 @@ public static class SqlInterpolEFCoreExtensions
     public static ModelBuilder MapSqlEntity<T>(this ModelBuilder modelBuilder, SqlInterpolOptions? options = null) where T : class
     {
         var meta = SqlMetadataRegistry.GetMetadata<T>();
-        options ??= new SqlInterpolOptions();
+        options ??= SqlInterpolOptions.DefaultFactory?.Invoke() ?? new SqlInterpolOptions();
 
         // Respect [SqlView] vs [SqlTable] — views must not be treated as tables by EF Core migrations.
         if (meta.Type == SqlEntityType.View)

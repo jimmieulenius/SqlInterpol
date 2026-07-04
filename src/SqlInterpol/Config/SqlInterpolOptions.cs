@@ -1,4 +1,3 @@
-using SqlInterpol.Dialects;
 using SqlInterpol.Parsing;
 
 namespace SqlInterpol;
@@ -14,6 +13,13 @@ namespace SqlInterpol;
 /// </remarks>
 public record SqlInterpolOptions
 {
+    /// <summary>
+    /// A factory method used to generate the default options for every newly created SqlBuilder.
+    /// Configure this once at application startup.
+    /// Example: SqlInterpolOptions.DefaultFactory = () => new SqlInterpolOptions { MetaSqlTranspilation = false };
+    /// </summary>
+    public static Func<SqlInterpolOptions>? DefaultFactory { get; set; }
+
     /// <summary>
     /// Gets the starting index used when generating parameter names (e.g. <c>0</c> → <c>@p0</c>, <c>1</c> → <c>@p1</c>).
     /// Defaults to <c>0</c>.
@@ -62,6 +68,13 @@ public record SqlInterpolOptions
     /// Defaults to false to ensure backward compatibility.
     /// </summary>
     public bool EntityAutoAliasing { get; set; } = false;
+
+    /// <summary>
+    /// When true, the engine will structurally transpile known Meta-SQL keywords 
+    /// (like LIMIT / OFFSET) into the syntax required by the active database dialect.
+    /// Default is true.
+    /// </summary>
+    public bool MetaSqlTranspilation { get; set; } = true;
 
     /// <summary>
     /// Gets the active dialect kind. Set automatically by <see cref="SqlBuilder"/> when constructing the context.

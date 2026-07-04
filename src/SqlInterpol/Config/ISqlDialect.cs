@@ -78,5 +78,5 @@ public interface ISqlDialect
 
     /// <summary>Returns the default <see cref="SqlInterpolOptions"/> for this dialect.</summary>
     /// <returns>A new <see cref="SqlInterpolOptions"/> with dialect-appropriate defaults.</returns>
-    SqlInterpolOptions GetDefaultOptions() => new();
+    SqlInterpolOptions GetDefaultOptions() => SqlInterpolOptions.DefaultFactory?.Invoke() ?? new SqlInterpolOptions() with { Dialect = Kind };
 }

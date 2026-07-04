@@ -3,10 +3,6 @@ using SqlInterpol.Benchmarks.Models;
 
 namespace SqlInterpol.Benchmarks;
 
-/// <summary>
-/// Measures the rendering cost across all five supported dialects for the same logical query.
-/// Highlights per-dialect overhead differences (identifier quoting, parameter styles, etc.).
-/// </summary>
 [MemoryDiagnoser]
 [MarkdownExporter]
 public class MultiDialectBenchmarks
@@ -56,16 +52,17 @@ public class MultiDialectBenchmarks
         int categoryId = 3;
         decimal minPrice = 9.99m;
 
-        var p = db.AddEntity<Product>(alias: "p");
-        var ol = db.AddEntity<OrderLine>(alias: "ol");
+        db.Entity<Product>(out var p);
+        db.Entity<OrderLine>(out var ol);
 
+        // The lexer dynamically detects 'AS p' and 'AS ol' now natively!
         db.Append($"""
-            SELECT {p[x => x.Id]}, {p[x => x.Name]}, SUM({ol[x => x.Price]}) AS total
-            FROM {p}
-            JOIN {ol} ON {p[x => x.Id]} = {ol[x => x.ProductId]}
-            WHERE {p[x => x.CategoryId]} = {categoryId}
-              AND {p[x => x.Price]} >= {minPrice}
-            GROUP BY {p[x => x.Id]}, {p[x => x.Name]}
+            SELECT {p.Id}, {p.Name}, SUM({ol.Price}) AS total
+            FROM {p} AS p
+            JOIN {ol} AS ol ON {p.Id} = {ol.ProductId}
+            WHERE {p.CategoryId} = {categoryId}
+              AND {p.Price} >= {minPrice}
+            GROUP BY {p.Id}, {p.Name}
             """);
     }
 }

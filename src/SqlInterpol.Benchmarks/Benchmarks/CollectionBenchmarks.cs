@@ -3,11 +3,6 @@ using SqlInterpol.Benchmarks.Models;
 
 namespace SqlInterpol.Benchmarks;
 
-/// <summary>
-/// Measures collection fragment rendering for IN (...) clauses across varying list sizes.
-/// Each item in the collection becomes a separate SQL parameter, so this exercises both
-/// the parameter-generation loop and the final SQL rendering.
-/// </summary>
 [MemoryDiagnoser]
 public class CollectionBenchmarks
 {
@@ -23,8 +18,8 @@ public class CollectionBenchmarks
     public string InClause_PostgreSql()
     {
         var db = SqlBuilder.PostgreSql();
-        var o = db.AddEntity<Order>();
-        db.Append($"SELECT {o[x => x.Id]}, {o[x => x.Total]} FROM {o} WHERE {o[x => x.Id]} IN ({_ids})");
+        db.Entity<Order>(out var o);
+        db.Append($"SELECT {o.Id}, {o.Total} FROM {o} WHERE {o.Id} IN ({_ids})");
         return db.Build().Sql;
     }
 
@@ -32,8 +27,8 @@ public class CollectionBenchmarks
     public string InClause_SqlServer()
     {
         var db = SqlBuilder.SqlServer();
-        var o = db.AddEntity<Order>();
-        db.Append($"SELECT {o[x => x.Id]}, {o[x => x.Total]} FROM {o} WHERE {o[x => x.Id]} IN ({_ids})");
+        db.Entity<Order>(out var o);
+        db.Append($"SELECT {o.Id}, {o.Total} FROM {o} WHERE {o.Id} IN ({_ids})");
         return db.Build().Sql;
     }
 
@@ -41,8 +36,8 @@ public class CollectionBenchmarks
     public string InClause_MySql()
     {
         var db = SqlBuilder.MySql();
-        var o = db.AddEntity<Order>();
-        db.Append($"SELECT {o[x => x.Id]}, {o[x => x.Total]} FROM {o} WHERE {o[x => x.Id]} IN ({_ids})");
+        db.Entity<Order>(out var o);
+        db.Append($"SELECT {o.Id}, {o.Total} FROM {o} WHERE {o.Id} IN ({_ids})");
         return db.Build().Sql;
     }
 }

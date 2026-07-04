@@ -38,7 +38,7 @@ public abstract class SqlDialectBase : ISqlDialect
 
 
     /// <inheritdoc />
-    public virtual SqlInterpolOptions GetDefaultOptions() => new();
+    public virtual SqlInterpolOptions GetDefaultOptions() => (SqlInterpolOptions.DefaultFactory?.Invoke() ?? new SqlInterpolOptions()) with { Dialect = Kind };
 
     /// <inheritdoc />
     public virtual string QuoteIdentifier(string name)

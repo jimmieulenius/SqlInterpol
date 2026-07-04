@@ -98,9 +98,17 @@ public partial class SqlSegmentPreprocessor
 
         if (!TryParseAlias(text.AsSpan(), out var parseResult))
         {
-            // FIX: If we found non-whitespace text that could not be parsed as an alias 
-            // (e.g., punctuation like '(' or ',' or DDL keywords), the alias opportunity is DEAD.
-            var trimmed = text.AsSpan().TrimStart();
+            // FIX: Ignore leading whitespaces and closing parentheses ')' 
+            // just like TryParseAlias does, before checking for a dangling AS.
+            int idx = 0;
+            while (idx < text.Length)
+            {
+                char c = text[idx];
+                if (char.IsWhiteSpace(c) || c == ')') idx++;
+                else break;
+            }
+            var trimmed = text.AsSpan(idx);
+
             if (trimmed.Length > 0)
             {
                 // Preserve dangling "AS " so hole-bound aliases still work!
@@ -202,7 +210,13 @@ public partial class SqlSegmentPreprocessor
 
         string? customAliasString = null;
 
-        if (segment.Value is ISqlEntityBase entityTarget)
+        // Extract raw alias from segment value if it's a string hole (e.g., {{"stats"}})
+        if (segment.Value is string explicitHoleAlias)
+        {
+             customAliasString = state.Context.Dialect.QuoteIdentifier(explicitHoleAlias.Trim('[', ']', '"', '`', ' ', '<', '>'));
+             ApplyAliasToTarget(customAliasString, state);
+        }
+        else if (segment.Value is ISqlEntityBase entityTarget)
         {
             string rawAlias = !string.IsNullOrWhiteSpace(entityTarget.Reference.Alias) ? entityTarget.Reference.Alias : (entityTarget.Reference.FallbackAlias ?? entityTarget.ModelType.Name);
             customAliasString = state.Context.Dialect.QuoteIdentifier(rawAlias.Trim('[', ']', '"', '`', ' ', '<', '>'));

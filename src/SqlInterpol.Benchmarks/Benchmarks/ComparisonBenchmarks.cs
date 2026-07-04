@@ -7,12 +7,6 @@ using System.Text;
 
 namespace SqlInterpol.Benchmarks;
 
-/// <summary>
-/// Compares SqlInterpol against raw strings, Dapper.SqlBuilder, and SqlKata across three scenarios:
-/// 1. Simple filtered SELECT (baseline)
-/// 2. IN (...) clause with a variable-size collection (parameter expansion)
-/// 3. Aliased multi-table JOIN (alias resolution)
-/// </summary>
 [MemoryDiagnoser]
 [MarkdownExporter]
 public class ComparisonBenchmarks
@@ -23,19 +17,35 @@ public class ComparisonBenchmarks
     private readonly int _customerId = 42;
     private readonly int[] _filterIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
-    // Static Pre-Compiled Templates
-    private static readonly SqlTemplate<Product> _filteredSelectTemplate = SqlTemplate.Create<Product>((db, p) =>
-        db.Append($"SELECT {p[x => x.Id]}, {p[x => x.Name]}, {p[x => x.Price]} FROM {p} WHERE {p[x => x.CategoryId]} = {Sql.Arg("CategoryId")} AND {p[x => x.Price]} >= {Sql.Arg("MinPrice")} AND {p[x => x.IsActive]} = {Sql.Arg("IsActive")}"));
-
-    private static readonly SqlTemplate<Order, OrderLine> _aliasedJoinTemplate = SqlTemplate.Create<Order, OrderLine>((db, o, ol) =>
-        db.Append($"SELECT {o[x => x.Id]}, {o[x => x.CustomerId]}, {ol[x => x.Price]}, {ol[x => x.Quantity]} FROM {o} JOIN {ol} ON {o[x => x.Id]} = {ol[x => x.OrderId]} WHERE {o[x => x.CustomerId]} = {Sql.Arg("CustomerId")}"));
-
-    // SqlKata Compiler (Instantiated once to match fairness with static caches)
+    // Static Pre-Compiled Templates (New API)
+    private static readonly ISqlTemplate _filteredSelectTemplate;
+    private static readonly ISqlTemplate _aliasedJoinTemplate;
     private static readonly PostgresCompiler _postgresCompiler = new PostgresCompiler();
 
-    // -------------------------------------------------------------------------
-    // Scenario 1: Simple filtered SELECT
-    // -------------------------------------------------------------------------
+    static ComparisonBenchmarks()
+    {
+        var db = SqlBuilder.PostgreSql();
+        
+        db.Entity<Product>(out var p);
+        db.Template(out _filteredSelectTemplate, $$"""
+            SELECT {{p.Id}}, {{p.Name}}, {{p.Price}} 
+            FROM {{p}} 
+            WHERE {{p.CategoryId}} = {{Sql.Arg("CategoryId")}} 
+              AND {{p.Price}} >= {{Sql.Arg("MinPrice")}} 
+              AND {{p.IsActive}} = {{Sql.Arg("IsActive")}}
+            """);
+
+        db.Clear();
+        
+        db.Entity<Order>(out var o);
+        db.Entity<OrderLine>(out var ol);
+        db.Template(out _aliasedJoinTemplate, $$"""
+            SELECT {{o.Id}}, {{o.CustomerId}}, {{ol.Price}}, {{ol.Quantity}} 
+            FROM {{o}} AS o 
+            JOIN {{ol}} AS ol ON {{o.Id}} = {{ol.OrderId}} 
+            WHERE {{o.CustomerId}} = {{Sql.Arg("CustomerId")}}
+            """);
+    }
 
     [Benchmark(Baseline = true)]
     public string RawString() =>
@@ -45,18 +55,13 @@ public class ComparisonBenchmarks
     public string DapperSqlBuilder()
     {
         var builder = new DapperSB();
-        var template = builder.AddTemplate(
-            "SELECT Id, PROD_NAME, Price FROM Products /**where**/");
+        var template = builder.AddTemplate("SELECT Id, PROD_NAME, Price FROM Products /**where**/");
         builder.Where("CategoryId = @categoryId", new { categoryId = _categoryId });
         builder.Where("Price >= @minPrice", new { minPrice = _minPrice });
         builder.Where("IsActive = @isActive", new { isActive = _isActive });
         return template.RawSql;
     }
 
-    /// <summary>
-    /// SqlKata — Fluent API building an AST, then compiled by PostgresCompiler.
-    /// Does not use reflection for column names (requires magic strings).
-    /// </summary>
     [Benchmark]
     public string SqlKata_PostgreSql()
     {
@@ -73,8 +78,8 @@ public class ComparisonBenchmarks
     public string SqlInterpol_PostgreSql()
     {
         var db = SqlBuilder.PostgreSql();
-        var p = db.AddEntity<Product>();
-        db.Append($"SELECT {p[x => x.Id]}, {p[x => x.Name]}, {p[x => x.Price]} FROM {p} WHERE {p[x => x.CategoryId]} = {_categoryId} AND {p[x => x.Price]} >= {_minPrice} AND {p[x => x.IsActive]} = {_isActive}");
+        db.Entity<Product>(out var p);
+        db.Append($"SELECT {p.Id}, {p.Name}, {p.Price} FROM {p} WHERE {p.CategoryId} = {_categoryId} AND {p.Price} >= {_minPrice} AND {p.IsActive} = {_isActive}");
         return db.Build().Sql;
     }
 
@@ -82,14 +87,9 @@ public class ComparisonBenchmarks
     public string SqlInterpolTemplate_PostgreSql()
     {
         var db = SqlBuilder.PostgreSql();
-        var p = db.AddEntity<Product>();
-        db.Append(_filteredSelectTemplate, p, new { CategoryId = _categoryId, MinPrice = _minPrice, IsActive = _isActive });
+        db.Append(_filteredSelectTemplate, new { CategoryId = _categoryId, MinPrice = _minPrice, IsActive = _isActive });
         return db.Build().Sql;
     }
-
-    // -------------------------------------------------------------------------
-    // Scenario 2: IN (...) clause — collection parameter expansion
-    // -------------------------------------------------------------------------
 
     [Benchmark]
     public string RawString_InClause()
@@ -104,9 +104,6 @@ public class ComparisonBenchmarks
         return sb.ToString();
     }
 
-    /// <summary>
-    /// SqlKata: Uses .WhereIn() to expand collections dynamically.
-    /// </summary>
     [Benchmark]
     public string SqlKata_InClause()
     {
@@ -122,23 +119,15 @@ public class ComparisonBenchmarks
     public string SqlInterpol_InClause()
     {
         var db = SqlBuilder.PostgreSql();
-        var p = db.AddEntity<Product>();
-        db.Append($"SELECT {p[x => x.Id]}, {p[x => x.Name]} FROM {p} WHERE {p[x => x.CategoryId]} = {_categoryId} AND {p[x => x.Id]} IN ({_filterIds})");
+        db.Entity<Product>(out var p);
+        db.Append($"SELECT {p.Id}, {p.Name} FROM {p} WHERE {p.CategoryId} = {_categoryId} AND {p.Id} IN ({_filterIds})");
         return db.Build().Sql;
     }
-
-    // -------------------------------------------------------------------------
-    // Scenario 3: Aliased multi-table JOIN — alias resolution
-    // -------------------------------------------------------------------------
 
     [Benchmark]
     public string RawString_AliasedJoin() =>
         "SELECT o.\"Id\", o.\"CustomerId\", ol.\"Price\", ol.\"Quantity\" FROM \"dbo\".\"Orders\" AS o JOIN \"dbo\".\"OrderLines\" AS ol ON o.\"Id\" = ol.\"OrderId\" WHERE o.\"CustomerId\" = @p0";
 
-    /// <summary>
-    /// SqlKata: Aliases must be typed explicitly as magic strings in the From/Join definitions 
-    /// and prefixed manually in the Select statements.
-    /// </summary>
     [Benchmark]
     public string SqlKata_AliasedJoin()
     {
@@ -154,9 +143,9 @@ public class ComparisonBenchmarks
     public string SqlInterpol_AliasedJoin()
     {
         var db = SqlBuilder.PostgreSql();
-        var o = db.AddEntity<Order>(alias: "o");
-        var ol = db.AddEntity<OrderLine>(alias: "ol");
-        db.Append($"SELECT {o[x => x.Id]}, {o[x => x.CustomerId]}, {ol[x => x.Price]}, {ol[x => x.Quantity]} FROM {o} JOIN {ol} ON {o[x => x.Id]} = {ol[x => x.OrderId]} WHERE {o[x => x.CustomerId]} = {_customerId}");
+        db.Entity<Order>(out var o);
+        db.Entity<OrderLine>(out var ol);
+        db.Append($"SELECT {o.Id}, {o.CustomerId}, {ol.Price}, {ol.Quantity} FROM {o} AS o JOIN {ol} AS ol ON {o.Id} = {ol.OrderId} WHERE {o.CustomerId} = {_customerId}");
         return db.Build().Sql;
     }
 
@@ -164,9 +153,7 @@ public class ComparisonBenchmarks
     public string SqlInterpolTemplate_AliasedJoin()
     {
         var db = SqlBuilder.PostgreSql();
-        var o = db.AddEntity<Order>(alias: "o");
-        var ol = db.AddEntity<OrderLine>(alias: "ol");
-        db.Append(_aliasedJoinTemplate, o, ol, new { CustomerId = _customerId });
+        db.Append(_aliasedJoinTemplate, new { CustomerId = _customerId });
         return db.Build().Sql;
     }
 }
