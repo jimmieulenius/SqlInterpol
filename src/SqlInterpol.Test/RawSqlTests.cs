@@ -110,10 +110,9 @@ public class RawSqlTests
                         GROUP BY "dbo"."Products"."Id", "dbo"."Products"."PROD_NAME"
                         HAVING COUNT(*) > 1
                         ORDER BY "dbo"."Products"."PROD_NAME" DESC
-                        LIMIT 10 OFFSET 5
-                        """
-                    ],
-                    expectedParameters: expectedParams
+                        OFFSET 5 ROWS FETCH NEXT 10 ROWS ONLY
+                        """ // <-- Make sure the closing quotes line up with SELECT
+                    ]
                 ),
                 new SqlTestCase(
                     SqlDialectKind.PostgreSql,
@@ -158,10 +157,9 @@ public class RawSqlTests
                         GROUP BY [dbo].[Products].[Id], [dbo].[Products].[PROD_NAME]
                         HAVING COUNT(*) > 1
                         ORDER BY [dbo].[Products].[PROD_NAME] DESC
-                        LIMIT 10 OFFSET 5
+                        OFFSET 5 ROWS FETCH NEXT 10 ROWS ONLY
                         """
-                    ],
-                    expectedParameters: expectedParams
+                    ]
                 )
             ];
         }

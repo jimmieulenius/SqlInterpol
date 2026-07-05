@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using SqlInterpol.Parsing;
 
 namespace SqlInterpol;
@@ -88,6 +90,12 @@ public record SqlInterpolOptions
     public ISqlSegmentPreprocessor? Preprocessor { get; init; }
 
     /// <summary>
+    /// A pipeline of custom lexical rules executed before the core preprocessor.
+    /// Modify this list to inject advanced syntax recognition from extension packages.
+    /// </summary>
+    public List<ISqlPreprocessorRule> PreprocessorRules { get; } = new();
+
+    /// <summary>
     /// The compilation pipeline modules. Modifying this list allows you to inject 
     /// custom SQL AST transformations. Duplicate rewriter types are safely ignored.
     /// </summary>
@@ -103,6 +111,25 @@ public record SqlInterpolOptions
     /// When <see langword="null"/>, <c>SqlSegmentRenderer.Instance</c> is used.
     /// </summary>
     public ISqlSegmentRenderer? Renderer { get; init; }
+
+    /// <summary>
+    /// A registry of custom keywords and their associated AST tags.
+    /// Extension packages can add keywords here so the Lexer automatically identifies them!
+    /// </summary>
+    public Dictionary<string, string[]> KeywordTags { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Creates a new instance of options and automatically applies any globally registered extensions.
+    /// </summary>
+    public SqlInterpolOptions()
+    {
+        // Pull the deduplicated list of extensions from the registry!
+        var globals = SqlExtensionRegistry.GetGlobalExtensions();
+        for (int i = 0; i < globals.Count; i++)
+        {
+            globals[i].Register(this);
+        }
+    }
 
     /// <summary>
     /// Returns the default <see cref="SqlInterpolOptions"/> for the specified dialect

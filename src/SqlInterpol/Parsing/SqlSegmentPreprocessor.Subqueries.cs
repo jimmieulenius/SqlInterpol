@@ -16,7 +16,7 @@ public partial class SqlSegmentPreprocessor
         return null;
     }
 
-    private bool ProcessSubquery(SqlSegment segment, int currentIndex, IReadOnlyList<SqlSegment> segments, PreprocessorState state)
+    private bool ProcessSubquery(SqlSegment segment, int currentIndex, IReadOnlyList<SqlSegment> segments, SqlPreprocessorState state)
     {
         bool isSubquery = segment.Value is ISqlQueryFragment || (segment.Value is ISqlEntityBase e && e.Reference is ISqlQueryFragment) || segment.Value is ISqlQuery;                  
         var innerSegments = isSubquery && segment.Value != null ? ExtractInternalSegments(segment.Value) : null;

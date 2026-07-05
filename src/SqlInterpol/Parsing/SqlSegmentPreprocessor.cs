@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace SqlInterpol.Parsing;
 
 /// <summary>
@@ -11,12 +13,36 @@ public partial class SqlSegmentPreprocessor : ISqlSegmentPreprocessor
     /// <inheritdoc />
     public IReadOnlyList<SqlSegment> Process(IReadOnlyList<SqlSegment> segments, ISqlContext context)
     {
-        var state = new PreprocessorState(context, segments.Count + 10);
+        var state = new SqlPreprocessorState(context, segments.Count + 10);
+        
+        // ====================================================================
+        // MICRO-OPTIMIZATION: Cache the extension rules flag outside the loop!
+        // ====================================================================
+        var rules = context.Options.PreprocessorRules;
+        bool hasCustomRules = rules.Count > 0;
 
         for (int i = 0; i < segments.Count; i++)
         {
             var segment = segments[i];
 
+            // 1. The Extension Pipeline (e.g., custom JSON operators, proprietary syntax)
+            if (hasCustomRules)
+            {
+                bool handled = false;
+                for (int r = 0; r < rules.Count; r++)
+                {
+                    if (rules[r].Process(ref segment, segments, i, state))
+                    {
+                        handled = true;
+                        break;
+                    }
+                }
+                
+                // If a custom rule took ownership of this segment, skip the core pipeline
+                if (handled) continue;
+            }
+
+            // 2. The Core State Machine (Lightning Fast)
             if (ProcessSubquery(segment, i, segments, state)) continue;
             if (ProcessHoleBoundAlias(segment, state)) continue;
             

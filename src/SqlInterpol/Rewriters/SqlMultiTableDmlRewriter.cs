@@ -1,4 +1,7 @@
 using SqlInterpol.Parsing;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace SqlInterpol;
 
@@ -9,7 +12,8 @@ namespace SqlInterpol;
 public class SqlMultiTableDmlRewriter : ISqlSegmentRewriter
 {
     /// <inheritdoc />
-    public bool IsApplicable(ISqlCompilationState state) => true; // Safely process dynamically wrapped AST fragments
+    // FIX: Cleanly opt-out of DML transpilation if the user disables Meta-SQL!
+    public bool IsApplicable(ISqlCompilationState state) => state.Context.Options.MetaSqlTranspilation;
 
     /// <inheritdoc />
     public IReadOnlyList<SqlSegment> Rewrite(IReadOnlyList<SqlSegment> segments, ISqlContext context)

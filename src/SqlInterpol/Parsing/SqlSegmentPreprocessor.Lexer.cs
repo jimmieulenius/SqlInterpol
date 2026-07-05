@@ -5,7 +5,7 @@ namespace SqlInterpol.Parsing;
 
 public partial class SqlSegmentPreprocessor
 {
-    private void ProcessTextLiteral(SqlSegment segment, IReadOnlyList<SqlSegment> segments, int i, PreprocessorState state)
+    private void ProcessTextLiteral(SqlSegment segment, IReadOnlyList<SqlSegment> segments, int i, SqlPreprocessorState state)
     {
         string text = (string)segment.Value!;
         if (text.Contains(';')) state.ForceBaseNamePhase = false;
@@ -20,6 +20,13 @@ public partial class SqlSegmentPreprocessor
         {
             TryExtractInlineAlias(ref text, segment, state);
         }
+
+        // ====================================================================
+        // MICRO-OPTIMIZATION: Cache hot-path flags outside the character loop!
+        // ====================================================================
+        bool metaSql = state.Context.Options.MetaSqlTranspilation;
+        bool hasKeywordTags = state.Context.Options.KeywordTags.Count > 0;
+        var keywordTagsDict = hasKeywordTags ? state.Context.Options.KeywordTags : null;
 
         int lastSplitIdx = 0;
         for (int j = 0; j < text.Length; j++)
@@ -41,9 +48,10 @@ public partial class SqlSegmentPreprocessor
                 var span = text.AsSpan(j);
                 string? matchedWord = null;
                 string? targetTag = null;
+                string[]? targetTags = null; 
 
                 // Centralized keyword boundary checking via MatchKeyword helper
-                if (MatchKeyword(span, SqlKeyword.SelectDistinct.Value)) { matchedWord = SqlKeyword.SelectDistinct.Value; targetTag = SqlSegmentTag.SelectDistinctKeyword; }
+                if (MatchKeyword(span, SqlKeyword.SelectDistinct.Value))  { matchedWord = SqlKeyword.SelectDistinct.Value; targetTag = SqlSegmentTag.SelectDistinctKeyword; }
                 else if (MatchKeyword(span, SqlKeyword.Select.Value))     { matchedWord = SqlKeyword.Select.Value;   targetTag = SqlSegmentTag.SelectKeyword; }
                 else if (MatchKeyword(span, SqlKeyword.Update.Value))     { matchedWord = SqlKeyword.Update.Value;   targetTag = SqlSegmentTag.UpdateKeyword; }
                 else if (MatchKeyword(span, SqlKeyword.Set.Value))        { matchedWord = SqlKeyword.Set.Value;      targetTag = SqlSegmentTag.SetKeyword; }
@@ -55,16 +63,18 @@ public partial class SqlSegmentPreprocessor
                 else if (MatchKeyword(span, SqlKeyword.LeftJoin.Value))   { matchedWord = SqlKeyword.LeftJoin.Value;  targetTag = SqlSegmentTag.FromKeyword; }
                 else if (MatchKeyword(span, SqlKeyword.RightJoin.Value))  { matchedWord = SqlKeyword.RightJoin.Value; targetTag = SqlSegmentTag.FromKeyword; }
                 else if (MatchKeyword(span, SqlKeyword.CrossJoin.Value))  { matchedWord = SqlKeyword.CrossJoin.Value; targetTag = SqlSegmentTag.FromKeyword; }
-                else if (MatchKeyword(span, SqlKeyword.Join.Value))       { matchedWord = SqlKeyword.Join.Value;       targetTag = SqlSegmentTag.FromKeyword; }
+                else if (MatchKeyword(span, SqlKeyword.Join.Value))       { matchedWord = SqlKeyword.Join.Value;     targetTag = SqlSegmentTag.FromKeyword; }
                 else if (MatchKeyword(span, SqlKeyword.Where.Value))      { matchedWord = SqlKeyword.Where.Value;    targetTag = SqlSegmentTag.WhereKeyword; }
                 else if (MatchKeyword(span, SqlKeyword.OrderBy.Value))    { matchedWord = SqlKeyword.OrderBy.Value;   targetTag = SqlSegmentTag.WhereKeyword; } 
                 else if (MatchKeyword(span, SqlKeyword.GroupBy.Value))    { matchedWord = SqlKeyword.GroupBy.Value;   targetTag = SqlSegmentTag.WhereKeyword; }
                 else if (MatchKeyword(span, SqlKeyword.Having.Value))     { matchedWord = SqlKeyword.Having.Value;   targetTag = SqlSegmentTag.WhereKeyword; }
                 else if (MatchKeyword(span, SqlKeyword.Delete.Value))     { matchedWord = SqlKeyword.Delete.Value;   targetTag = SqlSegmentTag.DeleteKeyword; }
-                else if (MatchKeyword(span, SqlKeyword.Limit.Value))      { matchedWord = SqlKeyword.Limit.Value;    targetTag = SqlSegmentTag.Paging; }
-                else if (MatchKeyword(span, SqlKeyword.Returning.Value))  { matchedWord = SqlKeyword.Returning.Value;targetTag = SqlSegmentTag.ReturningKeyword; }
-                else if (MatchKeyword(span, SqlKeyword.ForUpdate.Value))  { matchedWord = SqlKeyword.ForUpdate.Value;  targetTag = SqlSegmentTag.ForUpdateKeyword; }
-                else if (MatchKeyword(span, SqlKeyword.ForShare.Value))   { matchedWord = SqlKeyword.ForShare.Value;   targetTag = SqlSegmentTag.ForShareKeyword; }
+                
+                // Meta-SQL Transpilation keywords (Using cached metaSql flag!)
+                else if (metaSql && MatchKeyword(span, SqlKeyword.Limit.Value))      { matchedWord = SqlKeyword.Limit.Value;    targetTag = SqlSegmentTag.Paging; }
+                else if (metaSql && MatchKeyword(span, SqlKeyword.Returning.Value))  { matchedWord = SqlKeyword.Returning.Value;targetTag = SqlSegmentTag.ReturningKeyword; }
+                else if (metaSql && MatchKeyword(span, SqlKeyword.ForUpdate.Value))  { matchedWord = SqlKeyword.ForUpdate.Value;  targetTag = SqlSegmentTag.ForUpdateKeyword; }
+                else if (metaSql && MatchKeyword(span, SqlKeyword.ForShare.Value))   { matchedWord = SqlKeyword.ForShare.Value;   targetTag = SqlSegmentTag.ForShareKeyword; }
                 
                 else if (MatchKeyword(span, "WITH RECURSIVE"))
                 {
@@ -94,6 +104,23 @@ public partial class SqlSegmentPreprocessor
                         }
                     }
                 }
+                // Custom Extension Keywords (Using cached boolean and cached dictionary reference!)
+                else if (hasKeywordTags)
+                {
+                    int wordLen = 0;
+                    
+                    // Stop at punctuation or whitespace
+                    while (wordLen < span.Length && (char.IsLetterOrDigit(span[wordLen]) || span[wordLen] == '_')) wordLen++;
+                    
+                    if (wordLen > 0)
+                    {
+                        var currentWord = span.Slice(0, wordLen).ToString();
+                        if (keywordTagsDict!.TryGetValue(currentWord, out targetTags))
+                        {
+                            matchedWord = currentWord;
+                        }
+                    }
+                }
 
                 if (matchedWord != null)
                 {
@@ -103,10 +130,19 @@ public partial class SqlSegmentPreprocessor
                              targetTag == SqlSegmentTag.InsertValuesKeyword || targetTag == SqlSegmentTag.IntoKeyword || 
                              targetTag == SqlSegmentTag.SetKeyword || targetTag == SqlSegmentTag.WhereKeyword) state.ForceBaseNamePhase = false;
 
+                    // Push the parsed literal string BEFORE the keyword
                     if (j > lastSplitIdx) state.Refined.Add(new SqlSegment(SqlSegmentType.Literal, text[lastSplitIdx..j], segment.RenderMode, segment.Tags));
                     
-                    var appliedTags = targetTag != null && state.ParenDepth == 0 ? new[] { targetTag } : [];
-                    state.Refined.Add(new SqlSegment(SqlSegmentType.Literal, text.Substring(j, matchedWord.Length), null, appliedTags));
+                    // Push the matched keyword using Custom Tags (if present) or Standard Tags
+                    if (targetTags != null)
+                    {
+                        state.Refined.Add(new SqlSegment(SqlSegmentType.Literal, text.Substring(j, matchedWord.Length), null, targetTags));
+                    }
+                    else
+                    {
+                        var appliedTags = targetTag != null && state.ParenDepth == 0 ? new[] { targetTag } : [];
+                        state.Refined.Add(new SqlSegment(SqlSegmentType.Literal, text.Substring(j, matchedWord.Length), null, appliedTags));
+                    }
                     
                     state.CurrentKeyword = matchedWord;
                     state.CurrentClauseTag = targetTag;

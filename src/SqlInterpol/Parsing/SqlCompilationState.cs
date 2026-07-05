@@ -7,8 +7,12 @@ internal class SqlCompilationState : ISqlCompilationState
 {
     private readonly HashSet<string> _tags;
 
-    public SqlCompilationState(IReadOnlyList<SqlSegment> segments)
+    public ISqlContext Context { get; }
+
+    public SqlCompilationState(IReadOnlyList<SqlSegment> segments, ISqlContext context)
     {
+        Context = context;
+        
         // Initialize with default capacity, case-insensitive
         _tags = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 

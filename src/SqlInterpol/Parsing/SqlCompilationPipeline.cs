@@ -20,8 +20,8 @@ public class SqlCompilationPipeline
         // 1. Lexical Analysis & Tagging
         var segments = _preprocessor.Process(rawSegments, context);
 
-        // 2. Generate O(1) State Snapshot
-        var state = new SqlCompilationState(segments);
+        // 2. Generate O(1) State Snapshot (Now passing context!)
+        var state = new SqlCompilationState(segments, context);
 
         // 3. Execute AST Transformations
         for (int i = 0; i < _rewriters.Length; i++)

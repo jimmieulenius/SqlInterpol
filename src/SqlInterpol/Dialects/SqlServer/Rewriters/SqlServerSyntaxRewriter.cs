@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using SqlInterpol.Parsing;
 using SqlInterpol.Rewriters;
 
@@ -136,7 +139,9 @@ public class SqlServerSyntaxRewriter : SqlSyntaxRewriterBase
 
     protected override bool TryRewritePaging(SqlSegment segment, IReadOnlyList<SqlSegment> segments, List<SqlSegment> rewritten, ref int i)
     {
-        if (!segment.HasTag(SqlSegmentTag.Paging) || !SqlRewriterHelpers.TryExtractPagingParameters(segments, i, out var limitParam, out var offsetParam, out int nextIndex)) return false;
+        // FIX: Switch to the robust hybrid literal/parameter extractor!
+        if (!segment.HasTag(SqlSegmentTag.Paging) || !SqlRewriterHelpers.TryExtractPagingNodes(segments, i, out var limitNode, out var offsetNode, out int nextIndex, out string trailingText)) 
+            return false;
 
         if (segment.Value is string textPaging)
         {
@@ -145,10 +150,16 @@ public class SqlServerSyntaxRewriter : SqlSyntaxRewriterBase
         }
 
         rewritten.Add(new SqlSegment(SqlSegmentType.Literal, $"{SqlKeyword.Offset.Value} "));
-        rewritten.Add(offsetParam); 
+        rewritten.Add(offsetNode); 
         rewritten.Add(new SqlSegment(SqlSegmentType.Literal, " ROWS FETCH NEXT "));
-        rewritten.Add(limitParam); 
+        rewritten.Add(limitNode); 
         rewritten.Add(new SqlSegment(SqlSegmentType.Literal, " ROWS ONLY"));
+
+        // Append any unrecognized characters (like semicolons or comments) that were trailing the integers
+        if (!string.IsNullOrEmpty(trailingText))
+        {
+            rewritten.Add(new SqlSegment(SqlSegmentType.Literal, " " + trailingText.TrimStart()));
+        }
 
         i = nextIndex;
         return true;

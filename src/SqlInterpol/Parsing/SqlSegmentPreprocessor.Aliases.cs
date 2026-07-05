@@ -7,7 +7,7 @@ public partial class SqlSegmentPreprocessor
         if (target is ISqlAliasable aliasableTarget) aliasableTarget.Alias = alias;
     }
 
-    private static void ApplyAliasToTarget(string quotedAlias, PreprocessorState state)
+    private static void ApplyAliasToTarget(string quotedAlias, SqlPreprocessorState state)
     {
         // FIX: Prioritize the immediate LastAliasableTarget! 
         // Previously, LastEntityRef was blindly hijacking aliases meant for columns.
@@ -25,7 +25,7 @@ public partial class SqlSegmentPreprocessor
         }
     }
 
-    private static string DetermineAliasTag(PreprocessorState state)
+    private static string DetermineAliasTag(SqlPreprocessorState state)
     {
         if (state.ActiveDmlKeyword == SqlKeyword.Update.Value && state.CurrentClauseTag == SqlSegmentTag.UpdateKeyword) 
             return SqlSegmentTag.UpdateAsKeyword;
@@ -92,7 +92,7 @@ public partial class SqlSegmentPreprocessor
         return new SqlColumnReference(activeRef, entityMeta.Columns[memberMeta], memberMeta.Name);
     }
 
-    private bool TryExtractInlineAlias(ref string text, SqlSegment segment, PreprocessorState state)
+    private bool TryExtractInlineAlias(ref string text, SqlSegment segment, SqlPreprocessorState state)
     {
         if (string.IsNullOrEmpty(text)) return false;
 
@@ -197,7 +197,7 @@ public partial class SqlSegmentPreprocessor
         return true;
     }
 
-    private bool ProcessHoleBoundAlias(SqlSegment segment, PreprocessorState state)
+    private bool ProcessHoleBoundAlias(SqlSegment segment, SqlPreprocessorState state)
     {
         if (!state.ExpectsAlias || segment.Type == SqlSegmentType.Literal) return false;
         state.ExpectsAlias = false;

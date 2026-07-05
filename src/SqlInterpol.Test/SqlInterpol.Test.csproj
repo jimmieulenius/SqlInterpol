@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SqlInterpol\SqlInterpol.csproj" />
+    <ProjectReference Include="..\SqlInterpol.Test.MetaSql.Functions\SqlInterpol.Test.MetaSql.Functions.csproj" />
   </ItemGroup>
 
   <ItemGroup>

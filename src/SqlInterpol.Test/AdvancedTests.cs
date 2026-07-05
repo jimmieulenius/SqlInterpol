@@ -589,7 +589,7 @@ public class AdvancedTests
                 GROUP BY "dbo"."Products"."Id", "dbo"."Products"."PROD_NAME"
                 HAVING COUNT(*) > 1
                 ORDER BY "dbo"."Products"."PROD_NAME" DESC
-                LIMIT 10 OFFSET 5
+                OFFSET 5 ROWS FETCH NEXT 10 ROWS ONLY
                 """
             ]
         ),
@@ -634,7 +634,7 @@ public class AdvancedTests
                 GROUP BY [dbo].[Products].[Id], [dbo].[Products].[PROD_NAME]
                 HAVING COUNT(*) > 1
                 ORDER BY [dbo].[Products].[PROD_NAME] DESC
-                LIMIT 10 OFFSET 5
+                OFFSET 5 ROWS FETCH NEXT 10 ROWS ONLY
                 """
             ]
         )

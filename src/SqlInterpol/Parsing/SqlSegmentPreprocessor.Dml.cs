@@ -9,7 +9,7 @@ public partial class SqlSegmentPreprocessor
     /// <summary>
     /// Evaluates DML structural contexts (like INSERT column lists) and delegates to standard target tracking.
     /// </summary>
-    private bool ProcessDmlContext(ref SqlSegment segment, IReadOnlyList<SqlSegment> originalSegments, PreprocessorState state)
+    private bool ProcessDmlContext(ref SqlSegment segment, IReadOnlyList<SqlSegment> originalSegments, SqlPreprocessorState state)
     {
         // 1. Structural Analysis: Auto-Detect if we are inside an INSERT INTO (...) column list
         if (segment.Value is SqlColumnReferenceBase && segment.RenderMode == null)
@@ -25,7 +25,7 @@ public partial class SqlSegmentPreprocessor
         return ProcessTargetTracking(segment, originalSegments, state);
     }
 
-    private bool ProcessTargetTracking(SqlSegment segment, IReadOnlyList<SqlSegment> segments, PreprocessorState state)
+    private bool ProcessTargetTracking(SqlSegment segment, IReadOnlyList<SqlSegment> segments, SqlPreprocessorState state)
     {
         if (segment.Value is SqlDynamicColumnFragment dynCol)
         {

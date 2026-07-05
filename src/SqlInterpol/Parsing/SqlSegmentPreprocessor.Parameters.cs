@@ -5,7 +5,7 @@ namespace SqlInterpol.Parsing;
 
 public partial class SqlSegmentPreprocessor
 {
-    private bool ProcessUnresolved(SqlSegment segment, IReadOnlyList<SqlSegment> segments, PreprocessorState state)
+    private bool ProcessUnresolved(SqlSegment segment, IReadOnlyList<SqlSegment> segments, SqlPreprocessorState state)
     {
         if (segment.Type != SqlSegmentType.Unresolved) return false;
 

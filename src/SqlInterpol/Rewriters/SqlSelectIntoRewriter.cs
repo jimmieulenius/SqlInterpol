@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using SqlInterpol.Parsing;
 
@@ -9,7 +10,8 @@ namespace SqlInterpol;
 /// </summary>
 public class SqlSelectIntoRewriter : ISqlSegmentRewriter
 {
-    public bool IsApplicable(ISqlCompilationState state) => true;
+    // Opt-out of transpilation if the user disables Meta-SQL!
+    public bool IsApplicable(ISqlCompilationState state) => state.Context.Options.MetaSqlTranspilation;
 
     public IReadOnlyList<SqlSegment> Rewrite(IReadOnlyList<SqlSegment> segments, ISqlContext context)
     {
@@ -158,6 +160,7 @@ public class SqlSelectIntoRewriter : ISqlSegmentRewriter
             }
             else
             {
+                // FIX: Removed the buggy extra newline insertion here! Just add the segment.
                 rewritten.Add(seg);
             }
         }
