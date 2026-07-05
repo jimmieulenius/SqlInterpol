@@ -104,4 +104,13 @@ public static class SqlSegmentTag
 
     /// <summary>Identifies a 'JOIN' keyword.</summary>
     public const string JoinKeyword = "JoinKeyword";
+
+    /// <summary>Identifies an ANSI standard 'TRUE' keyword.</summary>
+    public const string TrueKeyword = "TrueKeyword";
+
+    /// <summary>Identifies an ANSI standard 'FALSE' keyword.</summary>
+    public const string FalseKeyword = "FalseKeyword";
+
+    /// <summary>Identifies an ANSI standard string concatenation operator '||'.</summary>
+    public const string ConcatOperator = "ConcatOperator";
 }

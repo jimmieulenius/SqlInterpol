@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using SqlInterpol.Parsing;
 using SqlInterpol.Rewriters;
 
@@ -8,9 +5,14 @@ namespace SqlInterpol.Dialects.SqlServer;
 
 public class SqlServerSyntaxRewriter : SqlSyntaxRewriterBase
 {
+    protected override string TranspileTrueKeyword(string value) => "1";
+    protected override string TranspileFalseKeyword(string value) => "0";
+    protected override string TranspileConcatOperator(string value) => "+";
+
     protected override string ProcessLiteral(string literal)
     {
-        if (literal.Contains("WITH RECURSIVE", StringComparison.OrdinalIgnoreCase)) return SqlSegmentPreprocessor.SafeReplaceKeyword(literal, "WITH RECURSIVE", "WITH");
+        if (literal.Contains("WITH RECURSIVE", StringComparison.OrdinalIgnoreCase)) 
+            return SqlSegmentPreprocessor.SafeReplaceKeyword(literal, "WITH RECURSIVE", "WITH");
         return literal;
     }
 
@@ -139,7 +141,6 @@ public class SqlServerSyntaxRewriter : SqlSyntaxRewriterBase
 
     protected override bool TryRewritePaging(SqlSegment segment, IReadOnlyList<SqlSegment> segments, List<SqlSegment> rewritten, ref int i)
     {
-        // FIX: Switch to the robust hybrid literal/parameter extractor!
         if (!segment.HasTag(SqlSegmentTag.Paging) || !SqlRewriterHelpers.TryExtractPagingNodes(segments, i, out var limitNode, out var offsetNode, out int nextIndex, out string trailingText)) 
             return false;
 
@@ -155,7 +156,6 @@ public class SqlServerSyntaxRewriter : SqlSyntaxRewriterBase
         rewritten.Add(limitNode); 
         rewritten.Add(new SqlSegment(SqlSegmentType.Literal, " ROWS ONLY"));
 
-        // Append any unrecognized characters (like semicolons or comments) that were trailing the integers
         if (!string.IsNullOrEmpty(trailingText))
         {
             rewritten.Add(new SqlSegment(SqlSegmentType.Literal, " " + trailingText.TrimStart()));

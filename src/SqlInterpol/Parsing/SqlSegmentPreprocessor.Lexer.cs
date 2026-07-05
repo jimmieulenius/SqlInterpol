@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-
 namespace SqlInterpol.Parsing;
 
 public partial class SqlSegmentPreprocessor
@@ -21,9 +18,6 @@ public partial class SqlSegmentPreprocessor
             TryExtractInlineAlias(ref text, segment, state);
         }
 
-        // ====================================================================
-        // MICRO-OPTIMIZATION: Cache hot-path flags outside the character loop!
-        // ====================================================================
         bool metaSql = state.Context.Options.MetaSqlTranspilation;
         bool hasKeywordTags = state.Context.Options.KeywordTags.Count > 0;
         var keywordTagsDict = hasKeywordTags ? state.Context.Options.KeywordTags : null;
@@ -42,6 +36,18 @@ public partial class SqlSegmentPreprocessor
             if (c == '(') { state.PushState(); continue; }
             if (c == ')') { state.PopState(); continue; }
 
+            // ====================================================================
+            // NATIVE STRING CONCATENATION '||'
+            // ====================================================================
+            if (c == '|' && j + 1 < text.Length && text[j + 1] == '|')
+            {
+                if (j > lastSplitIdx) state.Refined.Add(new SqlSegment(SqlSegmentType.Literal, text[lastSplitIdx..j], segment.RenderMode, segment.Tags));
+                state.Refined.Add(new SqlSegment(SqlSegmentType.Literal, "||", null, [SqlSegmentTag.ConcatOperator]));
+                j++; 
+                lastSplitIdx = j + 1;
+                continue;
+            }
+
             bool isWordBoundary = j == 0 || (!char.IsLetterOrDigit(text[j - 1]) && text[j - 1] != '_');
             if (isWordBoundary)
             {
@@ -50,7 +56,6 @@ public partial class SqlSegmentPreprocessor
                 string? targetTag = null;
                 string[]? targetTags = null; 
 
-                // Centralized keyword boundary checking via MatchKeyword helper
                 if (MatchKeyword(span, SqlKeyword.SelectDistinct.Value))  { matchedWord = SqlKeyword.SelectDistinct.Value; targetTag = SqlSegmentTag.SelectDistinctKeyword; }
                 else if (MatchKeyword(span, SqlKeyword.Select.Value))     { matchedWord = SqlKeyword.Select.Value;   targetTag = SqlSegmentTag.SelectKeyword; }
                 else if (MatchKeyword(span, SqlKeyword.Update.Value))     { matchedWord = SqlKeyword.Update.Value;   targetTag = SqlSegmentTag.UpdateKeyword; }
@@ -70,7 +75,12 @@ public partial class SqlSegmentPreprocessor
                 else if (MatchKeyword(span, SqlKeyword.Having.Value))     { matchedWord = SqlKeyword.Having.Value;   targetTag = SqlSegmentTag.WhereKeyword; }
                 else if (MatchKeyword(span, SqlKeyword.Delete.Value))     { matchedWord = SqlKeyword.Delete.Value;   targetTag = SqlSegmentTag.DeleteKeyword; }
                 
-                // Meta-SQL Transpilation keywords (Using cached metaSql flag!)
+                // ====================================================================
+                // NATIVE BOOLEAN TRANSPILATION
+                // ====================================================================
+                else if (MatchKeyword(span, "TRUE"))                      { matchedWord = "TRUE";                    targetTag = SqlSegmentTag.TrueKeyword; }
+                else if (MatchKeyword(span, "FALSE"))                     { matchedWord = "FALSE";                   targetTag = SqlSegmentTag.FalseKeyword; }
+
                 else if (metaSql && MatchKeyword(span, SqlKeyword.Limit.Value))      { matchedWord = SqlKeyword.Limit.Value;    targetTag = SqlSegmentTag.Paging; }
                 else if (metaSql && MatchKeyword(span, SqlKeyword.Returning.Value))  { matchedWord = SqlKeyword.Returning.Value;targetTag = SqlSegmentTag.ReturningKeyword; }
                 else if (metaSql && MatchKeyword(span, SqlKeyword.ForUpdate.Value))  { matchedWord = SqlKeyword.ForUpdate.Value;  targetTag = SqlSegmentTag.ForUpdateKeyword; }
@@ -104,12 +114,9 @@ public partial class SqlSegmentPreprocessor
                         }
                     }
                 }
-                // Custom Extension Keywords (Using cached boolean and cached dictionary reference!)
                 else if (hasKeywordTags)
                 {
                     int wordLen = 0;
-                    
-                    // Stop at punctuation or whitespace
                     while (wordLen < span.Length && (char.IsLetterOrDigit(span[wordLen]) || span[wordLen] == '_')) wordLen++;
                     
                     if (wordLen > 0)
@@ -130,17 +137,20 @@ public partial class SqlSegmentPreprocessor
                              targetTag == SqlSegmentTag.InsertValuesKeyword || targetTag == SqlSegmentTag.IntoKeyword || 
                              targetTag == SqlSegmentTag.SetKeyword || targetTag == SqlSegmentTag.WhereKeyword) state.ForceBaseNamePhase = false;
 
-                    // Push the parsed literal string BEFORE the keyword
                     if (j > lastSplitIdx) state.Refined.Add(new SqlSegment(SqlSegmentType.Literal, text[lastSplitIdx..j], segment.RenderMode, segment.Tags));
                     
-                    // Push the matched keyword using Custom Tags (if present) or Standard Tags
                     if (targetTags != null)
                     {
                         state.Refined.Add(new SqlSegment(SqlSegmentType.Literal, text.Substring(j, matchedWord.Length), null, targetTags));
                     }
                     else
                     {
-                        var appliedTags = targetTag != null && state.ParenDepth == 0 ? new[] { targetTag } : [];
+                        // CRITICAL FIX: Ensure Native Operators bypass parenthesis stripping!
+                        bool isOperator = targetTag == SqlSegmentTag.TrueKeyword || 
+                                          targetTag == SqlSegmentTag.FalseKeyword || 
+                                          targetTag == SqlSegmentTag.ConcatOperator;
+
+                        var appliedTags = targetTag != null && (state.ParenDepth == 0 || isOperator) ? new[] { targetTag } : [];
                         state.Refined.Add(new SqlSegment(SqlSegmentType.Literal, text.Substring(j, matchedWord.Length), null, appliedTags));
                     }
                     
@@ -191,9 +201,6 @@ public partial class SqlSegmentPreprocessor
         }
     }
 
-    /// <summary>
-    /// Safely replaces a keyword in a SQL string while ignoring occurrences inside strings and comments.
-    /// </summary>
     public static string SafeReplaceKeyword(string sql, string target, string replacement)
     {
         if (string.IsNullOrEmpty(sql) || sql.IndexOf(target, StringComparison.OrdinalIgnoreCase) == -1) 
@@ -215,7 +222,6 @@ public partial class SqlSegmentPreprocessor
             if (c == '/' && i + 1 < sql.Length && sql[i + 1] == '*') { inBlockCmt = true; sb.Append("/*"); i++; continue; }
             if (c == '-' && i + 1 < sql.Length && sql[i + 1] == '-') { inLineCmt = true; sb.Append("--"); i++; continue; }
 
-            // Match target keyword with exact word boundaries
             if (char.ToUpperInvariant(c) == char.ToUpperInvariant(target[0]))
             {
                 if (i + targetLen <= sql.Length && sql.Substring(i, targetLen).Equals(target, StringComparison.OrdinalIgnoreCase))
@@ -226,7 +232,7 @@ public partial class SqlSegmentPreprocessor
                     if (wordStart && wordEnd)
                     {
                         sb.Append(replacement);
-                        i += targetLen - 1; // Skip the replaced characters
+                        i += targetLen - 1; 
                         continue;
                     }
                 }

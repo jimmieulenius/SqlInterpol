@@ -5,7 +5,8 @@ namespace SqlInterpol.Dialects.Oracle;
 
 /// <summary>
 /// A structural rewriter that transforms EXCEPT to MINUS, handles recursive CTE syntax, 
-/// strips invalid AS aliases recursively, transpiles LIMIT/OFFSET paging, and safely repositions deferred locks for Oracle.
+/// strips invalid AS aliases recursively, transpiles LIMIT/OFFSET paging, safely repositions deferred locks,
+/// and transpiles Boolean keywords (TRUE/FALSE to 1/0) for Oracle.
 /// </summary>
 public class OracleSyntaxRewriter : SqlSyntaxRewriterBase
 {
@@ -13,6 +14,8 @@ public class OracleSyntaxRewriter : SqlSyntaxRewriterBase
 
     // Activates the alias dropping routine in the base class!
     protected override bool DropTableAliasAsKeyword => true;
+    protected override string TranspileTrueKeyword(string value) => "1";
+    protected override string TranspileFalseKeyword(string value) => "0";
 
     protected override SqlSegment ProcessRecursiveSegments(SqlSegment segment, ISqlContext context)
     {
@@ -57,7 +60,6 @@ public class OracleSyntaxRewriter : SqlSyntaxRewriterBase
 
     protected override bool TryRewritePaging(SqlSegment segment, IReadOnlyList<SqlSegment> segments, List<SqlSegment> rewritten, ref int i)
     {
-        // FIX: Use the new hybrid node extractor!
         if (!segment.HasTag(SqlSegmentTag.Paging) || !SqlRewriterHelpers.TryExtractPagingNodes(segments, i, out var limitNode, out var offsetNode, out int nextIndex, out string trailingText)) 
             return false;
 
@@ -73,7 +75,6 @@ public class OracleSyntaxRewriter : SqlSyntaxRewriterBase
         rewritten.Add(limitNode); 
         rewritten.Add(new SqlSegment(SqlSegmentType.Literal, " ROWS ONLY"));
 
-        // Append any unrecognized characters (like semicolons or comments) that were trailing the integers
         if (!string.IsNullOrEmpty(trailingText))
         {
             rewritten.Add(new SqlSegment(SqlSegmentType.Literal, " " + trailingText.TrimStart()));

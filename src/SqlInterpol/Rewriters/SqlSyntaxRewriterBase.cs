@@ -39,6 +39,13 @@ public abstract class SqlSyntaxRewriterBase : ISqlSegmentRewriter
                     droppedAs = false;
                 }
 
+                // ==============================================================
+                // FAST TOKEN SWAPS (Handled seamlessly by the Dialects!)
+                // ==============================================================
+                if (segment.HasTag(SqlSegmentTag.TrueKeyword)) newValue = TranspileTrueKeyword(newValue);
+                else if (segment.HasTag(SqlSegmentTag.FalseKeyword)) newValue = TranspileFalseKeyword(newValue);
+                else if (segment.HasTag(SqlSegmentTag.ConcatOperator)) newValue = TranspileConcatOperator(newValue);
+
                 newValue = ProcessLiteral(newValue);
 
                 if (!ReferenceEquals(newValue, literalValue))
@@ -70,7 +77,6 @@ public abstract class SqlSyntaxRewriterBase : ISqlSegmentRewriter
             rewritten.Add(segment);
         }
 
-        // Apply any final post-processing passes (e.g. UPDATE AS elevations or deferred locks)
         ApplyDeferredTransforms(rewritten, context);
 
         return rewritten;
@@ -79,6 +85,12 @@ public abstract class SqlSyntaxRewriterBase : ISqlSegmentRewriter
     // =====================================================================
     // VIRTUAL DIALECT STRATEGY HOOKS
     // =====================================================================
+    
+    // Fast Token Hooks
+    protected virtual string TranspileTrueKeyword(string value) => value;
+    protected virtual string TranspileFalseKeyword(string value) => value;
+    protected virtual string TranspileConcatOperator(string value) => value;
+    
     protected virtual bool DropTableAliasAsKeyword => false;
     protected virtual SqlSegment ProcessRecursiveSegments(SqlSegment segment, ISqlContext context) => segment;
     protected virtual string ProcessLiteral(string literal) => literal;
@@ -115,9 +127,7 @@ public abstract class SqlSyntaxRewriterBase : ISqlSegmentRewriter
     protected virtual SqlMultiTableUpdateFragment? CreateMultiTableUpdate(SqlUpdateAsFragment upAsFrag, SqlSetFragment setFrag, List<SqlSegment> rewritten, int whereKeywordIdx, ISqlContext context) 
         => null;
 
-    // =====================================================================
-    // SHARED REWRITER UTILITIES
-    // =====================================================================
+    // Shared Rewriter Utilities
     protected bool TryRewriteStandardOnConflict(SqlSegment segment, IReadOnlyList<SqlSegment> segments, List<SqlSegment> rewritten, ref int i)
     {
         bool isOnConflict = segment.HasTag(SqlSegmentTag.OnConflictKeyword) || 
