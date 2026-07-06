@@ -1,6 +1,6 @@
-namespace SqlInterpol.Test.MetaSql.Functions;
+namespace SqlInterpol.Test.XvSql.Functions;
 
-public class SqlMetaSqlFunctionsExtension : ISqlExtension
+public class XvSqlFunctionsExtension : ISqlExtension
 {
     public void Register(SqlInterpolOptions options)
     {
@@ -10,9 +10,9 @@ public class SqlMetaSqlFunctionsExtension : ISqlExtension
         options.KeywordTags["CAST"] = ["Meta_Cast"];
 
         // 2. Inject Lexical Rules (Proprietary Operators)
-        options.PreprocessorRules.Add(new MetaSqlPreprocessorRules());
+        options.PreprocessorRules.Add(new XvSqlPreprocessorRules());
 
         // 3. Inject AST Rewriters (Semantics)
-        options.Rewriters.Add(new MetaSqlFunctionsRewriter());
+        options.Rewriters.Add(new XvSqlFunctionsRewriter());
     }
 }

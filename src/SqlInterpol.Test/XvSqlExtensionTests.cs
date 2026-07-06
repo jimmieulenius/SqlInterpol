@@ -1,4 +1,4 @@
-using SqlInterpol.Test.MetaSql.Functions;
+using SqlInterpol.Test.XvSql.Functions;
 
 namespace SqlInterpol.Test;
 
@@ -6,7 +6,7 @@ namespace SqlInterpol.Test;
 /// This test suite acts as living documentation, proving the three distinct ways 
 /// a third-party extension can be loaded into the SqlInterpol engine.
 /// </summary>
-public class MetaSqlExtensionTests
+public class XvSqlExtensionTests
 {
     // ====================================================================
     // LOADING PARADIGM 1: Zero-Touch (Standard JIT / Reflection)
@@ -36,9 +36,9 @@ public class MetaSqlExtensionTests
     {
         // Arrange - The user explicitly registers the extension to a specific options instance.
         // This is the standard approach for Strict Native AOT and Microsoft DI setup.
-        // e.g. services.AddSqlInterpol(opt => opt.AddExtension(new SqlMetaSqlFunctionsExtension()));
+        // e.g. services.AddSqlInterpol(opt => opt.AddExtension(new XvSqlFunctionsExtension()));
         var options = new SqlInterpolOptions()
-            .AddExtension(new SqlMetaSqlFunctionsExtension());
+            .AddExtension(new XvSqlFunctionsExtension());
 
         // Act
         var db = SqlBuilder.SqLite(options);
@@ -57,7 +57,7 @@ public class MetaSqlExtensionTests
         // Arrange - The developer manually registers the extension globally at App Startup.
         // This prevents the need for Reflection, but ensures every 'new SqlInterpolOptions()' 
         // inherits the extension automatically without explicit DI injection.
-        SqlExtensionRegistry.Register(new SqlMetaSqlFunctionsExtension());
+        SqlExtensionRegistry.Register(new XvSqlFunctionsExtension());
 
         var options = new SqlInterpolOptions(); 
 

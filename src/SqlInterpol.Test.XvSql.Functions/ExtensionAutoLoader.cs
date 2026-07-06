@@ -1,9 +1,9 @@
 ﻿using System.Runtime.CompilerServices;
 
-namespace SqlInterpol.Test.MetaSql.Functions;
+namespace SqlInterpol.Test.XvSql.Functions;
 
 /// <summary>
-/// Automatically wires up the MetaSql.Functions extension into the core engine 
+/// Automatically wires up the XvSql.Functions extension into the core engine 
 /// the moment this assembly is loaded into memory.
 /// </summary>
 internal static class ExtensionAutoLoader
@@ -12,7 +12,7 @@ internal static class ExtensionAutoLoader
     [ModuleInitializer]
     internal static void Initialize()
     {
-        SqlExtensionRegistry.Register(new SqlMetaSqlFunctionsExtension());
+        SqlExtensionRegistry.Register(new XvSqlFunctionsExtension());
     }
     #pragma warning restore CA2255
 }

@@ -2,14 +2,14 @@ using SqlInterpol.Test.Models;
 
 namespace SqlInterpol.Test;
 
-public class MetaSqlTranspilationTests
+public class XvSqlTranspilationTests
 {
     // ========================================================================
     // 1. KEYWORD TRANSPILATION (PAGING)
     // ========================================================================
     [Theory]
     [MemberData(nameof(PagingToggleData))]
-    public void MetaSql_Paging_Toggle(bool metaSql, SqlTestCase testCase)
+    public void XvSql_Paging_Toggle(bool xvSql, SqlTestCase testCase)
     {
         var db = testCase.CreateBuilder();
         
@@ -19,7 +19,7 @@ public class MetaSqlTranspilationTests
         
         testCase.Action(() => 
         {
-            db.Context.Options.MetaSqlTranspilation = metaSql;
+            db.Context.Options.CrossVendorSqlTranspilation = xvSql;
             
             // Act: Use string interpolation so the AST can extract the parameter nodes!
             return [db.Append($"SELECT * FROM Products LIMIT {limit} OFFSET {offset}").Build()];
@@ -85,13 +85,13 @@ public class MetaSqlTranspilationTests
 
     [Theory]
     [MemberData(nameof(PagingHardcodedToggleData))]
-    public void MetaSql_Paging_Hardcoded_Toggle(bool metaSql, SqlTestCase testCase)
+    public void XvSql_Paging_Hardcoded_Toggle(bool xvSql, SqlTestCase testCase)
     {
         var db = testCase.CreateBuilder();
         
         testCase.Action(() => 
         {
-            db.Context.Options.MetaSqlTranspilation = metaSql;
+            db.Context.Options.CrossVendorSqlTranspilation = xvSql;
             
             // Act: Passing a pure, hardcoded string. No interpolation holes!
             return [db.Append($"SELECT * FROM Products LIMIT 10 OFFSET 20").Build()];
@@ -139,13 +139,13 @@ public class MetaSqlTranspilationTests
     // ========================================================================
     [Theory]
     [MemberData(nameof(RowLockingToggleData))]
-    public void MetaSql_RowLocking_Toggle(bool metaSql, SqlTestCase testCase)
+    public void XvSql_RowLocking_Toggle(bool xvSql, SqlTestCase testCase)
     {
         var db = testCase.CreateBuilder();
 
         testCase.Action(() => 
         {
-            db.Context.Options.MetaSqlTranspilation = metaSql;
+            db.Context.Options.CrossVendorSqlTranspilation = xvSql;
             return [db.Append($"SELECT * FROM Products FOR UPDATE").Build()];
         });
 
@@ -191,13 +191,13 @@ public class MetaSqlTranspilationTests
     // ========================================================================
     [Theory]
     [MemberData(nameof(SelectIntoToggleData))]
-    public void MetaSql_SelectInto_Toggle(bool metaSql, SqlTestCase testCase)
+    public void XvSql_SelectInto_Toggle(bool xvSql, SqlTestCase testCase)
     {
         var db = testCase.CreateBuilder();
 
         testCase.Action(() => 
         {
-            db.Context.Options.MetaSqlTranspilation = metaSql;
+            db.Context.Options.CrossVendorSqlTranspilation = xvSql;
             return [db.Append($"SELECT Id INTO #Temp FROM Products").Build()];
         });
 

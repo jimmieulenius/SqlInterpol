@@ -1,8 +1,8 @@
 using SqlInterpol.Parsing;
 
-namespace SqlInterpol.Test.MetaSql.Functions;
+namespace SqlInterpol.Test.XvSql.Functions;
 
-public partial class MetaSqlPreprocessorRules
+public partial class XvSqlPreprocessorRules
 {
     private partial void InitializeJsonOperatorRule()
     {

@@ -1,15 +1,15 @@
 using SqlInterpol.Parsing;
 
-namespace SqlInterpol.Test.MetaSql.Functions;
+namespace SqlInterpol.Test.XvSql.Functions;
 
 /// <summary>
 /// A unified, high-performance AST rewriter that processes all custom Meta-SQL function strategies.
 /// </summary>
-public partial class MetaSqlFunctionsRewriter : ISqlSegmentRewriter
+public partial class XvSqlFunctionsRewriter : ISqlSegmentRewriter
 {
     private readonly Dictionary<string, Func<SqlSegment, ISqlContext, SqlSegment>> _strategies = new(StringComparer.OrdinalIgnoreCase);
 
-    public MetaSqlFunctionsRewriter()
+    public XvSqlFunctionsRewriter()
     {
         // Centralized registration registry
         InitializeStrategies();

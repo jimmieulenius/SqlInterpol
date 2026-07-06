@@ -1,12 +1,12 @@
 using SqlInterpol.Parsing;
 
-namespace SqlInterpol.Test.MetaSql.Functions;
+namespace SqlInterpol.Test.XvSql.Functions;
 
 /// <summary>
 /// A unified, high-performance preprocessor rule that coordinates all custom 
 /// Meta-SQL lexical analysis and proprietary syntax translations.
 /// </summary>
-public partial class MetaSqlPreprocessorRules : ISqlPreprocessorRule
+public partial class XvSqlPreprocessorRules : ISqlPreprocessorRule
 {
     // Custom delegate type required to support high-performance C# 'ref' parameters
     private delegate bool PreprocessorRuleDelegate(
@@ -17,7 +17,7 @@ public partial class MetaSqlPreprocessorRules : ISqlPreprocessorRule
 
     private readonly List<PreprocessorRuleDelegate> _rules = new();
 
-    public MetaSqlPreprocessorRules()
+    public XvSqlPreprocessorRules()
     {
         InitializeRules();
     }

@@ -18,7 +18,7 @@ public record SqlInterpolOptions
     /// <summary>
     /// A factory method used to generate the default options for every newly created SqlBuilder.
     /// Configure this once at application startup.
-    /// Example: SqlInterpolOptions.DefaultFactory = () => new SqlInterpolOptions { MetaSqlTranspilation = false };
+    /// Example: SqlInterpolOptions.DefaultFactory = () => new SqlInterpolOptions { XvSqlTranspilation = false };
     /// </summary>
     public static Func<SqlInterpolOptions>? DefaultFactory { get; set; }
 
@@ -76,7 +76,7 @@ public record SqlInterpolOptions
     /// (like LIMIT / OFFSET) into the syntax required by the active database dialect.
     /// Default is true.
     /// </summary>
-    public bool MetaSqlTranspilation { get; set; } = true;
+    public bool CrossVendorSqlTranspilation { get; set; } = true;
 
     /// <summary>
     /// Gets the active dialect kind. Set automatically by <see cref="SqlBuilder"/> when constructing the context.

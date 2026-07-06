@@ -18,7 +18,7 @@ public partial class SqlSegmentPreprocessor
             TryExtractInlineAlias(ref text, segment, state);
         }
 
-        bool metaSql = state.Context.Options.MetaSqlTranspilation;
+        bool xvSql = state.Context.Options.CrossVendorSqlTranspilation;
         bool hasKeywordTags = state.Context.Options.KeywordTags.Count > 0;
         var keywordTagsDict = hasKeywordTags ? state.Context.Options.KeywordTags : null;
 
@@ -81,10 +81,10 @@ public partial class SqlSegmentPreprocessor
                 else if (MatchKeyword(span, "TRUE"))                      { matchedWord = "TRUE";                    targetTag = SqlSegmentTag.TrueKeyword; }
                 else if (MatchKeyword(span, "FALSE"))                     { matchedWord = "FALSE";                   targetTag = SqlSegmentTag.FalseKeyword; }
 
-                else if (metaSql && MatchKeyword(span, SqlKeyword.Limit.Value))      { matchedWord = SqlKeyword.Limit.Value;    targetTag = SqlSegmentTag.Paging; }
-                else if (metaSql && MatchKeyword(span, SqlKeyword.Returning.Value))  { matchedWord = SqlKeyword.Returning.Value;targetTag = SqlSegmentTag.ReturningKeyword; }
-                else if (metaSql && MatchKeyword(span, SqlKeyword.ForUpdate.Value))  { matchedWord = SqlKeyword.ForUpdate.Value;  targetTag = SqlSegmentTag.ForUpdateKeyword; }
-                else if (metaSql && MatchKeyword(span, SqlKeyword.ForShare.Value))   { matchedWord = SqlKeyword.ForShare.Value;   targetTag = SqlSegmentTag.ForShareKeyword; }
+                else if (xvSql && MatchKeyword(span, SqlKeyword.Limit.Value))      { matchedWord = SqlKeyword.Limit.Value;    targetTag = SqlSegmentTag.Paging; }
+                else if (xvSql && MatchKeyword(span, SqlKeyword.Returning.Value))  { matchedWord = SqlKeyword.Returning.Value;targetTag = SqlSegmentTag.ReturningKeyword; }
+                else if (xvSql && MatchKeyword(span, SqlKeyword.ForUpdate.Value))  { matchedWord = SqlKeyword.ForUpdate.Value;  targetTag = SqlSegmentTag.ForUpdateKeyword; }
+                else if (xvSql && MatchKeyword(span, SqlKeyword.ForShare.Value))   { matchedWord = SqlKeyword.ForShare.Value;   targetTag = SqlSegmentTag.ForShareKeyword; }
                 
                 else if (MatchKeyword(span, "WITH RECURSIVE"))
                 {

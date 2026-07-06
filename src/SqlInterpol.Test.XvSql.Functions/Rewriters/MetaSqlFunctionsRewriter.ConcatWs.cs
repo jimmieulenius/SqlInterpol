@@ -1,6 +1,6 @@
-namespace SqlInterpol.Test.MetaSql.Functions;
+namespace SqlInterpol.Test.XvSql.Functions;
 
-public partial class MetaSqlFunctionsRewriter
+public partial class XvSqlFunctionsRewriter
 {
     // Hook into the main constructor initialization loop
     private partial void InitializeConcatWsStrategy()
