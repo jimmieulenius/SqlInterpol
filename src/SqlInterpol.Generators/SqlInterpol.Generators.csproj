@@ -10,8 +10,32 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Antlr4.Runtime.Standard" Version="4.13.1" GeneratePathProperty="true" PrivateAssets="all" />
+    <PackageReference Include="Antlr4BuildTasks" Version="12.14.0" PrivateAssets="all" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" PrivateAssets="all" />
     <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.4" PrivateAssets="all" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Antlr4 Include="Grammar\PostgreSQLLexer.g4">
+      <Package>SqlInterpol.Generators.Parsing</Package>
+    </Antlr4>
+    
+    <Antlr4 Include="Grammar\PostgreSQLParser.g4">
+      <Package>SqlInterpol.Generators.Parsing</Package>
+      <Visitor>True</Visitor> 
+      <Listener>False</Listener>
+    </Antlr4>
+  </ItemGroup>
+
+  <PropertyGroup>
+    <GetTargetPathDependsOn>$(GetTargetPathDependsOn);GetDependencyTargetPaths</GetTargetPathDependsOn>
+</PropertyGroup>
+
+<Target Name="GetDependencyTargetPaths">
+    <ItemGroup>
+        <TargetPathWithTargetPlatformMoniker Include="$(PkgAntlr4_Runtime_Standard)\lib\netstandard2.0\Antlr4.Runtime.Standard.dll" IncludeRuntimeDependency="false" />
+    </ItemGroup>
+</Target>
 
 </Project>

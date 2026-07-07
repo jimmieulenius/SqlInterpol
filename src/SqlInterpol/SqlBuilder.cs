@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using SqlInterpol.Parsing;
 
@@ -8,7 +6,7 @@ namespace SqlInterpol;
 /// <summary>
 /// The primary entry point for building parameterized, dialect-aware SQL queries using C# interpolated strings.
 /// </summary>
-public partial class SqlBuilder : ISqlEntityRegistry
+public partial class SqlBuilder : ISqlEntityRegistry, ISqlGeneratorBuilder
 {
     private List<SqlSegment> _segments = [];
     private readonly List<ISqlEntity> _entities = [];
@@ -366,7 +364,10 @@ public partial class SqlBuilder : ISqlEntityRegistry
 
         if (errors.Count > 0)
         {
-            throw new SqlDialectException($"Dialect capabilities validation failed:{Environment.NewLine}- " + string.Join($"{Environment.NewLine}- ", errors));
+            throw new SqlDialectException(
+                Context.Dialect.Kind.ToString(), 
+                "Multiple Operations", 
+                $"Dialect capabilities validation failed:{Environment.NewLine}- " + string.Join($"{Environment.NewLine}- ", errors));
         }
 
         // ---------------------------------------------------------------------
@@ -433,5 +434,23 @@ public partial class SqlBuilder : ISqlEntityRegistry
             SqlEntityType.View => new SqlView<T>(physicalName, physicalSchema, alias),
             _ => new SqlTable<T>(physicalName, physicalSchema, alias)
         };
+    }
+
+    void ISqlGeneratorBuilder.AppendRaw(string text)
+    {
+        if (!string.IsNullOrEmpty(text))
+        {
+            _segments.Add(new SqlSegment(SqlSegmentType.Literal, text));
+        }
+    }
+
+    void ISqlGeneratorBuilder.AppendNode(ISqlFragment node)
+    {
+        _segments.Add(new SqlSegment(SqlSegmentType.Raw, node));
+    }
+
+    void ISqlGeneratorBuilder.AppendTemplate(ISqlTemplate template)
+    {
+        _segments.Add(new SqlSegment(SqlSegmentType.Raw, template));
     }
 }

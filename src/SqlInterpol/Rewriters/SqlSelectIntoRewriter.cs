@@ -49,7 +49,8 @@ public class SqlSelectIntoRewriter : ISqlSegmentRewriter
         // If it doesn't support SELECT INTO *and* lacks CREATE TABLE AS SELECT, abort.
         if (!context.Dialect.SupportedFeatures.Contains(SqlFeature.CreateTableAsSelect))
         {
-            throw new SqlDialectException("'SELECT INTO' is not supported");
+            // UPDATED: Now passing the dialect name and the unsupported operation.
+            throw new SqlDialectException(context.Dialect.Kind, "SELECT INTO / CREATE TABLE AS SELECT");
         }
 
         // ====================================================================

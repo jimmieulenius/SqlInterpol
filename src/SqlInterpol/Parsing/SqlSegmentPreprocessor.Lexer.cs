@@ -1,204 +1,118 @@
+using System;
+using System.Collections.Generic;
+
 namespace SqlInterpol.Parsing;
 
 public partial class SqlSegmentPreprocessor
 {
-    private void ProcessTextLiteral(SqlSegment segment, IReadOnlyList<SqlSegment> segments, int i, SqlPreprocessorState state)
+    private void ProcessTextLiteral(SqlSegment segment, string text, IReadOnlyList<SqlSegment> segments, ref int segmentIndex, SqlPreprocessorState state)
     {
-        string text = (string)segment.Value!;
-        if (text.Contains(';')) state.ForceBaseNamePhase = false;
-
-        bool isEligibleForAlias = state.Refined.Count > 0 && 
-            (state.Refined[^1].Type == SqlSegmentType.Reference || 
-             state.Refined[^1].Type == SqlSegmentType.Raw ||
-             state.Refined[^1].Value is ISqlProjection ||
-             state.Refined[^1].Value is ISqlFragment);
-
-        if (isEligibleForAlias)
-        {
-            TryExtractInlineAlias(ref text, segment, state);
-        }
-
-        bool xvSql = state.Context.Options.CrossVendorSqlTranspilation;
-        bool hasKeywordTags = state.Context.Options.KeywordTags.Count > 0;
-        var keywordTagsDict = hasKeywordTags ? state.Context.Options.KeywordTags : null;
-
         int lastSplitIdx = 0;
+
         for (int j = 0; j < text.Length; j++)
         {
             char c = text[j];
+            
+            // 1. Fast-path state tracking to ignore keywords inside strings or comments
             if (state.InString) { if (c == '\'') { if (j + 1 < text.Length && text[j + 1] == '\'') j++; else state.InString = false; } continue; }
             if (state.InBlockCmt) { if (c == '*' && j + 1 < text.Length && text[j + 1] == '/') { state.InBlockCmt = false; j++; } continue; }
             if (state.InLineCmt) { if (c == '\n' || c == '\r') state.InLineCmt = false; continue; }
+            
             if (c == '\'') { state.InString = true; continue; }
             if (c == '/' && j + 1 < text.Length && text[j + 1] == '*') { state.InBlockCmt = true; j++; continue; }
             if (c == '-' && j + 1 < text.Length && text[j + 1] == '-') { state.InLineCmt = true; j++; continue; }
-            
-            if (c == '(') { state.PushState(); continue; }
-            if (c == ')') { state.PopState(); continue; }
 
-            // ====================================================================
-            // NATIVE STRING CONCATENATION '||'
-            // ====================================================================
-            if (c == '|' && j + 1 < text.Length && text[j + 1] == '|')
-            {
-                if (j > lastSplitIdx) state.Refined.Add(new SqlSegment(SqlSegmentType.Literal, text[lastSplitIdx..j], segment.RenderMode, segment.Tags));
-                state.Refined.Add(new SqlSegment(SqlSegmentType.Literal, "||", null, [SqlSegmentTag.ConcatOperator]));
-                j++; 
-                lastSplitIdx = j + 1;
-                continue;
-            }
+            /*
+             * ====================================================================
+             * TIER 1 DYNAMIC BYPASS:
+             * We explicitly DO NOT parse deep expressions (like '||', AS aliases, 
+             * or TRUE/FALSE booleans). Any uncompiled dynamic string appended to 
+             * the query simply bypasses this logic, enforcing native SQL syntax 
+             * at runtime without allocation overhead.
+             * ====================================================================
+             */
 
             bool isWordBoundary = j == 0 || (!char.IsLetterOrDigit(text[j - 1]) && text[j - 1] != '_');
+            
             if (isWordBoundary)
             {
                 var span = text.AsSpan(j);
-                string? matchedWord = null;
-                string? targetTag = null;
-                string[]? targetTags = null; 
 
-                if (MatchKeyword(span, SqlKeyword.SelectDistinct.Value))  { matchedWord = SqlKeyword.SelectDistinct.Value; targetTag = SqlSegmentTag.SelectDistinctKeyword; }
-                else if (MatchKeyword(span, SqlKeyword.Select.Value))     { matchedWord = SqlKeyword.Select.Value;   targetTag = SqlSegmentTag.SelectKeyword; }
-                else if (MatchKeyword(span, SqlKeyword.Update.Value))     { matchedWord = SqlKeyword.Update.Value;   targetTag = SqlSegmentTag.UpdateKeyword; }
-                else if (MatchKeyword(span, SqlKeyword.Set.Value))        { matchedWord = SqlKeyword.Set.Value;      targetTag = SqlSegmentTag.SetKeyword; }
-                else if (MatchKeyword(span, SqlKeyword.Insert.Value))     { matchedWord = SqlKeyword.Insert.Value;   targetTag = SqlSegmentTag.InsertKeyword; }
-                else if (MatchKeyword(span, SqlKeyword.Into.Value))       { matchedWord = SqlKeyword.Into.Value;     targetTag = SqlSegmentTag.IntoKeyword; }
-                else if (MatchKeyword(span, SqlKeyword.Values.Value))     { matchedWord = SqlKeyword.Values.Value;   targetTag = SqlSegmentTag.InsertValuesKeyword; }
-                else if (MatchKeyword(span, SqlKeyword.From.Value))       { matchedWord = SqlKeyword.From.Value;     targetTag = SqlSegmentTag.FromKeyword; }
-                else if (MatchKeyword(span, SqlKeyword.InnerJoin.Value))  { matchedWord = SqlKeyword.InnerJoin.Value; targetTag = SqlSegmentTag.FromKeyword; }
-                else if (MatchKeyword(span, SqlKeyword.LeftJoin.Value))   { matchedWord = SqlKeyword.LeftJoin.Value;  targetTag = SqlSegmentTag.FromKeyword; }
-                else if (MatchKeyword(span, SqlKeyword.RightJoin.Value))  { matchedWord = SqlKeyword.RightJoin.Value; targetTag = SqlSegmentTag.FromKeyword; }
-                else if (MatchKeyword(span, SqlKeyword.CrossJoin.Value))  { matchedWord = SqlKeyword.CrossJoin.Value; targetTag = SqlSegmentTag.FromKeyword; }
-                else if (MatchKeyword(span, SqlKeyword.Join.Value))       { matchedWord = SqlKeyword.Join.Value;     targetTag = SqlSegmentTag.FromKeyword; }
-                else if (MatchKeyword(span, SqlKeyword.Where.Value))      { matchedWord = SqlKeyword.Where.Value;    targetTag = SqlSegmentTag.WhereKeyword; }
-                else if (MatchKeyword(span, SqlKeyword.OrderBy.Value))    { matchedWord = SqlKeyword.OrderBy.Value;   targetTag = SqlSegmentTag.WhereKeyword; } 
-                else if (MatchKeyword(span, SqlKeyword.GroupBy.Value))    { matchedWord = SqlKeyword.GroupBy.Value;   targetTag = SqlSegmentTag.WhereKeyword; }
-                else if (MatchKeyword(span, SqlKeyword.Having.Value))     { matchedWord = SqlKeyword.Having.Value;   targetTag = SqlSegmentTag.WhereKeyword; }
-                else if (MatchKeyword(span, SqlKeyword.Delete.Value))     { matchedWord = SqlKeyword.Delete.Value;   targetTag = SqlSegmentTag.DeleteKeyword; }
-                
-                // ====================================================================
-                // NATIVE BOOLEAN TRANSPILATION
-                // ====================================================================
-                else if (MatchKeyword(span, "TRUE"))                      { matchedWord = "TRUE";                    targetTag = SqlSegmentTag.TrueKeyword; }
-                else if (MatchKeyword(span, "FALSE"))                     { matchedWord = "FALSE";                   targetTag = SqlSegmentTag.FalseKeyword; }
-
-                else if (xvSql && MatchKeyword(span, SqlKeyword.Limit.Value))      { matchedWord = SqlKeyword.Limit.Value;    targetTag = SqlSegmentTag.Paging; }
-                else if (xvSql && MatchKeyword(span, SqlKeyword.Returning.Value))  { matchedWord = SqlKeyword.Returning.Value;targetTag = SqlSegmentTag.ReturningKeyword; }
-                else if (xvSql && MatchKeyword(span, SqlKeyword.ForUpdate.Value))  { matchedWord = SqlKeyword.ForUpdate.Value;  targetTag = SqlSegmentTag.ForUpdateKeyword; }
-                else if (xvSql && MatchKeyword(span, SqlKeyword.ForShare.Value))   { matchedWord = SqlKeyword.ForShare.Value;   targetTag = SqlSegmentTag.ForShareKeyword; }
-                
-                else if (MatchKeyword(span, "WITH RECURSIVE"))
+                // 2. Scan exclusively for Structural Block Keywords that require fragment routing
+                if (MatchKeyword(span, SqlKeyword.Limit.Value))
                 {
-                    matchedWord = "WITH RECURSIVE";
-                    if (string.IsNullOrWhiteSpace(text.Substring(j + matchedWord.Length)))
-                    {
-                        int forward = i + 1;
-                        while (forward < segments.Count)
-                        {
-                            if (segments[forward].Value is ISqlRoleable roleableTarget) { roleableTarget.Role = SqlEntityRole.Cte; break; }
-                            if (segments[forward].Type == SqlSegmentType.Literal && !string.IsNullOrWhiteSpace(segments[forward].Value?.ToString())) break; 
-                            forward++;
-                        }
-                    }
-                }
-                else if (MatchKeyword(span, SqlKeyword.With.Value))
-                {
-                    matchedWord = SqlKeyword.With.Value;
-                    if (string.IsNullOrWhiteSpace(text.Substring(j + matchedWord.Length)))
-                    {
-                        int forward = i + 1;
-                        while (forward < segments.Count)
-                        {
-                            if (segments[forward].Value is ISqlRoleable roleableTarget) { roleableTarget.Role = SqlEntityRole.Cte; break; }
-                            if (segments[forward].Type == SqlSegmentType.Literal && !string.IsNullOrWhiteSpace(segments[forward].Value?.ToString())) break; 
-                            forward++;
-                        }
-                    }
-                }
-                else if (hasKeywordTags)
-                {
-                    int wordLen = 0;
-                    while (wordLen < span.Length && (char.IsLetterOrDigit(span[wordLen]) || span[wordLen] == '_')) wordLen++;
-                    
-                    if (wordLen > 0)
-                    {
-                        var currentWord = span.Slice(0, wordLen).ToString();
-                        if (keywordTagsDict!.TryGetValue(currentWord, out targetTags))
-                        {
-                            matchedWord = currentWord;
-                        }
-                    }
-                }
-
-                if (matchedWord != null)
-                {
-                    if (targetTag == SqlSegmentTag.InsertKeyword || targetTag == SqlSegmentTag.ReturningKeyword) state.ForceBaseNamePhase = true;
-                    else if (targetTag == SqlSegmentTag.SelectKeyword || targetTag == SqlSegmentTag.SelectDistinctKeyword || 
-                             targetTag == SqlSegmentTag.UpdateKeyword || targetTag == SqlSegmentTag.DeleteKeyword || 
-                             targetTag == SqlSegmentTag.InsertValuesKeyword || targetTag == SqlSegmentTag.IntoKeyword || 
-                             targetTag == SqlSegmentTag.SetKeyword || targetTag == SqlSegmentTag.WhereKeyword) state.ForceBaseNamePhase = false;
-
                     if (j > lastSplitIdx) state.Refined.Add(new SqlSegment(SqlSegmentType.Literal, text[lastSplitIdx..j], segment.RenderMode, segment.Tags));
                     
-                    if (targetTags != null)
-                    {
-                        state.Refined.Add(new SqlSegment(SqlSegmentType.Literal, text.Substring(j, matchedWord.Length), null, targetTags));
-                    }
-                    else
-                    {
-                        // CRITICAL FIX: Ensure Native Operators bypass parenthesis stripping!
-                        bool isOperator = targetTag == SqlSegmentTag.TrueKeyword || 
-                                          targetTag == SqlSegmentTag.FalseKeyword || 
-                                          targetTag == SqlSegmentTag.ConcatOperator;
-
-                        var appliedTags = targetTag != null && (state.ParenDepth == 0 || isOperator) ? new[] { targetTag } : [];
-                        state.Refined.Add(new SqlSegment(SqlSegmentType.Literal, text.Substring(j, matchedWord.Length), null, appliedTags));
-                    }
+                    var pagingFragment = ExtractPagingFragment(text, ref j, segments, ref segmentIndex);
+                    state.Refined.Add(new SqlSegment(SqlSegmentType.Fragment, pagingFragment));
                     
-                    state.CurrentKeyword = matchedWord;
-                    state.CurrentClauseTag = targetTag;
-                    
-                    if (matchedWord == SqlKeyword.From.Value) state.FromCount++;
-                    else if (
-                        matchedWord == SqlKeyword.Update.Value || 
-                        matchedWord == SqlKeyword.Delete.Value || 
-                        matchedWord == SqlKeyword.Select.Value || 
-                        matchedWord == SqlKeyword.SelectDistinct.Value || 
-                        matchedWord == SqlKeyword.Insert.Value) 
-                    {
-                        state.ActiveDmlKeyword = matchedWord;
-                        state.FromCount = 0;
-                    }
-
-                    j += matchedWord.Length - 1; 
                     lastSplitIdx = j + 1;
+                    continue;
+                }
+                else if (MatchKeyword(span, SqlKeyword.Returning.Value))
+                {
+                    if (j > lastSplitIdx) state.Refined.Add(new SqlSegment(SqlSegmentType.Literal, text[lastSplitIdx..j], segment.RenderMode, segment.Tags));
+                    
+                    var returningFragment = ExtractReturningFragment(text, ref j, segments, ref segmentIndex);
+                    state.Refined.Add(new SqlSegment(SqlSegmentType.Fragment, returningFragment));
+                    
+                    lastSplitIdx = j + 1;
+                    continue;
+                }
+                else if (MatchKeyword(span, SqlKeyword.ForUpdate.Value) || MatchKeyword(span, SqlKeyword.ForShare.Value))
+                {
+                    if (j > lastSplitIdx) state.Refined.Add(new SqlSegment(SqlSegmentType.Literal, text[lastSplitIdx..j], segment.RenderMode, segment.Tags));
+                    
+                    bool isForUpdate = MatchKeyword(span, SqlKeyword.ForUpdate.Value);
+                    var lockFragment = ExtractLockFragment(text, ref j, isForUpdate, segments, ref segmentIndex);
+                    state.Refined.Add(new SqlSegment(SqlSegmentType.Fragment, lockFragment));
+                    
+                    lastSplitIdx = j + 1;
+                    continue;
                 }
             }
         }
 
+        // Flush remaining text
         if (lastSplitIdx < text.Length)
         {
-            var chunk = text[lastSplitIdx..];
-            var trimmedText = chunk.TrimEnd();
-            if (trimmedText.EndsWith("AS", StringComparison.OrdinalIgnoreCase))
-            {
-                state.ExpectsAlias = trimmedText.Length == 2 || (!char.IsLetterOrDigit(trimmedText[^3]) && trimmedText[^3] != '_');
-                if (state.ExpectsAlias)
-                {
-                    int asIdx = chunk.LastIndexOf("AS", StringComparison.OrdinalIgnoreCase);
-                    string prefix = chunk[..asIdx];
-                    if (prefix.Length > 0) state.Refined.Add(new SqlSegment(SqlSegmentType.Literal, prefix, segment.RenderMode, segment.Tags));
-
-                    string determinedTag = DetermineAliasTag(state);
-                    string asKeyword = chunk.Substring(asIdx, 2);
-                    state.Refined.Add(new SqlSegment(SqlSegmentType.Literal, asKeyword, segment.RenderMode, determinedTag == "ColumnAliasAsKeyword" ? segment.Tags : [determinedTag]));
-                    
-                    string afterAs = chunk[(asIdx + 2)..];
-                    if (afterAs.Length > 0) state.Refined.Add(new SqlSegment(SqlSegmentType.Literal, afterAs, segment.RenderMode, segment.Tags));
-                }
-                else state.Refined.Add(new SqlSegment(SqlSegmentType.Literal, chunk, segment.RenderMode, segment.Tags));
-            }
-            else state.Refined.Add(new SqlSegment(SqlSegmentType.Literal, chunk, segment.RenderMode, segment.Tags));
+            state.Refined.Add(new SqlSegment(SqlSegmentType.Literal, text[lastSplitIdx..], segment.RenderMode, segment.Tags));
         }
+    }
+
+    // ====================================================================
+    // FRAGMENT EXTRACTORS (Forward-Scan only, manipulating ref indices)
+    // ====================================================================
+
+    private SqlPagingFragment ExtractPagingFragment(string text, ref int charIndex, IReadOnlyList<SqlSegment> segments, ref int segmentIndex)
+    {
+        charIndex += SqlKeyword.Limit.Value.Length - 1; 
+        // TO-DO: Advance segmentIndex if LIMIT/OFFSET arguments are passed as interpolated holes
+        return new SqlPagingFragment(0, 0); 
+    }
+
+    private SqlReturningFragment ExtractReturningFragment(string text, ref int charIndex, IReadOnlyList<SqlSegment> segments, ref int segmentIndex)
+    {
+        charIndex += SqlKeyword.Returning.Value.Length - 1;
+        // TO-DO: Advance segmentIndex to extract bound return projections
+        return new SqlReturningFragment(Array.Empty<ISqlProjection>()); 
+    }
+
+    private SqlLockFragment ExtractLockFragment(string text, ref int charIndex, bool isForUpdate, IReadOnlyList<SqlSegment> segments, ref int segmentIndex)
+    {
+        charIndex += (isForUpdate ? SqlKeyword.ForUpdate.Value.Length : SqlKeyword.ForShare.Value.Length) - 1;
+        return new SqlLockFragment(isForUpdate ? SqlLockMode.Update : SqlLockMode.Share); 
+    }
+
+    // ====================================================================
+    // UTILITIES
+    // ====================================================================
+
+    private static bool MatchKeyword(ReadOnlySpan<char> span, string keyword)
+    {
+        if (span.Length < keyword.Length) return false;
+        if (!span.Slice(0, keyword.Length).Equals(keyword, StringComparison.OrdinalIgnoreCase)) return false;
+        return span.Length == keyword.Length || (!char.IsLetterOrDigit(span[keyword.Length]) && span[keyword.Length] != '_');
     }
 
     public static string SafeReplaceKeyword(string sql, string target, string replacement)

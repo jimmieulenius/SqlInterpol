@@ -19,7 +19,7 @@ namespace SqlInterpol;
 /// </code>
 /// </example>
 /// </remarks>
-public static class Sql
+public static partial class Sql
 {
     /// <summary>
     /// Gets a fragment that renders the dialect's opening identifier-quote character

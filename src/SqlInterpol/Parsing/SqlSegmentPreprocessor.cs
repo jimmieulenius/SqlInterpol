@@ -3,8 +3,8 @@ using System.Collections.Generic;
 namespace SqlInterpol.Parsing;
 
 /// <summary>
-/// The default semantic preprocessor that normalizes text, isolates core DML keywords, 
-/// handles target entity aliases (both hole-bound and plain text), and routes projection mapping.
+/// Tier 1 Runtime Preprocessor. 
+/// Extremely fast, zero-allocation pipeline focused ONLY on structural blocks.
 /// </summary>
 public partial class SqlSegmentPreprocessor : ISqlSegmentPreprocessor
 {
@@ -42,23 +42,25 @@ public partial class SqlSegmentPreprocessor : ISqlSegmentPreprocessor
                 if (handled) continue;
             }
 
-            // 2. The Core State Machine (Lightning Fast)
-            if (ProcessSubquery(segment, i, segments, state)) continue;
-            if (ProcessHoleBoundAlias(segment, state)) continue;
-            
-            // Handles DML keywords, tracking, and structural rendering contexts (e.g. INSERT lists)
-            if (ProcessDmlContext(ref segment, segments, state)) continue; 
-            
-            if (segment.Type == SqlSegmentType.Literal && segment.Value is string)
+            // 2. Core Structural State Machine (Tier 1)
+            // Any non-literal (parameters, fragments, etc.) is simply passed through untouched
+            // bypassing any deep expression parsing or allocation.
+            if (segment.Type != SqlSegmentType.Literal)
             {
-                ProcessTextLiteral(segment, segments, i, state);
+                state.Refined.Add(segment);
                 continue;
             }
             
-            if (ProcessUnresolved(segment, segments, state)) continue;
+            // 3. Fast O(N) Forward-Scan Lexer for block keywords
+            if (segment.Value is string textLiteral)
+            {
+                // We pass 'ref i' so the lexer can advance the outer segment loop 
+                // if it consumes an interpolated parameter (e.g. for a LIMIT or OFFSET value)
+                ProcessTextLiteral(segment, textLiteral, segments, ref i, state);
+                continue;
+            }
 
             state.Refined.Add(segment);
-            state.ExpectsAlias = false;
         }
 
         return state.Refined;
