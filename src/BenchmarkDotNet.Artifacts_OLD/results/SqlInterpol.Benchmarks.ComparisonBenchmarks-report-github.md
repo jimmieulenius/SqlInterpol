@@ -1,0 +1,24 @@
+```
+
+BenchmarkDotNet v0.14.0, Windows 11 (10.0.26200.8655)
+Unknown processor
+.NET SDK 10.0.301
+  [Host]     : .NET 8.0.28 (8.0.2826.26413), X64 RyuJIT AVX2
+  DefaultJob : .NET 8.0.28 (8.0.2826.26413), X64 RyuJIT AVX2
+
+
+```
+| Method                          | Mean          | Error       | StdDev      | Median        | Ratio | RatioSD | Gen0   | Gen1   | Allocated | Alloc Ratio |
+|-------------------------------- |--------------:|------------:|------------:|--------------:|------:|--------:|-------:|-------:|----------:|------------:|
+| RawString                       |     0.0106 ns |   0.0146 ns |   0.0129 ns |     0.0055 ns |     ? |       ? |      - |      - |         - |           ? |
+| DapperSqlBuilder                |   289.4029 ns |   1.2391 ns |   1.0985 ns |   288.9043 ns |     ? |       ? | 0.0882 |      - |    1664 B |           ? |
+| SqlKata_PostgreSql              | 5,230.4204 ns | 103.6339 ns | 258.0844 ns | 5,109.3849 ns |     ? |       ? | 0.9460 | 0.0076 |   17929 B |           ? |
+| SqlInterpol_PostgreSql          | 7,479.0780 ns |  55.7954 ns |  49.4612 ns | 7,484.0065 ns |     ? |       ? | 0.5722 | 0.0076 |   10832 B |           ? |
+| SqlInterpolTemplate_PostgreSql  |   889.5115 ns |   4.2467 ns |   3.3155 ns |   889.2308 ns |     ? |       ? | 0.2108 | 0.0010 |    3984 B |           ? |
+| RawString_InClause              |    83.9005 ns |   0.3940 ns |   0.3686 ns |    83.9790 ns |     ? |       ? | 0.0421 |      - |     792 B |           ? |
+| SqlKata_InClause                | 7,073.9234 ns |  54.8639 ns |  48.6354 ns | 7,059.5993 ns |     ? |       ? | 1.1597 |      - |   21873 B |           ? |
+| SqlInterpol_InClause            | 6,546.5338 ns |  34.4020 ns |  30.4964 ns | 6,550.5466 ns |     ? |       ? | 0.5569 | 0.0076 |   10560 B |           ? |
+| RawString_AliasedJoin           |     0.0064 ns |   0.0111 ns |   0.0104 ns |     0.0000 ns |     ? |       ? |      - |      - |         - |           ? |
+| SqlKata_AliasedJoin             | 6,690.7116 ns |  35.6908 ns |  31.6390 ns | 6,688.4598 ns |     ? |       ? | 1.4191 | 0.0153 |   26809 B |           ? |
+| SqlInterpol_AliasedJoin         | 8,601.2488 ns | 162.2996 ns | 143.8744 ns | 8,535.7475 ns |     ? |       ? | 0.6561 |      - |   12457 B |           ? |
+| SqlInterpolTemplate_AliasedJoin |   741.5789 ns |   4.9554 ns |   4.6353 ns |   740.8339 ns |     ? |       ? | 0.1945 | 0.0010 |    3672 B |           ? |

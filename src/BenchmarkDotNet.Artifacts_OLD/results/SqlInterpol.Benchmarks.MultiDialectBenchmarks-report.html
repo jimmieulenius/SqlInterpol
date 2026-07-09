@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8' />
+<title>SqlInterpol.Benchmarks.MultiDialectBenchmarks-20260704-020508</title>
+
+<style type="text/css">
+	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
+	td, th { padding: 6px 13px; border: 1px solid #ddd; text-align: right; }
+	tr { background-color: #fff; border-top: 1px solid #ccc; }
+	tr:nth-child(even) { background: #f8f8f8; }
+</style>
+</head>
+<body>
+<pre><code>
+BenchmarkDotNet v0.14.0, Windows 11 (10.0.26200.8655)
+Unknown processor
+.NET SDK 10.0.301
+  [Host]     : .NET 8.0.28 (8.0.2826.26413), X64 RyuJIT AVX2
+  DefaultJob : .NET 8.0.28 (8.0.2826.26413), X64 RyuJIT AVX2
+</code></pre>
+<pre><code></code></pre>
+
+<table>
+<thead><tr><th>Method</th><th>Mean</th><th>Error</th><th>StdDev</th><th>Ratio</th><th>RatioSD</th><th>Gen0</th><th>Gen1</th><th>Allocated</th><th>Alloc Ratio</th>
+</tr>
+</thead><tbody><tr><td>SqlServer</td><td>12.16 &mu;s</td><td>0.064 &mu;s</td><td>0.060 &mu;s</td><td>1.07</td><td>0.01</td><td>0.7782</td><td>0.0153</td><td>14.52 KB</td><td>0.99</td>
+</tr><tr><td>PostgreSql</td><td>11.33 &mu;s</td><td>0.177 &mu;s</td><td>0.148 &mu;s</td><td>1.00</td><td>0.02</td><td>0.7935</td><td>0.0153</td><td>14.62 KB</td><td>1.00</td>
+</tr><tr><td>MySql</td><td>11.08 &mu;s</td><td>0.031 &mu;s</td><td>0.029 &mu;s</td><td>0.98</td><td>0.01</td><td>0.7782</td><td>0.0153</td><td>14.52 KB</td><td>0.99</td>
+</tr><tr><td>SqLite</td><td>11.13 &mu;s</td><td>0.022 &mu;s</td><td>0.020 &mu;s</td><td>0.98</td><td>0.01</td><td>0.7935</td><td>0.0153</td><td>14.62 KB</td><td>1.00</td>
+</tr><tr><td>Oracle</td><td>11.26 &mu;s</td><td>0.032 &mu;s</td><td>0.030 &mu;s</td><td>0.99</td><td>0.01</td><td>0.7629</td><td>0.0153</td><td>14.23 KB</td><td>0.97</td>
+</tr></tbody></table>
+</body>
+</html>

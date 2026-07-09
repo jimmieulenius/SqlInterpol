@@ -87,20 +87,48 @@ public partial class SqlSegmentPreprocessor
     private SqlPagingFragment ExtractPagingFragment(string text, ref int charIndex, IReadOnlyList<SqlSegment> segments, ref int segmentIndex)
     {
         charIndex += SqlKeyword.Limit.Value.Length - 1; 
-        // TO-DO: Advance segmentIndex if LIMIT/OFFSET arguments are passed as interpolated holes
-        return new SqlPagingFragment(0, 0); 
+        
+        int limit = 0;
+        int offset = 0;
+        
+        // Advance segmentIndex if LIMIT argument is passed as an interpolated hole
+        if (segmentIndex + 1 < segments.Count && segments[segmentIndex + 1].Type == SqlSegmentType.Parameter)
+        {
+            segmentIndex++;
+        }
+        
+        // Advance segmentIndex again if OFFSET argument is also passed as an interpolated hole
+        if (segmentIndex + 1 < segments.Count && segments[segmentIndex + 1].Type == SqlSegmentType.Parameter)
+        {
+            segmentIndex++;
+        }
+        
+        return new SqlPagingFragment(limit, offset); 
     }
 
     private SqlReturningFragment ExtractReturningFragment(string text, ref int charIndex, IReadOnlyList<SqlSegment> segments, ref int segmentIndex)
     {
         charIndex += SqlKeyword.Returning.Value.Length - 1;
-        // TO-DO: Advance segmentIndex to extract bound return projections
+        
+        // Advance segmentIndex to extract bound return projections (e.g. Returning {projection})
+        if (segmentIndex + 1 < segments.Count && segments[segmentIndex + 1].Type == SqlSegmentType.Parameter)
+        {
+            segmentIndex++;
+        }
+        
         return new SqlReturningFragment(Array.Empty<ISqlProjection>()); 
     }
 
     private SqlLockFragment ExtractLockFragment(string text, ref int charIndex, bool isForUpdate, IReadOnlyList<SqlSegment> segments, ref int segmentIndex)
     {
         charIndex += (isForUpdate ? SqlKeyword.ForUpdate.Value.Length : SqlKeyword.ForShare.Value.Length) - 1;
+        
+        // If a lock mode accepts parameters (like timeouts), advance the segmentIndex here
+        if (segmentIndex + 1 < segments.Count && segments[segmentIndex + 1].Type == SqlSegmentType.Parameter)
+        {
+            segmentIndex++;
+        }
+        
         return new SqlLockFragment(isForUpdate ? SqlLockMode.Update : SqlLockMode.Share); 
     }
 

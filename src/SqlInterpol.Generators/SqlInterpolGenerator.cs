@@ -1,8 +1,10 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Text;
 
 namespace SqlInterpol.Generators;
 
@@ -11,79 +13,62 @@ public class SqlInterpolGenerator : IIncrementalGenerator
 {
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        // 1. Create the syntax provider pipeline
         IncrementalValuesProvider<SqlExtractedQueryInfo> queryInfos = context.SyntaxProvider
             .CreateSyntaxProvider(
                 predicate: IsTargetInvocation,
                 transform: ExtractQueryInfo)
             .Where(static info => info is not null)!;
 
-        // Phase B & C will hook into this queryInfos provider.
-        // context.RegisterSourceOutput(queryInfos, (spc, queryInfo) => EmitCode(spc, queryInfo));
+        context.RegisterSourceOutput(queryInfos, static (spc, queryInfo) => EmitCode(spc, queryInfo));
     }
 
-    /// <summary>
-    /// PREDICATE: Extremely fast, purely syntactic check.
-    /// Runs on every keystroke. Do not use SemanticModel here.
-    /// </summary>
     private static bool IsTargetInvocation(SyntaxNode node, CancellationToken cancellationToken)
     {
         if (node is InvocationExpressionSyntax invocation &&
             invocation.Expression is MemberAccessExpressionSyntax memberAccess)
         {
             var methodName = memberAccess.Name.Identifier.Text;
-            
-            // Fast filter for our target method names
             return methodName is "Append" or "Query";
         }
-
         return false;
     }
 
-    /// <summary>
-    /// TRANSFORM: Slower, semantic check. Runs only on nodes that passed the predicate.
-    /// Extracts the interpolated string and formats it for the ANTLR parser.
-    /// </summary>
     private static SqlExtractedQueryInfo? ExtractQueryInfo(GeneratorSyntaxContext context, CancellationToken cancellationToken)
     {
         var invocation = (InvocationExpressionSyntax)context.Node;
         var memberAccess = (MemberAccessExpressionSyntax)invocation.Expression;
         var methodName = memberAccess.Name.Identifier.Text;
 
-        // Ensure we have arguments
         if (invocation.ArgumentList.Arguments.Count == 0) 
             return null;
 
-        // Verify the argument is an interpolated string: $"""...""" or $"..."
         var argument = invocation.ArgumentList.Arguments[0].Expression;
         if (argument is not InterpolatedStringExpressionSyntax interpolatedString) 
             return null;
 
-        // [Optional]: Validate via SemanticModel that the caller is actually our ORM type
-        // var symbolInfo = context.SemanticModel.GetSymbolInfo(invocation, cancellationToken);
-        // if (symbolInfo.Symbol is IMethodSymbol methodSymbol && 
-        //     methodSymbol.ContainingType.Name != "SqlBuilder") { return null; }
+        var targetNode = memberAccess.Name; 
+        var lineSpan = targetNode.GetLocation().GetLineSpan();
+        
+        string filePath = lineSpan.Path ?? context.Node.SyntaxTree.FilePath;
+        int line = lineSpan.StartLinePosition.Line + 1;
+        int character = lineSpan.StartLinePosition.Character + 1;
 
         var sqlBuilder = new StringBuilder();
         var parameters = new List<SqlQueryParameterInfo>();
         int paramCount = 1;
 
-        // Traverse the interpolated string parts
         foreach (var content in interpolatedString.Contents)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
             if (content is InterpolatedStringTextSyntax textSyntax)
             {
-                // Literal string part
                 sqlBuilder.Append(textSyntax.TextToken.ValueText);
             }
             else if (content is InterpolationSyntax interpolation)
             {
-                // The hole: {someVar} -> $1
                 sqlBuilder.Append($"${paramCount}");
 
-                // Grab type information for the expression inside the hole
                 var typeInfo = context.SemanticModel.GetTypeInfo(interpolation.Expression, cancellationToken);
                 var typeName = typeInfo.Type?.ToDisplayString() ?? "object";
 
@@ -100,7 +85,102 @@ public class SqlInterpolGenerator : IIncrementalGenerator
         return new SqlExtractedQueryInfo(
             MethodName: methodName,
             SqlTemplate: sqlBuilder.ToString(),
-            Parameters: new EquatableArray<SqlQueryParameterInfo>(parameters.Select(p => new SqlQueryParameterInfo(p.Index, p.TypeName, p.OriginalExpression)).ToArray())
+            Parameters: new EquatableArray<SqlQueryParameterInfo>(parameters.ToArray()),
+            FilePath: filePath,
+            Line: line,
+            Character: character
         );
+    }
+
+    private static void EmitCode(SourceProductionContext spc, SqlExtractedQueryInfo queryInfo)
+    {
+        var polyfill = @"// <auto-generated/>
+#pragma warning disable CS9113
+namespace System.Runtime.CompilerServices
+{
+    [AttributeUsage(AttributeTargets.Method, AllowMultiple = true)]
+    internal sealed class InterceptsLocationAttribute : Attribute
+    {
+        public InterceptsLocationAttribute(string filePath, int line, int character) { }
+    }
+}
+#pragma warning restore CS9113";
+        
+        spc.AddSource("InterceptsLocationAttribute.g.cs", SourceText.From(polyfill, Encoding.UTF8));
+
+        bool isQuery = queryInfo.MethodName == "Query";
+        string returnType = isQuery ? "SqlQueryResult" : "SqlBuilder";
+        var uniqueId = System.Guid.NewGuid().ToString("N");
+
+        var sb = new StringBuilder();
+        sb.AppendLine("// <auto-generated/>");
+        sb.AppendLine("using System;");
+        sb.AppendLine("using System.Runtime.CompilerServices;");
+        sb.AppendLine("using SqlInterpol;");
+        sb.AppendLine("using SqlInterpol.Parsing;"); 
+        sb.AppendLine();
+        sb.AppendLine("namespace SqlInterpol.Generated");
+        sb.AppendLine("{");
+        sb.AppendLine("    public static class SqlQueryInterceptors");
+        sb.AppendLine("    {");
+
+        sb.AppendLine($@"        [InterceptsLocationAttribute(@""{queryInfo.FilePath}"", {queryInfo.Line}, {queryInfo.Character})]");
+        sb.AppendLine($"        public static {returnType} Intercepted_{queryInfo.MethodName}_{uniqueId}(");
+        sb.AppendLine("            this SqlBuilder builder, ");
+        sb.AppendLine("            [InterpolatedStringHandlerArgument(\"builder\")] ref SqlQueryInterpolatedStringHandler handler)");
+        sb.AppendLine("        {");
+        
+        sb.AppendLine("            var genBuilder = (ISqlGeneratorBuilder)builder;");
+        sb.AppendLine("            int runtimeIdx = 0;");
+        sb.AppendLine();
+        sb.AppendLine("            // Helper to pluck the fully resolved Tier 1 holes natively out of the handler");
+        sb.AppendLine("            SqlSegment NextHole() {");
+        sb.AppendLine("                while (runtimeIdx < handler.SegmentCount && handler.GetSegment(runtimeIdx).Type == SqlSegmentType.Literal) runtimeIdx++;");
+        sb.AppendLine("                return handler.GetSegment(runtimeIdx++);");
+        sb.AppendLine("            }");
+        sb.AppendLine();
+        
+        string template = queryInfo.SqlTemplate;
+        int currentPos = 0;
+        var materializedParams = queryInfo.Parameters.ToArray();
+
+        for (int i = 0; i < materializedParams.Length; i++)
+        {
+            var param = materializedParams[i];
+            string placeholder = $"${param.Index}";
+            int placeholderIdx = template.IndexOf(placeholder, currentPos);
+
+            if (placeholderIdx >= 0)
+            {
+                string textChunk = template.Substring(currentPos, placeholderIdx - currentPos);
+                string escapedChunk = textChunk.Replace("\"", "\\\"").Replace("\r", "\\r").Replace("\n", "\\n");
+                
+                sb.AppendLine($"            genBuilder.AppendRaw(\"{escapedChunk}\");");
+                
+                // INJECT THE RESOLVED TIER 1 HOLE!
+                sb.AppendLine($"            genBuilder.AppendSegment(NextHole());");
+                
+                currentPos = placeholderIdx + placeholder.Length;
+            }
+        }
+
+        if (currentPos < template.Length)
+        {
+            string trailingChunk = template.Substring(currentPos);
+            string escapedTrailing = trailingChunk.Replace("\"", "\\\"").Replace("\r", "\\r").Replace("\n", "\\n");
+            sb.AppendLine($"            genBuilder.AppendRaw(\"{escapedTrailing}\");");
+        }
+        sb.AppendLine();
+
+        if (isQuery)
+            sb.AppendLine("            return builder.Build();");
+        else
+            sb.AppendLine("            return builder;");
+
+        sb.AppendLine("        }");
+        sb.AppendLine("    }");
+        sb.AppendLine("}");
+
+        spc.AddSource($"SqlQueryInterceptors_{uniqueId}.g.cs", SourceText.From(sb.ToString(), Encoding.UTF8));
     }
 }

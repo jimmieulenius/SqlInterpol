@@ -435,22 +435,4 @@ public partial class SqlBuilder : ISqlEntityRegistry, ISqlGeneratorBuilder
             _ => new SqlTable<T>(physicalName, physicalSchema, alias)
         };
     }
-
-    void ISqlGeneratorBuilder.AppendRaw(string text)
-    {
-        if (!string.IsNullOrEmpty(text))
-        {
-            _segments.Add(new SqlSegment(SqlSegmentType.Literal, text));
-        }
-    }
-
-    void ISqlGeneratorBuilder.AppendNode(ISqlFragment node)
-    {
-        _segments.Add(new SqlSegment(SqlSegmentType.Raw, node));
-    }
-
-    void ISqlGeneratorBuilder.AppendTemplate(ISqlTemplate template)
-    {
-        _segments.Add(new SqlSegment(SqlSegmentType.Raw, template));
-    }
 }

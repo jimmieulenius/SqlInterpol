@@ -22,6 +22,13 @@ public ref struct SqlQueryInterpolatedStringHandler
         _segmentCount = 0;
     }
 
+    // =================================================================
+    // NEW: Expose segments to the Interceptor for zero-allocation routing
+    // =================================================================
+    public int SegmentCount => _segmentCount;
+    
+    public SqlSegment GetSegment(int index) => _segments[index];
+
     public void AppendLiteral(string value)
     {
         if (string.IsNullOrEmpty(value)) return;

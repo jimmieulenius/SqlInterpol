@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8' />
+<title>SqlInterpol.Benchmarks.EntityMetadataBenchmarks-20260704-020342</title>
+
+<style type="text/css">
+	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
+	td, th { padding: 6px 13px; border: 1px solid #ddd; text-align: right; }
+	tr { background-color: #fff; border-top: 1px solid #ccc; }
+	tr:nth-child(even) { background: #f8f8f8; }
+</style>
+</head>
+<body>
+<pre><code>
+BenchmarkDotNet v0.14.0, Windows 11 (10.0.26200.8655)
+Unknown processor
+.NET SDK 10.0.301
+  [Host]     : .NET 8.0.28 (8.0.2826.26413), X64 RyuJIT AVX2
+  DefaultJob : .NET 8.0.28 (8.0.2826.26413), X64 RyuJIT AVX2
+</code></pre>
+<pre><code></code></pre>
+
+<table>
+<thead><tr><th>Method     </th><th>Mean   </th><th>Error</th><th>StdDev</th><th>Ratio</th><th>RatioSD</th><th>Gen0</th><th>Allocated</th><th>Alloc Ratio</th>
+</tr>
+</thead><tbody><tr><td>GenericLookup</td><td>0.5988 ns</td><td>0.0223 ns</td><td>0.0209 ns</td><td>1.00</td><td>0.05</td><td>-</td><td>-</td><td>NA</td>
+</tr><tr><td>RuntimeLookup</td><td>7.2094 ns</td><td>0.0687 ns</td><td>0.0609 ns</td><td>12.05</td><td>0.42</td><td>-</td><td>-</td><td>NA</td>
+</tr><tr><td>AddEntityAndBuild</td><td>3,657.2224 ns</td><td>28.2117 ns</td><td>25.0090 ns</td><td>6,114.05</td><td>210.24</td><td>0.3471</td><td>6568 B</td><td>NA</td>
+</tr></tbody></table>
+</body>
+</html>

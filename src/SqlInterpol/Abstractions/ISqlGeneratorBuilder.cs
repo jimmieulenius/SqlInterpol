@@ -23,4 +23,9 @@ public interface ISqlGeneratorBuilder
     /// Appends a pre-compiled or cached template structure.
     /// </summary>
     void AppendTemplate(ISqlTemplate template);
+
+    /// <summary>
+    /// Appends a fully resolved Tier 1 segment directly from the interpolated string handler.
+    /// </summary>
+    void AppendSegment(SqlSegment segment);
 }
