@@ -207,6 +207,32 @@ public ref struct SqlQueryInterpolatedStringHandler
         AddSegment(_builder.ProcessValue(value));
     }
 
+    /// <summary>
+    /// Exposes the evaluated arguments to the AOT Source Generator.
+    /// </summary>
+    public SqlSegment GetSegment(int formattedHoleIndex)
+    {
+        int holeCount = 0;
+        
+        // Use _segmentCount, NOT _segments.Length!
+        for (int i = 0; i < _segmentCount; i++)
+        {
+            var segment = _segments[i];
+            
+            // We strictly ignore only the literal text blocks injected by the compiler.
+            if (segment.Type != SqlSegmentType.Literal)
+            {
+                if (holeCount == formattedHoleIndex)
+                {
+                    return segment;
+                }
+                holeCount++;
+            }
+        }
+        
+        throw new ArgumentOutOfRangeException(nameof(formattedHoleIndex), "AOT requested a hole index that does not exist in the handler.");
+    }
+
     private void AddSegment(SqlSegment segment)
     {
         if (_segmentCount >= _segments.Length) GrowBuffer();

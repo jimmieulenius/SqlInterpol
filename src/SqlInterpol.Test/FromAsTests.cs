@@ -1,6 +1,5 @@
 using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
-using Xunit;
 
 namespace SqlInterpol.Test;
 
@@ -188,7 +187,7 @@ public class FromAsTests
                 .Entity<Product>(out var myProd)
                 .Append($$"""
                     SELECT {{myProd}}
-                    FROM {{myProd:decl}}
+                    FROM {{myProd}}
                     """)
                 .Build();
         });

@@ -372,7 +372,7 @@ public partial class SqlBuilder : ISqlEntityRegistry
         // ---------------------------------------------------------------------
         // 4. RENDER TO TEXT
         // ---------------------------------------------------------------------
-        var vsb = new SqlInterpol.Parsing.ValueStringBuilder(stackalloc char[2048]);
+        var vsb = new ValueStringBuilder(stackalloc char[2048]);
 
         try
         {
