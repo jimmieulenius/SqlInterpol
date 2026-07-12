@@ -28,9 +28,6 @@ public class SqlAotSyntaxWalker : CSharpSyntaxWalker
             }
             else if (methodName is "Append" or "AppendLine")
             {
-                // 🌟 SURGICAL JIT DELEGATION 🌟
-                // We only skip Append if it is explicitly inside a .Query() invocation. 
-                // We must NOT skip all lambdas, because testCase.Action(() => ...) uses lambdas!
                 var isInsideQuery = node.Ancestors().OfType<InvocationExpressionSyntax>()
                     .Any(inv => inv.Expression is MemberAccessExpressionSyntax ma && ma.Name.Identifier.Text == "Query");
 
@@ -47,7 +44,6 @@ public class SqlAotSyntaxWalker : CSharpSyntaxWalker
             }
             else if (methodName == "Query")
             {
-                // TRACK SUBQUERIES: db.Query(stats, ...)
                 if (node.ArgumentList.Arguments.Count > 0)
                 {
                     var firstArg = node.ArgumentList.Arguments[0].Expression;
@@ -66,8 +62,12 @@ public class SqlAotSyntaxWalker : CSharpSyntaxWalker
     {
         string variableName = "";
         string? explicitAlias = null;
+        string? customName = null;
+        string? customSchema = null;
         bool wasAutoAliased = true;
 
+        // 🌟 FLUENT API CONFIGURATION ANALYZER 🌟
+        int positionalIndex = 0;
         foreach (var argument in node.ArgumentList.Arguments)
         {
             if (argument.RefOrOutKeyword.IsKind(SyntaxKind.OutKeyword))
@@ -76,12 +76,28 @@ public class SqlAotSyntaxWalker : CSharpSyntaxWalker
                     variableName = decl.Designation.ToString();
                 else if (argument.Expression is IdentifierNameSyntax ident)
                     variableName = ident.Identifier.Text;
+                continue; 
             }
-            else if (argument.Expression is LiteralExpressionSyntax literal && 
-                     literal.IsKind(SyntaxKind.StringLiteralExpression))
+
+            string? stringValue = null;
+            if (argument.Expression is LiteralExpressionSyntax literal && literal.IsKind(SyntaxKind.StringLiteralExpression))
             {
-                explicitAlias = literal.Token.ValueText;
-                wasAutoAliased = false;
+                stringValue = literal.Token.ValueText;
+            }
+
+            if (argument.NameColon != null)
+            {
+                var paramName = argument.NameColon.Name.Identifier.Text;
+                if (paramName == "alias") { explicitAlias = stringValue; if (stringValue != null) wasAutoAliased = false; }
+                else if (paramName == "name") { customName = stringValue; }
+                else if (paramName == "schema") { customSchema = stringValue; }
+            }
+            else
+            {
+                if (positionalIndex == 0) { explicitAlias = stringValue; if (stringValue != null) wasAutoAliased = false; }
+                else if (positionalIndex == 1) { customName = stringValue; }
+                else if (positionalIndex == 2) { customSchema = stringValue; }
+                positionalIndex++;
             }
         }
 
@@ -121,11 +137,22 @@ public class SqlAotSyntaxWalker : CSharpSyntaxWalker
 
             foreach (var member in typeSymbol.GetMembers().OfType<IPropertySymbol>())
             {
-                if (member.IsStatic || member.IsIndexer) continue;
+                if (member.IsStatic || member.IsIndexer) continue; // 🌟 FIXED: Typo cleanly removed!
+                if (member.Name == "EqualityContract") continue;
+
+                var attributes = member.GetAttributes();
+                if (attributes.Any(a => a.AttributeClass?.Name is "SqlIgnoreAttribute" or "SqlIgnore")) continue;
+
+                var propType = member.Type;
+                if (propType.TypeKind == TypeKind.Class && 
+                    propType.SpecialType != SpecialType.System_String && 
+                    propType.ToDisplayString() != "byte[]")
+                {
+                    continue;
+                }
 
                 string colName = member.Name;
-                var sqlColumnAttr = member.GetAttributes()
-                    .FirstOrDefault(a => a.AttributeClass?.Name is "SqlColumnAttribute" or "SqlColumn");
+                var sqlColumnAttr = attributes.FirstOrDefault(a => a.AttributeClass?.Name is "SqlColumnAttribute" or "SqlColumn");
 
                 if (sqlColumnAttr != null && sqlColumnAttr.ConstructorArguments.Length > 0)
                 {
@@ -138,6 +165,9 @@ public class SqlAotSyntaxWalker : CSharpSyntaxWalker
             
             columns = columns.OrderBy(c => c.PropertyName).ToList();
         }
+
+        if (customName != null) mappedTableName = customName;
+        if (customSchema != null) mappedSchemaName = customSchema;
 
         var declaration = new EntityDeclaration(
             variableName, 

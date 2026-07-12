@@ -12,6 +12,18 @@ namespace SqlInterpol.Generators;
 [Generator]
 public class SqlAotInterceptorGenerator : IIncrementalGenerator
 {
+    private static string GetStartQuote(string dialect) => dialect.IndexOf("SqlServer", StringComparison.OrdinalIgnoreCase) >= 0 ? "[" : (dialect.IndexOf("MySql", StringComparison.OrdinalIgnoreCase) >= 0 ? "`" : "\"");
+    private static string GetEndQuote(string dialect) => dialect.IndexOf("SqlServer", StringComparison.OrdinalIgnoreCase) >= 0 ? "]" : (dialect.IndexOf("MySql", StringComparison.OrdinalIgnoreCase) >= 0 ? "`" : "\"");
+    
+    private static string Quote(string dialect, string identifier) => $"{GetStartQuote(dialect)}{identifier}{GetEndQuote(dialect)}";
+    private static string QuoteEntity(string dialect, string table, string? schema)
+    {
+        if (string.IsNullOrEmpty(schema)) return Quote(dialect, table);
+        return $"{Quote(dialect, schema)}.{Quote(dialect, table)}";
+    }
+
+    private static string Escape(string s) => s.Replace("\"", "\\\"");
+
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         context.RegisterPostInitializationOutput(static postInitContext =>
@@ -54,6 +66,13 @@ namespace System.Runtime.CompilerServices
             {
                 var containingMethod = ctx.Node.Ancestors().OfType<MethodDeclarationSyntax>().FirstOrDefault();
                 if (containingMethod == null) return null;
+
+                bool hasAdvancedComposition = containingMethod.DescendantNodes()
+                    .OfType<MemberAccessExpressionSyntax>()
+                    .Any(ma => ma.Name.Identifier.Text == "Template");
+
+                if (hasAdvancedComposition) return null;
+
                 var walker = new SqlAotSyntaxWalker(ctx.SemanticModel);
                 walker.Visit(containingMethod);
                 return walker.CurrentContext.AppendCalls.Count > 0 ? walker.CurrentContext : null;
@@ -117,6 +136,11 @@ namespace System.Runtime.CompilerServices
                     var arguments = appendCall.InvocationNode.ArgumentList.Arguments;
                     if (arguments.Count == 0)
                     {
+                        // 🌟 FIX: Ensure early returns respect AppendLine
+                        if (appendCall.MethodName == "AppendLine")
+                        {
+                            sb.AppendLine("            genDb.AppendRaw(\"\\n\");");
+                        }
                         sb.AppendLine("            return builder;");
                         sb.AppendLine("        }");
                         continue;
@@ -126,222 +150,573 @@ namespace System.Runtime.CompilerServices
 
                     if (firstArg is InterpolatedStringExpressionSyntax interpolatedString)
                     {
-                        int segmentIndex = 0;
-                        string currentSqlClause = "UNKNOWN";
-
-                        // =========================================================
-                        // PRE-PASS: Safely parse inline aliases and parenthesis
-                        // =========================================================
                         var inlineAliases = new Dictionary<string, string>();
+                        var inlinePropertyAliases = new Dictionary<int, string>(); 
                         var replacementForNextText = new Dictionary<int, string>();
                         var contents = interpolatedString.Contents;
 
-                        for (int i = 0; i < contents.Count; i++)
-                        {
-                            if (contents[i] is InterpolationSyntax interpolation &&
-                                interpolation.Expression is IdentifierNameSyntax ident &&
-                                queryContext.Entities.ContainsKey(ident.Identifier.Text))
-                            {
-                                string? format = interpolation.FormatClause?.FormatStringToken.ValueText;
-                                if (string.IsNullOrEmpty(format))
-                                {
-                                    if (i + 1 < contents.Count && contents[i + 1] is InterpolatedStringTextSyntax nextText)
-                                    {
-                                        var rawText = nextText.TextToken.ValueText;
-                                        
-                                        string rawTrimmed = rawText.TrimStart(' ', '\r', '\n', '\t', ')', ']');
-                                        if (rawTrimmed.StartsWith("AS ", StringComparison.OrdinalIgnoreCase))
-                                        {
-                                            var parts = rawTrimmed.Substring(3).TrimStart().Split(new[] { ' ', '\r', '\n', '\t', ',', ')' }, StringSplitOptions.RemoveEmptyEntries);
-                                            if (parts.Length > 0)
-                                            {
-                                                string cleanAlias = parts[0].Trim('[', ']', '"', '\'', '`');
-                                                inlineAliases[ident.Identifier.Text] = cleanAlias;
-                                                
-                                                // 🌟 CRITICAL FIX: Consume ONLY spaces and tabs immediately before AS to prevent trailing space bugs!
-                                                var regex = new System.Text.RegularExpressions.Regex(@"[ \t]*\bAS\s+\[?" + System.Text.RegularExpressions.Regex.Escape(cleanAlias) + @"\]?\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-                                                replacementForNextText[i] = regex.Replace(rawText, "", 1);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // =========================================================
-                        // AOT EMISSION PASS
-                        // =========================================================
-                        string activeTextReplacement = null;
+                        bool hasAsKeywordOrAlias = false;
+                        bool hasParameterHoles = false;
+                        bool hasReturning = false;
+                        bool isDmlQuery = false;
+                        bool hasComplexDynamicHoles = false;
+                        bool hasSetOperation = false;
+                        bool hasUnconsumableAlias = false;
+                        bool hasWindowFunction = false;
+                        bool hasUpsert = false;
+                        
+                        string prePassClause = "UNKNOWN";
 
                         for (int i = 0; i < contents.Count; i++)
                         {
-                            var content = contents[i];
-
-                            if (content is InterpolatedStringTextSyntax textContent)
+                            if (contents[i] is InterpolatedStringTextSyntax textSyntax)
                             {
-                                var rawText = textContent.TextToken.ValueText;
+                                var val = textSyntax.TextToken.ValueText;
+                                var upperText = val.ToUpperInvariant();
                                 
-                                if (activeTextReplacement != null)
-                                {
-                                    rawText = activeTextReplacement;
-                                    activeTextReplacement = null;
-                                }
+                                if (val.IndexOf("AS", StringComparison.OrdinalIgnoreCase) >= 0)
+                                    hasAsKeywordOrAlias = true;
+                                
+                                if (System.Text.RegularExpressions.Regex.IsMatch(val, @"\bRETURNING\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                                    hasReturning = true;
 
-                                var upperText = rawText.ToUpperInvariant();
+                                if (System.Text.RegularExpressions.Regex.IsMatch(val, @"\b(INSERT|UPDATE|DELETE)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                                    isDmlQuery = true;
+                                    
+                                if (System.Text.RegularExpressions.Regex.IsMatch(val, @"\b(INTERSECT|UNION|EXCEPT)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                                    hasSetOperation = true;
+
+                                if (System.Text.RegularExpressions.Regex.IsMatch(val, @"[)\]]\s*AS\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                                    hasUnconsumableAlias = true;
+
+                                if (System.Text.RegularExpressions.Regex.IsMatch(val, @"\bOVER\s*\(", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                                    hasWindowFunction = true;
+
+                                if (System.Text.RegularExpressions.Regex.IsMatch(val, @"\b(ON\s+CONFLICT|ON\s+DUPLICATE|MERGE\b)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                                    hasUpsert = true;
+
                                 int selIdx = upperText.LastIndexOf("SELECT");
                                 int fromIdx = upperText.LastIndexOf("FROM");
                                 int joinIdx = upperText.LastIndexOf("JOIN");
                                 int updateIdx = upperText.LastIndexOf("UPDATE");
                                 int setIdx = upperText.LastIndexOf("SET");
                                 int retIdx = upperText.LastIndexOf("RETURNING");
+                                int insIdx = upperText.LastIndexOf("INSERT");
+                                int whereIdx = upperText.LastIndexOf("WHERE");
+                                int valuesIdx = upperText.LastIndexOf("VALUES");
+                                int groupIdx = upperText.LastIndexOf("GROUP");
+                                int orderIdx = upperText.LastIndexOf("ORDER");
+                                int onIdx = upperText.LastIndexOf("ON");
+                                int delIdx = upperText.LastIndexOf("DELETE");
 
-                                int maxIdx = Math.Max(selIdx, Math.Max(fromIdx, Math.Max(joinIdx, Math.Max(updateIdx, Math.Max(setIdx, retIdx)))));
+                                int maxIdx = selIdx;
+                                if (fromIdx > maxIdx) maxIdx = fromIdx;
+                                if (joinIdx > maxIdx) maxIdx = joinIdx;
+                                if (updateIdx > maxIdx) maxIdx = updateIdx;
+                                if (setIdx > maxIdx) maxIdx = setIdx;
+                                if (retIdx > maxIdx) maxIdx = retIdx;
+                                if (insIdx > maxIdx) maxIdx = insIdx;
+                                if (whereIdx > maxIdx) maxIdx = whereIdx;
+                                if (valuesIdx > maxIdx) maxIdx = valuesIdx;
+                                if (groupIdx > maxIdx) maxIdx = groupIdx;
+                                if (orderIdx > maxIdx) maxIdx = orderIdx;
+                                if (onIdx > maxIdx) maxIdx = onIdx;
+                                if (delIdx > maxIdx) maxIdx = delIdx;
+
                                 if (maxIdx != -1)
                                 {
-                                    if (maxIdx == selIdx) currentSqlClause = "SELECT";
-                                    else if (maxIdx == fromIdx) currentSqlClause = "FROM";
-                                    else if (maxIdx == joinIdx) currentSqlClause = "JOIN";
-                                    else if (maxIdx == updateIdx) currentSqlClause = "UPDATE";
-                                    else if (maxIdx == setIdx) currentSqlClause = "SET";
-                                    else if (maxIdx == retIdx) currentSqlClause = "RETURNING";
+                                    if (maxIdx == selIdx) prePassClause = "SELECT";
+                                    else if (maxIdx == fromIdx) prePassClause = "FROM";
+                                    else if (maxIdx == joinIdx) prePassClause = "JOIN";
+                                    else if (maxIdx == updateIdx) prePassClause = "UPDATE";
+                                    else if (maxIdx == setIdx) prePassClause = "SET";
+                                    else if (maxIdx == retIdx) prePassClause = "RETURNING";
+                                    else if (maxIdx == insIdx) prePassClause = "INSERT";
+                                    else if (maxIdx == whereIdx) prePassClause = "WHERE";
+                                    else if (maxIdx == valuesIdx) prePassClause = "VALUES";
+                                    else if (maxIdx == groupIdx) prePassClause = "GROUP";
+                                    else if (maxIdx == orderIdx) prePassClause = "ORDER";
+                                    else if (maxIdx == onIdx) prePassClause = "ON";
+                                    else if (maxIdx == delIdx) prePassClause = "DELETE";
                                 }
-
-                                var text = rawText.Replace("\"", "\\\"").Replace("\r", "\\r").Replace("\n", "\\n"); 
-                                sb.AppendLine($"            genDb.AppendRaw(\"{text}\");");
                             }
-                            else if (content is InterpolationSyntax interpolation)
+
+                            if (contents[i] is InterpolationSyntax interpolation)
                             {
                                 string? format = interpolation.FormatClause?.FormatStringToken.ValueText;
-
-                                if (interpolation.Expression is MemberAccessExpressionSyntax holeMemberAccess &&
-                                    holeMemberAccess.Expression is IdentifierNameSyntax identifier &&
-                                    queryContext.Entities.TryGetValue(identifier.Identifier.Text, out var entityDecl))
+                                
+                                bool isEntity = interpolation.Expression is IdentifierNameSyntax ident &&
+                                                queryContext.Entities.ContainsKey(ident.Identifier.Text);
+                                
+                                bool isProperty = false;
+                                
+                                if (interpolation.Expression is MemberAccessExpressionSyntax propMemberAccess &&
+                                    propMemberAccess.Expression is IdentifierNameSyntax ident2 &&
+                                    queryContext.Entities.ContainsKey(ident2.Identifier.Text))
                                 {
-                                    var propertyName = holeMemberAccess.Name.Identifier.Text;
-                                    var colMap = entityDecl.Columns.FirstOrDefault(c => c.PropertyName == propertyName);
-                                    var columnName = colMap != null ? colMap.ColumnName : propertyName;
-                                        
-                                    string wasAuto = entityDecl.WasAutoAliased.ToString().ToLower();
-
-                                    if (string.Equals(format, "alias", StringComparison.OrdinalIgnoreCase))
-                                    {
-                                        sb.AppendLine($"            // AOT Mapped Property Alias: {columnName}");
-                                        sb.AppendLine($"            genDb.AppendRaw(genDb.Context.Dialect.QuoteIdentifier(\"{columnName}\"));");
-                                    }
-                                    else
-                                    {
-                                        sb.AppendLine($"            // AOT Mapped Property: {identifier.Identifier.Text}.{propertyName} -> {columnName}");
-                                        if (inlineAliases.TryGetValue(entityDecl.VariableName, out var inlineAlias))
-                                            sb.AppendLine($"            string alias_{segmentIndex} = \"{inlineAlias}\";");
-                                        else
-                                            sb.AppendLine($"            string alias_{segmentIndex} = genDb.ResolveAlias(\"{entityDecl.VariableName}\", \"{entityDecl.TypeName}\", {wasAuto});");
-
-                                        sb.AppendLine($"            genDb.AppendRaw(genDb.Context.Dialect.QuoteIdentifier(alias_{segmentIndex}));");
-                                        sb.AppendLine($"            genDb.AppendRaw(\".\");");
-                                        sb.AppendLine($"            genDb.AppendRaw(genDb.Context.Dialect.QuoteIdentifier(\"{columnName}\"));");
-                                    }
-                                    segmentIndex++;
+                                    isProperty = true;
                                 }
-                                else if (interpolation.Expression is IdentifierNameSyntax singleIdentifier &&
-                                         queryContext.Entities.TryGetValue(singleIdentifier.Identifier.Text, out var tableDecl))
+                                else if (interpolation.Expression is InvocationExpressionSyntax inv &&
+                                         inv.Expression is MemberAccessExpressionSyntax invMa &&
+                                         invMa.Name.Identifier.Text == "Column" &&
+                                         invMa.Expression is IdentifierNameSyntax invIdent &&
+                                         queryContext.Entities.ContainsKey(invIdent.Identifier.Text) &&
+                                         inv.ArgumentList.Arguments.Count == 1 &&
+                                         inv.ArgumentList.Arguments[0].Expression is LiteralExpressionSyntax)
                                 {
-                                    // ============================================================
-                                    // 🌟 CRITICAL FIX: Ensure Subqueries fallback immediately to JIT
-                                    // PRESERVING the ") AS alias" string format for the next loop!
-                                    // ============================================================
-                                    if (queryContext.SubqueryEntities.Contains(tableDecl.VariableName))
+                                    isProperty = true;
+                                }
+
+                                if (!isEntity && !isProperty)
+                                {
+                                    hasParameterHoles = true;
+                                    
+                                    if (interpolation.Expression is InvocationExpressionSyntax)
                                     {
-                                        sb.AppendLine($"            // AOT Mapped Subquery Fallback: {tableDecl.VariableName}");
-                                        sb.AppendLine($"            genDb.AppendSegment(handler.GetSegment({segmentIndex}));");
-                                        segmentIndex++;
-                                        continue; 
+                                        hasComplexDynamicHoles = true;
                                     }
-
-                                    // Safely trigger alias text replacements ONLY for standard tables!
-                                    if (inlineAliases.TryGetValue(tableDecl.VariableName, out var inlineAlias) && string.IsNullOrEmpty(format))
+                                    
+                                    if (prePassClause == "ORDER" || prePassClause == "GROUP")
                                     {
-                                        if (replacementForNextText.TryGetValue(i, out var rep))
-                                            activeTextReplacement = rep; 
+                                        hasComplexDynamicHoles = true;
                                     }
+                                }
 
-                                    string wasAuto = tableDecl.WasAutoAliased.ToString().ToLower();
+                                if (!string.IsNullOrEmpty(format)) continue;
 
-                                    if (string.Equals(format, "columns", StringComparison.OrdinalIgnoreCase) || 
-                                             (string.IsNullOrEmpty(format) && (currentSqlClause == "SELECT" || currentSqlClause == "RETURNING")))
+                                if (isEntity || isProperty)
+                                {
+                                    if (i + 1 < contents.Count && contents[i + 1] is InterpolatedStringTextSyntax nextText)
                                     {
-                                        sb.AppendLine($"            // AOT Mapped Columns: {tableDecl.VariableName}");
-                                        if (inlineAlias != null)
-                                            sb.AppendLine($"            string alias_{segmentIndex} = \"{inlineAlias}\";");
-                                        else
-                                            sb.AppendLine($"            string alias_{segmentIndex} = genDb.ResolveAlias(\"{tableDecl.VariableName}\", \"{tableDecl.TypeName}\", {wasAuto});");
+                                        var rawText = nextText.TextToken.ValueText;
+                                        string rawTrimmed = rawText.TrimStart(' ', '\r', '\n', '\t');
                                         
-                                        for (int k = 0; k < tableDecl.Columns.Count; k++)
+                                        if (rawTrimmed.StartsWith("AS ", StringComparison.OrdinalIgnoreCase))
                                         {
-                                            var col = tableDecl.Columns[k];
-                                            if (k > 0) sb.AppendLine($"            genDb.AppendRaw(\", \");");
-                                            sb.AppendLine($"            genDb.AppendRaw(genDb.Context.Dialect.QuoteIdentifier(alias_{segmentIndex}));");
-                                            sb.AppendLine($"            genDb.AppendRaw(\".\");");
-                                            sb.AppendLine($"            genDb.AppendRaw(genDb.Context.Dialect.QuoteIdentifier(\"{col.ColumnName}\"));");
+                                            var parts = rawTrimmed.Substring(3).TrimStart().Split(new[] { ' ', '\r', '\n', '\t', ',', ')' }, StringSplitOptions.RemoveEmptyEntries);
+                                            if (parts.Length > 0)
+                                            {
+                                                string cleanAlias = parts[0].Trim('[', ']', '"', '\'', '`');
+                                                var regex = new System.Text.RegularExpressions.Regex(@"[ \t]*\bAS\s+\[?" + System.Text.RegularExpressions.Regex.Escape(cleanAlias) + @"\]?\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                                                replacementForNextText[i] = regex.Replace(rawText, "", 1);
+
+                                                if (isEntity) inlineAliases[((IdentifierNameSyntax)interpolation.Expression).Identifier.Text] = cleanAlias;
+                                                else if (isProperty) inlinePropertyAliases[i] = cleanAlias; 
+                                            }
                                         }
                                     }
-                                    else if (inlineAlias != null && string.IsNullOrEmpty(format))
-                                    {
-                                        sb.AppendLine($"            // AOT Mapped Inline Alias Table: {tableDecl.VariableName} -> {inlineAlias}");
-                                        sb.AppendLine($"            string baseTbl_{segmentIndex} = \"\";");
-                                        if (tableDecl.MappedSchemaName != null)
-                                            sb.AppendLine($"            baseTbl_{segmentIndex} += genDb.Context.Dialect.QuoteIdentifier(\"{tableDecl.MappedSchemaName}\") + \".\";");
-                                        sb.AppendLine($"            baseTbl_{segmentIndex} += genDb.Context.Dialect.QuoteIdentifier(\"{tableDecl.MappedTableName}\");");
-                                        
-                                        sb.AppendLine($"            string qAlias_{segmentIndex} = genDb.Context.Dialect.QuoteIdentifier(\"{inlineAlias}\");");
-                                        sb.AppendLine($"            genDb.AppendRaw(genDb.Context.Dialect.ApplyAlias(baseTbl_{segmentIndex}, qAlias_{segmentIndex}));");
-                                    }
-                                    else if (string.Equals(format, "alias", StringComparison.OrdinalIgnoreCase))
-                                    {
-                                        sb.AppendLine($"            // AOT Mapped Alias-Only: {tableDecl.VariableName}");
-                                        if (inlineAlias != null)
-                                            sb.AppendLine($"            string alias_{segmentIndex} = \"{inlineAlias}\";");
-                                        else
-                                            sb.AppendLine($"            string alias_{segmentIndex} = genDb.ResolveAlias(\"{tableDecl.VariableName}\", \"{tableDecl.TypeName}\", {wasAuto});");
-                                        
-                                        sb.AppendLine($"            genDb.AppendRaw(genDb.Context.Dialect.QuoteIdentifier(alias_{segmentIndex}));");
-                                    }
-                                    else if (string.Equals(format, "base", StringComparison.OrdinalIgnoreCase))
-                                    {
-                                        sb.AppendLine($"            // AOT Mapped Base-Only: {tableDecl.VariableName}");
-                                        if (tableDecl.MappedSchemaName != null)
-                                        {
-                                            sb.AppendLine($"            genDb.AppendRaw(genDb.Context.Dialect.QuoteIdentifier(\"{tableDecl.MappedSchemaName}\"));");
-                                            sb.AppendLine($"            genDb.AppendRaw(\".\");");
-                                        }
-                                        sb.AppendLine($"            genDb.AppendRaw(genDb.Context.Dialect.QuoteIdentifier(\"{tableDecl.MappedTableName}\"));");
-                                    }
-                                    else
-                                    {
-                                        sb.AppendLine($"            // AOT Mapped Table: {tableDecl.VariableName} -> {tableDecl.MappedTableName}");
-                                        sb.AppendLine($"            string baseTbl_{segmentIndex} = \"\";");
-                                        if (tableDecl.MappedSchemaName != null)
-                                            sb.AppendLine($"            baseTbl_{segmentIndex} += genDb.Context.Dialect.QuoteIdentifier(\"{tableDecl.MappedSchemaName}\") + \".\";");
-                                        sb.AppendLine($"            baseTbl_{segmentIndex} += genDb.Context.Dialect.QuoteIdentifier(\"{tableDecl.MappedTableName}\");");
-
-                                        sb.AppendLine($"            if (!{wasAuto} || genDb.Context.Options.EntityAutoAliasing)");
-                                        sb.AppendLine($"            {{");
-                                        sb.AppendLine($"                string alias_{segmentIndex} = genDb.ResolveAlias(\"{tableDecl.VariableName}\", \"{tableDecl.TypeName}\", {wasAuto});");
-                                        sb.AppendLine($"                string qAlias_{segmentIndex} = genDb.Context.Dialect.QuoteIdentifier(alias_{segmentIndex});");
-                                        sb.AppendLine($"                genDb.AppendRaw(genDb.Context.Dialect.ApplyAlias(baseTbl_{segmentIndex}, qAlias_{segmentIndex}));");
-                                        sb.AppendLine($"            }}");
-                                        sb.AppendLine($"            else");
-                                        sb.AppendLine($"            {{");
-                                        sb.AppendLine($"                genDb.AppendRaw(baseTbl_{segmentIndex});");
-                                        sb.AppendLine($"            }}");
-                                    }
-                                    segmentIndex++;
-                                }
-                                else
-                                {
-                                    sb.AppendLine($"            genDb.AppendSegment(handler.GetSegment({segmentIndex}));");
-                                    segmentIndex++;
                                 }
                             }
+                            else if (contents[i] is InterpolatedStringTextSyntax textContent)
+                            {
+                                var rawText = textContent.TextToken.ValueText;
+                                string rawTrimmedStart = rawText.TrimStart(' ', '\r', '\n', '\t', ')', ']');
+                                if (rawTrimmedStart.TrimEnd().Equals("AS", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    if (i > 0 && contents[i - 1] is InterpolationSyntax prevHole)
+                                    {
+                                        if (prevHole.Expression is IdentifierNameSyntax prevIdent &&
+                                            queryContext.Entities.ContainsKey(prevIdent.Identifier.Text))
+                                        {
+                                            queryContext.SubqueryEntities.Add(prevIdent.Identifier.Text);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if ((hasAsKeywordOrAlias && hasParameterHoles) || hasReturning || hasComplexDynamicHoles || hasSetOperation || hasUnconsumableAlias || hasWindowFunction || hasUpsert)
+                        {
+                            sb.AppendLine("            builder.Append(ref handler); // JIT Dynamic Fallback");
+                            // 🌟 FIX: Ensure early JIT fallback still respects AppendLine 🌟
+                            if (appendCall.MethodName == "AppendLine")
+                            {
+                                sb.AppendLine("            genDb.AppendRaw(\"\\n\");");
+                            }
+                            sb.AppendLine("            return builder;");
+                            sb.AppendLine("        }");
+                            sb.AppendLine("");
+                            continue;
+                        }
+
+                        sb.AppendLine($"            string activeDialect = genDb.Context.Dialect.GetType().Name;");
+                        
+                        var targetDialects = dialects.ToList();
+                        targetDialects.Add("RUNTIME");
+
+                        string QuoteId(string dialect, string id) => dialect == "RUNTIME" ? $"genDb.Context.Dialect.QuoteIdentifier(\"{Escape(id)}\")" : $"\"{Escape(Quote(dialect, id))}\"";
+                        string QuoteEnt(string dialect, string tbl, string? sch) => dialect == "RUNTIME" ? $"genDb.Context.Dialect.QuoteEntityName(\"{Escape(tbl)}\", {(sch == null ? "null" : $"\"{Escape(sch)}\"")})" : $"\"{Escape(QuoteEntity(dialect, tbl, sch))}\"";
+                        string QuoteVar(string dialect, string varName) => dialect == "RUNTIME" ? $"genDb.Context.Dialect.QuoteIdentifier({varName})" : $"(\"{Escape(GetStartQuote(dialect))}\" + {varName} + \"{Escape(GetEndQuote(dialect))}\")";
+
+                        bool isFirstDialect = true;
+                        foreach (var targetDialect in targetDialects)
+                        {
+                            bool isRuntime = targetDialect == "RUNTIME";
+
+                            if (isRuntime)
+                            {
+                                if (isFirstDialect) sb.AppendLine("            {");
+                                else sb.AppendLine("            else\n            {");
+                            }
+                            else
+                            {
+                                if (isFirstDialect) sb.AppendLine($"            if (activeDialect.StartsWith(\"{targetDialect}\", StringComparison.OrdinalIgnoreCase))\n            {{");
+                                else sb.AppendLine($"            else if (activeDialect.StartsWith(\"{targetDialect}\", StringComparison.OrdinalIgnoreCase))\n            {{");
+                            }
+                            isFirstDialect = false;
+
+                            int segmentIndex = 0;
+                            string currentSqlClause = "UNKNOWN";
+                            string activeTextReplacement = null;
+                            bool expectsAlias = false;
+                            bool nextRequiresHorizontalSpace = false;
+
+                            for (int i = 0; i < contents.Count; i++)
+                            {
+                                var content = contents[i];
+
+                                if (content is InterpolatedStringTextSyntax textContent2)
+                                {
+                                    var rawText = textContent2.TextToken.ValueText;
+                                    
+                                    if (activeTextReplacement != null)
+                                    {
+                                        rawText = activeTextReplacement;
+                                        activeTextReplacement = null;
+                                    }
+
+                                    var trimmed = rawText.TrimEnd();
+                                    if (trimmed.EndsWith("AS", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        if (trimmed.Length == 2 || !char.IsLetterOrDigit(trimmed[trimmed.Length - 3]))
+                                            expectsAlias = true;
+                                        else expectsAlias = false;
+                                    }
+                                    else expectsAlias = false;
+
+                                    var upperText = rawText.ToUpperInvariant();
+                                    int selIdx = upperText.LastIndexOf("SELECT");
+                                    int fromIdx = upperText.LastIndexOf("FROM");
+                                    int joinIdx = upperText.LastIndexOf("JOIN");
+                                    int updateIdx = upperText.LastIndexOf("UPDATE");
+                                    int setIdx = upperText.LastIndexOf("SET");
+                                    int retIdx = upperText.LastIndexOf("RETURNING");
+                                    int insIdx = upperText.LastIndexOf("INSERT");
+                                    int whereIdx = upperText.LastIndexOf("WHERE");
+                                    int valuesIdx = upperText.LastIndexOf("VALUES");
+                                    int groupIdx = upperText.LastIndexOf("GROUP");
+                                    int orderIdx = upperText.LastIndexOf("ORDER");
+                                    int onIdx = upperText.LastIndexOf("ON");
+                                    int delIdx = upperText.LastIndexOf("DELETE");
+
+                                    int maxIdx = selIdx;
+                                    if (fromIdx > maxIdx) maxIdx = fromIdx;
+                                    if (joinIdx > maxIdx) maxIdx = joinIdx;
+                                    if (updateIdx > maxIdx) maxIdx = updateIdx;
+                                    if (setIdx > maxIdx) maxIdx = setIdx;
+                                    if (retIdx > maxIdx) maxIdx = retIdx;
+                                    if (insIdx > maxIdx) maxIdx = insIdx;
+                                    if (whereIdx > maxIdx) maxIdx = whereIdx;
+                                    if (valuesIdx > maxIdx) maxIdx = valuesIdx;
+                                    if (groupIdx > maxIdx) maxIdx = groupIdx;
+                                    if (orderIdx > maxIdx) maxIdx = orderIdx;
+                                    if (onIdx > maxIdx) maxIdx = onIdx;
+                                    if (delIdx > maxIdx) maxIdx = delIdx;
+
+                                    if (maxIdx != -1)
+                                    {
+                                        if (maxIdx == selIdx) currentSqlClause = "SELECT";
+                                        else if (maxIdx == fromIdx) currentSqlClause = "FROM";
+                                        else if (maxIdx == joinIdx) currentSqlClause = "JOIN";
+                                        else if (maxIdx == updateIdx) currentSqlClause = "UPDATE";
+                                        else if (maxIdx == setIdx) currentSqlClause = "SET";
+                                        else if (maxIdx == retIdx) currentSqlClause = "RETURNING";
+                                        else if (maxIdx == insIdx) currentSqlClause = "INSERT";
+                                        else if (maxIdx == whereIdx) currentSqlClause = "WHERE";
+                                        else if (maxIdx == valuesIdx) currentSqlClause = "VALUES";
+                                        else if (maxIdx == groupIdx) currentSqlClause = "GROUP";
+                                        else if (maxIdx == orderIdx) currentSqlClause = "ORDER";
+                                        else if (maxIdx == onIdx) currentSqlClause = "ON";
+                                        else if (maxIdx == delIdx) currentSqlClause = "DELETE";
+                                    }
+
+                                    bool nextIsColumns = false;
+                                    if (i + 1 < contents.Count && contents[i + 1] is InterpolationSyntax nextHole)
+                                    {
+                                        string? nextFormat = nextHole.FormatClause?.FormatStringToken.ValueText;
+                                        bool isEntityHole = false;
+                                        if (nextHole.Expression is IdentifierNameSyntax nId && queryContext.Entities.ContainsKey(nId.Identifier.Text))
+                                        {
+                                            isEntityHole = true;
+                                        }
+                                        if (isEntityHole && (string.Equals(nextFormat, "columns", StringComparison.OrdinalIgnoreCase) || (string.IsNullOrEmpty(nextFormat) && (currentSqlClause == "SELECT" || currentSqlClause == "RETURNING"))))
+                                        {
+                                            nextIsColumns = true;
+                                        }
+                                    }
+
+                                    if (nextIsColumns && rawText.EndsWith(" "))
+                                    {
+                                        rawText = rawText.Substring(0, rawText.Length - 1);
+                                        nextRequiresHorizontalSpace = true;
+                                    }
+                                    else
+                                    {
+                                        nextRequiresHorizontalSpace = false;
+                                    }
+
+                                    var text = rawText.Replace("\"", "\\\"").Replace("\r", "\\r").Replace("\n", "\\n"); 
+                                    sb.AppendLine($"                genDb.AppendRaw(\"{text}\");");
+                                }
+                                else if (content is InterpolationSyntax interpolation)
+                                {
+                                    string? format = interpolation.FormatClause?.FormatStringToken.ValueText;
+                                    
+                                    bool isAliasHole = expectsAlias || string.Equals(format, "alias", StringComparison.OrdinalIgnoreCase);
+                                    expectsAlias = false;
+
+                                    string propertyName = null;
+                                    string entityIdentifier = null;
+
+                                    if (interpolation.Expression is MemberAccessExpressionSyntax holeMemberAccess &&
+                                        holeMemberAccess.Expression is IdentifierNameSyntax identifier &&
+                                        queryContext.Entities.ContainsKey(identifier.Identifier.Text))
+                                    {
+                                        propertyName = holeMemberAccess.Name.Identifier.Text;
+                                        entityIdentifier = identifier.Identifier.Text;
+                                    }
+                                    else if (interpolation.Expression is InvocationExpressionSyntax inv &&
+                                             inv.Expression is MemberAccessExpressionSyntax invMa &&
+                                             invMa.Name.Identifier.Text == "Column" &&
+                                             invMa.Expression is IdentifierNameSyntax invIdent &&
+                                             queryContext.Entities.ContainsKey(invIdent.Identifier.Text) &&
+                                             inv.ArgumentList.Arguments.Count == 1 &&
+                                             inv.ArgumentList.Arguments[0].Expression is LiteralExpressionSyntax lit)
+                                    {
+                                        propertyName = ((LiteralExpressionSyntax)inv.ArgumentList.Arguments[0].Expression).Token.ValueText;
+                                        entityIdentifier = invIdent.Identifier.Text;
+                                    }
+
+                                    if (propertyName != null && entityIdentifier != null)
+                                    {
+                                        var entityDecl = queryContext.Entities[entityIdentifier];
+
+                                        if (queryContext.SubqueryEntities.Contains(entityDecl.VariableName))
+                                        {
+                                            sb.AppendLine($"                // AOT Mapped Property Subquery/Dynamic Fallback: {entityDecl.VariableName}");
+                                            sb.AppendLine($"                genDb.AppendSegment(handler.GetSegment({segmentIndex}));");
+                                            segmentIndex++;
+                                            continue; 
+                                        }
+
+                                        if (inlinePropertyAliases.TryGetValue(i, out var propAlias) && string.IsNullOrEmpty(format))
+                                        {
+                                            if (replacementForNextText.TryGetValue(i, out var rep))
+                                                activeTextReplacement = rep; 
+                                        }
+
+                                        var colMap = entityDecl.Columns.FirstOrDefault(c => c.PropertyName == propertyName);
+                                        var columnName = colMap != null ? colMap.ColumnName : propertyName;
+                                            
+                                        string wasAuto = entityDecl.WasAutoAliased.ToString().ToLower();
+
+                                        if (isAliasHole)
+                                        {
+                                            sb.AppendLine($"                // AOT Mapped Property Alias: {propertyName}");
+                                            sb.AppendLine($"                genDb.AppendRaw({QuoteId(targetDialect, propertyName)});");
+                                        }
+                                        else if (currentSqlClause == "INSERT")
+                                        {
+                                            sb.AppendLine($"                // AOT Mapped Property (Unprefixed): {entityDecl.VariableName}.{propertyName} -> {columnName}");
+                                            sb.AppendLine($"                genDb.AppendRaw({QuoteId(targetDialect, columnName)});");
+                                        }
+                                        else
+                                        {
+                                            sb.AppendLine($"                // AOT Mapped Property: {entityDecl.VariableName}.{propertyName} -> {columnName}");
+                                            if (inlineAliases.TryGetValue(entityDecl.VariableName, out var inlineAlias))
+                                            {
+                                                sb.AppendLine($"                genDb.AppendRaw({QuoteId(targetDialect, inlineAlias)} + \".\" + {QuoteId(targetDialect, columnName)});");
+                                            }
+                                            else
+                                            {
+                                                sb.AppendLine($"                bool suppressAutoAlias_{segmentIndex} = {isDmlQuery.ToString().ToLower()} && {wasAuto};");
+                                                sb.AppendLine($"                string resolvedAlias_{segmentIndex} = suppressAutoAlias_{segmentIndex} ? \"\" : genDb.ResolveAlias(\"{Escape(entityDecl.VariableName)}\", \"\", {wasAuto});");
+                                                
+                                                sb.AppendLine($"                if (!string.IsNullOrEmpty(resolvedAlias_{segmentIndex}))");
+                                                sb.AppendLine($"                {{");
+                                                sb.AppendLine($"                    genDb.AppendRaw({QuoteVar(targetDialect, $"resolvedAlias_{segmentIndex}")} + \".\");");
+                                                sb.AppendLine($"                }}");
+                                                sb.AppendLine($"                else");
+                                                sb.AppendLine($"                {{");
+                                                sb.AppendLine($"                    genDb.AppendRaw({QuoteEnt(targetDialect, entityDecl.MappedTableName, entityDecl.MappedSchemaName)} + \".\");");
+                                                sb.AppendLine($"                }}");
+                                                sb.AppendLine($"                genDb.AppendRaw({QuoteId(targetDialect, columnName)});");
+                                            }
+                                        }
+
+                                        if (inlinePropertyAliases.TryGetValue(i, out var pAlias) && string.IsNullOrEmpty(format))
+                                        {
+                                            sb.AppendLine($"                genDb.AppendRaw(\" AS \" + {QuoteId(targetDialect, pAlias)});");
+                                        }
+
+                                        segmentIndex++;
+                                    }
+                                    else if (interpolation.Expression is IdentifierNameSyntax singleIdentifier &&
+                                             queryContext.Entities.TryGetValue(singleIdentifier.Identifier.Text, out var tableDecl))
+                                    {
+                                        if (queryContext.SubqueryEntities.Contains(tableDecl.VariableName))
+                                        {
+                                            sb.AppendLine($"                // AOT Mapped Subquery/Dynamic Fallback: {tableDecl.VariableName}");
+                                            sb.AppendLine($"                genDb.AppendSegment(handler.GetSegment({segmentIndex}));");
+                                            segmentIndex++;
+                                            continue; 
+                                        }
+
+                                        string prevUpperText = "";
+                                        if (i > 0 && contents[i - 1] is InterpolatedStringTextSyntax prevTextSyntax)
+                                            prevUpperText = prevTextSyntax.TextToken.ValueText.ToUpperInvariant();
+
+                                        bool isDeleteFrom = currentSqlClause == "FROM" && prevUpperText.LastIndexOf("DELETE") > prevUpperText.LastIndexOf("SELECT");
+
+                                        if (currentSqlClause == "INSERT" || currentSqlClause == "UPDATE" || isDeleteFrom)
+                                        {
+                                            sb.AppendLine($"                // AOT Fallback to JIT for DML target entity context registration");
+                                            sb.AppendLine($"                genDb.AppendSegment(handler.GetSegment({segmentIndex}));");
+                                            segmentIndex++;
+                                            continue;
+                                        }
+
+                                        if (inlineAliases.TryGetValue(tableDecl.VariableName, out var inlineAlias) && string.IsNullOrEmpty(format))
+                                        {
+                                            if (replacementForNextText.TryGetValue(i, out var rep))
+                                                activeTextReplacement = rep; 
+                                        }
+
+                                        string wasAuto = tableDecl.WasAutoAliased.ToString().ToLower();
+
+                                        if (string.Equals(format, "columns", StringComparison.OrdinalIgnoreCase) || 
+                                                 (string.IsNullOrEmpty(format) && (currentSqlClause == "SELECT" || currentSqlClause == "RETURNING")))
+                                        {
+                                            sb.AppendLine($"                // AOT Mapped Columns: {tableDecl.VariableName}");
+                                            
+                                            sb.AppendLine($"                string indent_{segmentIndex} = new string(' ', genDb.Context.Options.IndentSize);");
+
+                                            sb.AppendLine($"                bool omitPrefix_{segmentIndex} = (\"{currentSqlClause}\" == \"INSERT\");");
+                                            
+                                            sb.AppendLine($"                string prefix_{segmentIndex} = \"\";");
+                                            if (inlineAlias != null)
+                                            {
+                                                sb.AppendLine($"                prefix_{segmentIndex} = {QuoteId(targetDialect, inlineAlias)} + \".\";");
+                                            }
+                                            else
+                                            {
+                                                sb.AppendLine($"                bool suppressAutoAlias_{segmentIndex} = {isDmlQuery.ToString().ToLower()} && {wasAuto};");
+                                                sb.AppendLine($"                string resolvedAlias_{segmentIndex} = suppressAutoAlias_{segmentIndex} ? \"\" : genDb.ResolveAlias(\"{Escape(tableDecl.VariableName)}\", \"\", {wasAuto});");
+                                                sb.AppendLine($"                if (!string.IsNullOrEmpty(resolvedAlias_{segmentIndex}))");
+                                                sb.AppendLine($"                {{");
+                                                sb.AppendLine($"                    prefix_{segmentIndex} = {QuoteVar(targetDialect, $"resolvedAlias_{segmentIndex}")} + \".\";");
+                                                sb.AppendLine($"                }}");
+                                                sb.AppendLine($"                else");
+                                                sb.AppendLine($"                {{");
+                                                sb.AppendLine($"                    prefix_{segmentIndex} = {QuoteEnt(targetDialect, tableDecl.MappedTableName, tableDecl.MappedSchemaName)} + \".\";");
+                                                sb.AppendLine($"                }}");
+                                            }
+                                            
+                                            for (int k = 0; k < tableDecl.Columns.Count; k++)
+                                            {
+                                                var col = tableDecl.Columns[k];
+                                                if (k > 0)
+                                                {
+                                                    sb.AppendLine($"                if (genDb.Context.Options.CollectionLayout == SqlCollectionLayout.Vertical)");
+                                                    sb.AppendLine($"                {{");
+                                                    sb.AppendLine($"                    genDb.AppendRaw(\",\\n\");");
+                                                    sb.AppendLine($"                    genDb.AppendRaw(indent_{segmentIndex});");
+                                                    sb.AppendLine($"                }}");
+                                                    sb.AppendLine($"                else genDb.AppendRaw(\", \");");
+                                                }
+                                                else
+                                                {
+                                                    sb.AppendLine($"                if (genDb.Context.Options.CollectionLayout == SqlCollectionLayout.Vertical)");
+                                                    sb.AppendLine($"                {{");
+                                                    sb.AppendLine($"                    genDb.AppendRaw(\"\\n\");");
+                                                    sb.AppendLine($"                    genDb.AppendRaw(indent_{segmentIndex});");
+                                                    sb.AppendLine($"                }}");
+                                                    
+                                                    if (nextRequiresHorizontalSpace)
+                                                    {
+                                                        sb.AppendLine($"                else genDb.AppendRaw(\" \");");
+                                                    }
+                                                }
+                                                
+                                                sb.AppendLine($"                if (!omitPrefix_{segmentIndex}) genDb.AppendRaw(prefix_{segmentIndex});");
+                                                sb.AppendLine($"                genDb.AppendRaw({QuoteId(targetDialect, col.ColumnName)});");
+                                            }
+                                            nextRequiresHorizontalSpace = false;
+                                        }
+                                        else if (inlineAlias != null && string.IsNullOrEmpty(format))
+                                        {
+                                            sb.AppendLine($"                // AOT Mapped Inline Alias Table: {tableDecl.VariableName} -> {inlineAlias}");
+                                            
+                                            sb.AppendLine($"                var segVal_{segmentIndex} = handler.GetSegment({segmentIndex}).Value;");
+                                            sb.AppendLine($"                if (segVal_{segmentIndex} is SqlInterpol.ISqlEntityBase entBase_{segmentIndex} && entBase_{segmentIndex}.Reference is SqlInterpol.ISqlAliasable aliasable_{segmentIndex})");
+                                            sb.AppendLine($"                {{");
+                                            sb.AppendLine($"                    aliasable_{segmentIndex}.Alias = \"{Escape(inlineAlias)}\";");
+                                            sb.AppendLine($"                    aliasable_{segmentIndex}.IsAliasQuoted = false;");
+                                            sb.AppendLine($"                }}");
+
+                                            sb.AppendLine($"                genDb.AppendRaw(genDb.Context.Dialect.ApplyAlias({QuoteEnt(targetDialect, tableDecl.MappedTableName, tableDecl.MappedSchemaName)}, {QuoteId(targetDialect, inlineAlias)}));");
+                                        }
+                                        else if (isAliasHole)
+                                        {
+                                            sb.AppendLine($"                // AOT Mapped Alias-Only: {tableDecl.VariableName}");
+                                            if (inlineAlias != null)
+                                            {
+                                                sb.AppendLine($"                genDb.AppendRaw({QuoteId(targetDialect, inlineAlias)});");
+                                            }
+                                            else
+                                            {
+                                                sb.AppendLine($"                string alias_{segmentIndex} = genDb.ResolveAlias(\"{Escape(tableDecl.VariableName)}\", \"{Escape(tableDecl.MappedTableName)}\", {wasAuto});");
+                                                sb.AppendLine($"                genDb.AppendRaw({QuoteVar(targetDialect, $"alias_{segmentIndex}")});");
+                                            }
+                                        }
+                                        else if (string.Equals(format, "base", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            sb.AppendLine($"                // AOT Mapped Base-Only: {tableDecl.VariableName}");
+                                            sb.AppendLine($"                genDb.AppendRaw({QuoteEnt(targetDialect, tableDecl.MappedTableName, tableDecl.MappedSchemaName)});");
+                                        }
+                                        else
+                                        {
+                                            sb.AppendLine($"                // AOT Mapped Table: {tableDecl.VariableName} -> {tableDecl.MappedTableName}");
+
+                                            sb.AppendLine($"                bool suppressAutoAlias_{segmentIndex} = {isDmlQuery.ToString().ToLower()} && {wasAuto};");
+                                            sb.AppendLine($"                if (!suppressAutoAlias_{segmentIndex} && (!{wasAuto} || genDb.Context.Options.EntityAutoAliasing))");
+                                            sb.AppendLine($"                {{");
+                                            sb.AppendLine($"                    string alias_{segmentIndex} = genDb.ResolveAlias(\"{Escape(tableDecl.VariableName)}\", \"{Escape(tableDecl.VariableName)}\", {wasAuto});");
+
+                                            sb.AppendLine($"                    var segVal_{segmentIndex} = handler.GetSegment({segmentIndex}).Value;");
+                                            sb.AppendLine($"                    if (segVal_{segmentIndex} is SqlInterpol.ISqlEntityBase entBase_{segmentIndex} && entBase_{segmentIndex}.Reference is SqlInterpol.ISqlAliasable aliasable_{segmentIndex})");
+                                            sb.AppendLine($"                    {{");
+                                            sb.AppendLine($"                        aliasable_{segmentIndex}.Alias = alias_{segmentIndex};");
+                                            sb.AppendLine($"                        aliasable_{segmentIndex}.IsAliasQuoted = false;");
+                                            sb.AppendLine($"                    }}");
+
+                                            sb.AppendLine($"                    genDb.AppendRaw(genDb.Context.Dialect.ApplyAlias({QuoteEnt(targetDialect, tableDecl.MappedTableName, tableDecl.MappedSchemaName)}, {QuoteVar(targetDialect, $"alias_{segmentIndex}")}));");
+                                            sb.AppendLine($"                }}");
+                                            sb.AppendLine($"                else");
+                                            sb.AppendLine($"                {{");
+                                            sb.AppendLine($"                    genDb.AppendRaw({QuoteEnt(targetDialect, tableDecl.MappedTableName, tableDecl.MappedSchemaName)});");
+                                            sb.AppendLine($"                }}");
+                                        }
+                                        segmentIndex++;
+                                    }
+                                    else
+                                    {
+                                        sb.AppendLine($"                genDb.AppendSegment(handler.GetSegment({segmentIndex}));");
+                                        segmentIndex++;
+                                    }
+                                }
+                            }
+                            sb.AppendLine("            }");
                         }
                     }
                     else if (firstArg is LiteralExpressionSyntax literal)

@@ -6,9 +6,9 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
       
-    <!-- <SqlInterpolDialects>PostgreSql,SqlServer</SqlInterpolDialects>
+    <SqlInterpolDialects>PostgreSql,SqlServer</SqlInterpolDialects>
     
-    <InterceptorsPreviewNamespaces>$(InterceptorsPreviewNamespaces);SqlInterpol.Generators.Generated</InterceptorsPreviewNamespaces>
+    <!-- <InterceptorsPreviewNamespaces>$(InterceptorsPreviewNamespaces);SqlInterpol.Generators.Generated</InterceptorsPreviewNamespaces>
     
     <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles> -->
   </PropertyGroup>
