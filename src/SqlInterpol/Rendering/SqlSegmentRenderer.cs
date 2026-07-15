@@ -25,14 +25,14 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
                 break;
 
             case SqlSegmentType.Reference:
-                // Intercept CTE Declarations to enforce schema-less physical table names
                 if (segment.Value is ISqlEntityBase entityCte && segment.Value is not ISqlQueryFragment && segment.Value is not ISqlQuery)
                 {
                     bool isCte = false;
                     int lookahead = index + 1;
-                    while (lookahead < segments.Count && segments[lookahead].Type == SqlSegmentType.Literal && string.IsNullOrWhiteSpace(segments[lookahead].Value as string)) lookahead++;
+                    // 🌟 FIX: Allow Raw strings
+                    while (lookahead < segments.Count && (segments[lookahead].Type == SqlSegmentType.Literal || segments[lookahead].Type == SqlSegmentType.Raw) && string.IsNullOrWhiteSpace(segments[lookahead].Value as string)) lookahead++;
 
-                    if (lookahead < segments.Count && segments[lookahead].Type == SqlSegmentType.Literal)
+                    if (lookahead < segments.Count && (segments[lookahead].Type == SqlSegmentType.Literal || segments[lookahead].Type == SqlSegmentType.Raw))
                     {
                         var text = segments[lookahead].Value?.ToString()?.TrimStart();
                         bool hasAs = text?.StartsWith($"{SqlKeyword.As.Value} ", StringComparison.OrdinalIgnoreCase) == true
@@ -48,11 +48,11 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
                             else if (string.IsNullOrEmpty(afterAs))
                             {
                                 int next = lookahead + 1;
-                                while (next < segments.Count && segments[next].Type == SqlSegmentType.Literal && string.IsNullOrWhiteSpace(segments[next].Value as string)) next++;
+                                while (next < segments.Count && (segments[next].Type == SqlSegmentType.Literal || segments[next].Type == SqlSegmentType.Raw) && string.IsNullOrWhiteSpace(segments[next].Value as string)) next++;
                                 if (next < segments.Count)
                                 {
                                     var nextSeg = segments[next];
-                                    if (nextSeg.Type == SqlSegmentType.Literal && nextSeg.Value?.ToString()?.TrimStart().StartsWith("(") == true) isCte = true;
+                                    if ((nextSeg.Type == SqlSegmentType.Literal || nextSeg.Type == SqlSegmentType.Raw) && nextSeg.Value?.ToString()?.TrimStart().StartsWith("(") == true) isCte = true;
                                     else if (nextSeg.Value is ISqlQueryFragment || nextSeg.Value is ISqlQuery) isCte = true;
                                 }
                             }
@@ -63,7 +63,7 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
                     {
                         var meta = SqlMetadataRegistry.GetMetadata(entityCte.ModelType);
                         rendered = context.Dialect.QuoteIdentifier(meta.Name);
-                        break; // Bypass fragment.ToSql completely to strip assigned aliases and schemas!
+                        break; 
                     }
                 }
                 
@@ -81,7 +81,6 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
                 if (index > 0 && segments[index - 1].Value is ISqlQueryFragment prevSubquery)
                 {
                     var trimmed = text.TrimStart();
-
                     if (trimmed.StartsWith(")"))
                     {
                         var afterClose = trimmed[1..].TrimStart();
@@ -90,11 +89,9 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
                                          || afterClose.StartsWith($"{SqlKeyword.As.Value}\r", StringComparison.OrdinalIgnoreCase);
 
                         bool requiresAlias = true;
-
-                        if (index >= 2 && segments[index - 2].Type == SqlSegmentType.Literal)
+                        if (index >= 2 && (segments[index - 2].Type == SqlSegmentType.Literal || segments[index - 2].Type == SqlSegmentType.Raw))
                         {
                             var beforeSubquery = segments[index - 2].Value?.ToString()?.TrimEnd();
-
                             if (beforeSubquery != null && beforeSubquery.EndsWith("("))
                             {
                                 var textBeforeParen = beforeSubquery[..^1].TrimEnd();
@@ -110,7 +107,7 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
                         if (!alreadyHasAs)
                         {
                             int lookahead = index + 1;
-                            while (lookahead < segments.Count && segments[lookahead].Type == SqlSegmentType.Literal && string.IsNullOrWhiteSpace(segments[lookahead].Value?.ToString()))
+                            while (lookahead < segments.Count && (segments[lookahead].Type == SqlSegmentType.Literal || segments[lookahead].Type == SqlSegmentType.Raw) && string.IsNullOrWhiteSpace(segments[lookahead].Value?.ToString()))
                             {
                                 lookahead++;
                             }
@@ -174,7 +171,6 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
 
         if (segment.Value is ISqlFragment && segment.Type != SqlSegmentType.Projection && rendered != null)
         {
-            // Checks if the fragment is a native collection anywhere in its hierarchy to skip external indentation
             if (!IsCollectionFragment(segment.Value.GetType()))
             {
                 rendered = ApplyAutoIndentation(rendered, index, segments);
@@ -186,7 +182,6 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
 
     private static bool IsCollectionFragment(Type? type)
     {
-        // FIX: Explicitly include SqlRawCollectionFragment!
         if (type == typeof(SqlRawCollectionFragment)) return true;
 
         while (type != null && type != typeof(object))
@@ -202,7 +197,8 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
 
     private string ApplyAutoIndentation(string rendered, int index, IReadOnlyList<SqlSegment> segments)
     {
-        if (index <= 0 || segments[index - 1].Type != SqlSegmentType.Literal)
+        // 🌟 FIX: Allow Raw strings to trigger auto-indentation just like Literals!
+        if (index <= 0 || (segments[index - 1].Type != SqlSegmentType.Literal && segments[index - 1].Type != SqlSegmentType.Raw))
         {
             return rendered;
         }
@@ -230,7 +226,8 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
     {
         if (segment.Value is SqlColumnReferenceBase)
         {
-            if (index > 0 && segments[index - 1].Type == SqlSegmentType.Literal)
+            // 🌟 FIX: Allow Raw strings
+            if (index > 0 && (segments[index - 1].Type == SqlSegmentType.Literal || segments[index - 1].Type == SqlSegmentType.Raw))
             {
                 var prevText = segments[index - 1].Value?.ToString()?.TrimEnd();
                 if (prevText != null && prevText.EndsWith("AS", StringComparison.OrdinalIgnoreCase))
@@ -246,7 +243,8 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
 
         if (segment.Value is not ISqlEntityBase entity) return SqlRenderMode.Default;
 
-        if (index > 0 && segments[index - 1].Type == SqlSegmentType.Literal)
+        // 🌟 FIX: Allow Raw strings
+        if (index > 0 && (segments[index - 1].Type == SqlSegmentType.Literal || segments[index - 1].Type == SqlSegmentType.Raw))
         {
             var prevText = segments[index - 1].Value?.ToString()?.TrimEnd();
             if (prevText != null && prevText.EndsWith("("))
@@ -256,12 +254,14 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
         }
 
         int lookahead = index + 1;
-        while (lookahead < segments.Count && segments[lookahead].Type == SqlSegmentType.Literal && string.IsNullOrWhiteSpace(segments[lookahead].Value as string))
+        // 🌟 FIX: Allow Raw strings
+        while (lookahead < segments.Count && (segments[lookahead].Type == SqlSegmentType.Literal || segments[lookahead].Type == SqlSegmentType.Raw) && string.IsNullOrWhiteSpace(segments[lookahead].Value as string))
         {
             lookahead++;
         }
 
-        if (lookahead < segments.Count && segments[lookahead].Type == SqlSegmentType.Literal)
+        // 🌟 FIX: Allow Raw strings
+        if (lookahead < segments.Count && (segments[lookahead].Type == SqlSegmentType.Literal || segments[lookahead].Type == SqlSegmentType.Raw))
         {
             var text = segments[lookahead].Value?.ToString()?.TrimStart();
             

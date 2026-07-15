@@ -1,4 +1,7 @@
+using System;
 using System.Buffers;
+using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.CompilerServices;
 
 namespace SqlInterpol.Parsing;
@@ -7,79 +10,152 @@ namespace SqlInterpol.Parsing;
 public ref struct SqlQueryInterpolatedStringHandler
 {
     private readonly SqlBuilder _builder;
-    private Span<SqlSegment> _segments;
-    private int _segmentCount;
-    private SqlSegment[] _arrayToReturn;
+    
+    // 🌟 ZERO-ALLOCATION BUCKET 🌟
+    public struct PendingHole 
+    {
+        public bool IsLiteral;
+        public string? StringValue; 
+        public object? ObjectValue; 
+        public string? Expression;  
+    }
+    
+    private PendingHole[] _holes;
+    private int _count;
 
     public SqlQueryInterpolatedStringHandler(int literalLength, int formattedCount, SqlBuilder builder, out bool shouldAppend)
     {
         _builder = builder;
         shouldAppend = true;
-
         int estimated = (literalLength / 10) + formattedCount + 2;
-        _arrayToReturn = ArrayPool<SqlSegment>.Shared.Rent(Math.Max(estimated, 16));
-        _segments = _arrayToReturn;
-        _segmentCount = 0;
+        _holes = ArrayPool<PendingHole>.Shared.Rent(Math.Max(estimated, 16));
+        _count = 0;
     }
 
     public void AppendLiteral(string value)
     {
         if (string.IsNullOrEmpty(value)) return;
-        AddSegment(new SqlSegment(SqlSegmentType.Literal, value));
+        if (_count >= _holes.Length) GrowBuffer();
+        _holes[_count++] = new PendingHole { IsLiteral = true, StringValue = value };
     }
 
     public void AppendFormatted<T>(T value, string? format = null, [CallerArgumentExpression("value")] string? expression = null)
     {
-        if (value is ISqlFragment frag)
+        if (_count >= _holes.Length) GrowBuffer();
+        // 🌟 DEFERRED EXECUTION: Zero allocations here except for necessary value boxing! 🌟
+        _holes[_count++] = new PendingHole { IsLiteral = false, ObjectValue = value, StringValue = format, Expression = expression };
+    }
+
+    private void GrowBuffer()
+    {
+        int newSize = _holes.Length * 2;
+        var newArray = ArrayPool<PendingHole>.Shared.Rent(newSize);
+        _holes.AsSpan(0, _count).CopyTo(newArray);
+        ArrayPool<PendingHole>.Shared.Return(_holes);
+        _holes = newArray;
+    }
+
+    /// <summary>
+    /// Evaluates a specific formatted hole ON DEMAND. Used exclusively by the AOT Generator fallback.
+    /// </summary>
+    public SqlSegment GetSegment(int formattedHoleIndex)
+    {
+        int holeCount = 0;
+        for (int i = 0; i < _count; i++)
         {
-            if (frag is SqlSegmentCollectionFragment collection)
+            ref var hole = ref _holes[i];
+            if (!hole.IsLiteral)
             {
-                string indent = "";
-                if (_segmentCount > 0 && _segments[_segmentCount - 1].Type == SqlSegmentType.Literal)
+                if (holeCount == formattedHoleIndex)
                 {
-                    var prevText = _segments[_segmentCount - 1].Value?.ToString();
-                    if (!string.IsNullOrEmpty(prevText))
+                    return EvaluateHole(ref hole);
+                }
+                holeCount++;
+            }
+        }
+        throw new ArgumentOutOfRangeException(nameof(formattedHoleIndex), "AOT requested a hole index that does not exist in the handler.");
+    }
+
+    /// <summary>
+    /// Invoked by the JIT engine to lazily evaluate the AST only when AOT is not available.
+    /// </summary>
+    internal void TransferSegments(List<SqlSegment> destination)
+    {
+        for (int i = 0; i < _count; i++)
+        {
+            ref var hole = ref _holes[i];
+            if (hole.IsLiteral)
+            {
+                destination.Add(new SqlSegment(SqlSegmentType.Literal, hole.StringValue!));
+            }
+            else
+            {
+                var segment = EvaluateHole(ref hole);
+                
+                // Formatting indentation
+                if (segment.Type == SqlSegmentType.Raw && segment.Value is SqlSegmentCollectionFragment collection)
+                {
+                    string indent = "";
+                    if (destination.Count > 0 && destination[^1].Type == SqlSegmentType.Literal)
                     {
-                        int lastNewline = prevText.LastIndexOf('\n');
-                        if (lastNewline >= 0)
+                        var prevText = destination[^1].Value?.ToString();
+                        if (!string.IsNullOrEmpty(prevText))
                         {
-                            int chars = 0;
-                            int i = lastNewline + 1;
-                            while (i < prevText.Length && (prevText[i] == ' ' || prevText[i] == '\t')) 
+                            int lastNewline = prevText.LastIndexOf('\n');
+                            if (lastNewline >= 0)
                             {
-                                chars++;
-                                i++;
-                            }
-                            if (chars > 0)
-                            {
-                                indent = prevText.Substring(lastNewline + 1, chars);
+                                int chars = 0;
+                                int k = lastNewline + 1;
+                                while (k < prevText.Length && (prevText[k] == ' ' || prevText[k] == '\t')) 
+                                {
+                                    chars++;
+                                    k++;
+                                }
+                                if (chars > 0) indent = prevText.Substring(lastNewline + 1, chars);
                             }
                         }
                     }
+                    foreach (var innerSeg in collection.Segments)
+                    {
+                        if (indent.Length > 0 && (innerSeg.Type == SqlSegmentType.Literal || innerSeg.Type == SqlSegmentType.Raw) && innerSeg.Value is string s && s.Contains('\n'))
+                        {
+                            destination.Add(new SqlSegment(innerSeg.Type, s.Replace("\n", "\n" + indent), innerSeg.RenderMode, innerSeg.Tags));
+                        }
+                        else
+                        {
+                            destination.Add(innerSeg);
+                        }
+                    }
                 }
-
-                foreach (var segment in collection.Segments)
+                else
                 {
-                    if (indent.Length > 0 && segment.Type == SqlSegmentType.Literal && segment.Value is string s && s.Contains('\n'))
-                    {
-                        AddSegment(new SqlSegment(SqlSegmentType.Literal, s.Replace("\n", "\n" + indent), segment.RenderMode, segment.Tags));
-                    }
-                    else
-                    {
-                        AddSegment(segment);
-                    }
+                    destination.Add(segment);
                 }
-                return;
             }
+        }
+        
+        if (_holes != null)
+        {
+            ArrayPool<PendingHole>.Shared.Return(_holes);
+            _holes = null!;
+        }
+    }
 
-            AddSegment(_builder.ProcessValue(frag));
-            return;
+    // 🌟 AST AND REFLECTION ARE DEFERRED HERE 🌟
+    private SqlSegment EvaluateHole(ref PendingHole hole)
+    {
+        var value = hole.ObjectValue;
+        var format = hole.StringValue;
+        var expression = hole.Expression;
+
+        if (value is ISqlFragment frag)
+        {
+            return _builder.ProcessValue(frag);
         }
 
         if (!string.IsNullOrEmpty(expression))
         {
-            int dotIndex = expression.IndexOf('.');
-
+            int dotIndex = expression!.IndexOf('.');
             if (dotIndex == -1)
             {
                 if (_builder.ScopedVariables.TryGetValue(expression, out var tableEntity))
@@ -87,7 +163,6 @@ public ref struct SqlQueryInterpolatedStringHandler
                     if (tableEntity is ISqlQuery queryEntity && tableEntity is ISqlEntityBase queryEntityBase)
                     {
                         SqlSegment segment;
-
                         if (format == "alias")
                         {
                             segment = _builder.ProcessValue(queryEntityBase.Reference);
@@ -100,15 +175,11 @@ public ref struct SqlQueryInterpolatedStringHandler
                         }
                         else if (format == "decl" || (format == null && _builder.Context.Options.EntityAutoAliasing))
                         {
-                            // =================================================================
-                            // FIX: Clean, strongly-typed alias assignment! No more reflection!
-                            // =================================================================
                             if (string.IsNullOrEmpty(queryEntityBase.Reference.Alias) && queryEntityBase.Reference is ISqlAliasable aliasable)
                             {
                                 aliasable.Alias = expression;
                                 aliasable.IsAliasQuoted = true; 
                             }
-                            
                             var declFragment = new SqlSubqueryDeclarationFragment(queryEntity);
                             segment = _builder.ProcessValue(declFragment);
                         }
@@ -116,9 +187,7 @@ public ref struct SqlQueryInterpolatedStringHandler
                         {
                             segment = _builder.ProcessValue((ISqlFragment)queryEntity);
                         }
-
-                        AddSegment(segment);
-                        return;
+                        return segment;
                     }
 
                     ISqlEntityBase? standardEntityBase = tableEntity as ISqlEntityBase;
@@ -140,10 +209,6 @@ public ref struct SqlQueryInterpolatedStringHandler
                         if (format == "decl" || (format == null && _builder.Context.Options.EntityAutoAliasing))
                         {
                             mode = SqlRenderMode.Declaration;
-                            
-                            // =================================================================
-                            // FIX: Clean, strongly-typed alias assignment! No more reflection!
-                            // =================================================================
                             if (string.IsNullOrEmpty(standardEntityBase.Reference.Alias) && standardEntityBase.Reference is ISqlAliasable aliasable)
                             {
                                 aliasable.Alias = expression;
@@ -152,14 +217,11 @@ public ref struct SqlQueryInterpolatedStringHandler
                         }
 
                         var segmentResult = _builder.ProcessValue(tableEntity);
-                        
                         if (mode != null)
                         {
                             segmentResult = new SqlSegment(segmentResult.Type, segmentResult.Value, mode, segmentResult.Tags);
                         }
-                        
-                        AddSegment(segmentResult);
-                        return;
+                        return segmentResult;
                     }
                 }
             }
@@ -179,10 +241,9 @@ public ref struct SqlQueryInterpolatedStringHandler
                     if (entityBase != null)
                     {
                         var meta = SqlMetadataRegistry.GetMetadata(entityBase.ModelType);
-                        
                         var memberMeta = meta.Columns.Keys.FirstOrDefault(k => k.Name.Equals(propertyName, StringComparison.OrdinalIgnoreCase));
                         string physicalColumnName = memberMeta != null ? meta.Columns[memberMeta] : propertyName;
-
+                        
                         var columnRef = new SqlColumnReference(entityBase.Reference, physicalColumnName, propertyName);
                         
                         SqlRenderMode? mode = format switch
@@ -197,66 +258,12 @@ public ref struct SqlQueryInterpolatedStringHandler
                         {
                             segmentResult = new SqlSegment(segmentResult.Type, segmentResult.Value, mode, segmentResult.Tags);
                         }
-                        AddSegment(segmentResult);
-                        return;
+                        return segmentResult;
                     }
                 }
             }
         }
 
-        AddSegment(_builder.ProcessValue(value));
-    }
-
-    /// <summary>
-    /// Exposes the evaluated arguments to the AOT Source Generator.
-    /// </summary>
-    public SqlSegment GetSegment(int formattedHoleIndex)
-    {
-        int holeCount = 0;
-        
-        // Use _segmentCount, NOT _segments.Length!
-        for (int i = 0; i < _segmentCount; i++)
-        {
-            var segment = _segments[i];
-            
-            // We strictly ignore only the literal text blocks injected by the compiler.
-            if (segment.Type != SqlSegmentType.Literal)
-            {
-                if (holeCount == formattedHoleIndex)
-                {
-                    return segment;
-                }
-                holeCount++;
-            }
-        }
-        
-        throw new ArgumentOutOfRangeException(nameof(formattedHoleIndex), "AOT requested a hole index that does not exist in the handler.");
-    }
-
-    private void AddSegment(SqlSegment segment)
-    {
-        if (_segmentCount >= _segments.Length) GrowBuffer();
-        _segments[_segmentCount++] = segment;
-    }
-
-    private void GrowBuffer()
-    {
-        int newSize = _segments.Length * 2;
-        var newArray = ArrayPool<SqlSegment>.Shared.Rent(newSize);
-        _segments[.._segmentCount].CopyTo(newArray);
-        if (_arrayToReturn != null) ArrayPool<SqlSegment>.Shared.Return(_arrayToReturn);
-        _arrayToReturn = newArray;
-        _segments = _arrayToReturn;
-    }
-
-    internal void TransferSegments(List<SqlSegment> destination)
-    {
-        for (int i = 0; i < _segmentCount; i++) destination.Add(_segments[i]);
-
-        if (_arrayToReturn != null)
-        {
-            ArrayPool<SqlSegment>.Shared.Return(_arrayToReturn);
-            _arrayToReturn = null!;
-        }
+        return _builder.ProcessValue(value);
     }
 }

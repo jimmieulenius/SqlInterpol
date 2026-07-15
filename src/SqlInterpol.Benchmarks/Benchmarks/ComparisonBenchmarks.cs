@@ -17,7 +17,6 @@ public class ComparisonBenchmarks
     private readonly int _customerId = 42;
     private readonly int[] _filterIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
-    // Static Pre-Compiled Templates (New API)
     private static readonly ISqlTemplate _filteredSelectTemplate;
     private static readonly ISqlTemplate _aliasedJoinTemplate;
     private static readonly PostgresCompiler _postgresCompiler = new PostgresCompiler();
@@ -29,23 +28,26 @@ public class ComparisonBenchmarks
         db.Entity<Product>(out var p);
         db.Template(out _filteredSelectTemplate, $$"""
             SELECT {{p.Id}}, {{p.Name}}, {{p.Price}} 
-            FROM {{p}} 
-            WHERE {{p.CategoryId}} = {{Sql.Arg("CategoryId")}} 
-              AND {{p.Price}} >= {{Sql.Arg("MinPrice")}} 
-              AND {{p.IsActive}} = {{Sql.Arg("IsActive")}}
+             FROM {{p}} 
+             WHERE {{p.CategoryId}} = {{Sql.Arg("CategoryId")}}
+               AND {{p.Price}} >= {{Sql.Arg("MinPrice")}}
+               AND {{p.IsActive}} = {{Sql.Arg("IsActive")}}
             """);
-
         db.Clear();
-        
+
         db.Entity<Order>(out var o);
         db.Entity<OrderLine>(out var ol);
         db.Template(out _aliasedJoinTemplate, $$"""
             SELECT {{o.Id}}, {{o.CustomerId}}, {{ol.Price}}, {{ol.Quantity}} 
-            FROM {{o}} AS o 
-            JOIN {{ol}} AS ol ON {{o.Id}} = {{ol.OrderId}} 
-            WHERE {{o.CustomerId}} = {{Sql.Arg("CustomerId")}}
+             FROM {{o}} AS o 
+             JOIN {{ol}} AS ol ON {{o.Id}} = {{ol.OrderId}} 
+             WHERE {{o.CustomerId}} = {{Sql.Arg("CustomerId")}}
             """);
     }
+
+    // =========================================================================
+    // 1. STANDARD FILTERED SELECT
+    // =========================================================================
 
     [Benchmark(Baseline = true)]
     public string RawString() =>
@@ -70,26 +72,35 @@ public class ComparisonBenchmarks
             .Where("CategoryId", _categoryId)
             .Where("Price", ">=", _minPrice)
             .Where("IsActive", _isActive);
-
         return _postgresCompiler.Compile(query).Sql;
     }
 
     [Benchmark]
-    public string SqlInterpol_PostgreSql()
+    public string SqlInterpol_Select_JIT()
     {
         var db = SqlBuilder.PostgreSql();
         db.Entity<Product>(out var p);
-        db.Append($"SELECT {p.Id}, {p.Name}, {p.Price} FROM {p} WHERE {p.CategoryId} = {_categoryId} AND {p.Price} >= {_minPrice} AND {p.IsActive} = {_isActive}");
-        return db.Build().Sql;
+        return db.AppendJit($"SELECT {p.Id}, {p.Name}, {p.Price} FROM {p} WHERE {p.CategoryId} = {_categoryId} AND {p.Price} >= {_minPrice} AND {p.IsActive} = {_isActive}").Build().Sql;
     }
 
     [Benchmark]
-    public string SqlInterpolTemplate_PostgreSql()
+    public string SqlInterpol_Select_AOT()
     {
         var db = SqlBuilder.PostgreSql();
-        db.Append(_filteredSelectTemplate, new { CategoryId = _categoryId, MinPrice = _minPrice, IsActive = _isActive });
-        return db.Build().Sql;
+        db.Entity<Product>(out var p);
+        return db.Append($"SELECT {p.Id}, {p.Name}, {p.Price} FROM {p} WHERE {p.CategoryId} = {_categoryId} AND {p.Price} >= {_minPrice} AND {p.IsActive} = {_isActive}").Build().Sql;
     }
+
+    [Benchmark]
+    public string SqlInterpol_Select_Template()
+    {
+        var db = SqlBuilder.PostgreSql();
+        return db.Append(_filteredSelectTemplate, new { CategoryId = _categoryId, MinPrice = _minPrice, IsActive = _isActive }).Build().Sql;
+    }
+
+    // =========================================================================
+    // 2. IN CLAUSE COLLECTIONS
+    // =========================================================================
 
     [Benchmark]
     public string RawString_InClause()
@@ -111,7 +122,6 @@ public class ComparisonBenchmarks
             .Select("Id", "PROD_NAME")
             .Where("CategoryId", _categoryId)
             .WhereIn("Id", _filterIds);
-
         return _postgresCompiler.Compile(query).Sql;
     }
 
@@ -120,9 +130,12 @@ public class ComparisonBenchmarks
     {
         var db = SqlBuilder.PostgreSql();
         db.Entity<Product>(out var p);
-        db.Append($"SELECT {p.Id}, {p.Name} FROM {p} WHERE {p.CategoryId} = {_categoryId} AND {p.Id} IN ({_filterIds})");
-        return db.Build().Sql;
+        return db.Append($"SELECT {p.Id}, {p.Name} FROM {p} WHERE {p.CategoryId} = {_categoryId} AND {p.Id} IN ({_filterIds})").Build().Sql;
     }
+
+    // =========================================================================
+    // 3. COMPLEX ALIASED JOINS
+    // =========================================================================
 
     [Benchmark]
     public string RawString_AliasedJoin() =>
@@ -135,25 +148,36 @@ public class ComparisonBenchmarks
             .Select("o.Id", "o.CustomerId", "ol.Price", "ol.Quantity")
             .Join("dbo.OrderLines AS ol", "o.Id", "ol.OrderId")
             .Where("o.CustomerId", _customerId);
-
         return _postgresCompiler.Compile(query).Sql;
     }
 
     [Benchmark]
-    public string SqlInterpol_AliasedJoin()
+    public string SqlInterpol_Join_JIT()
     {
         var db = SqlBuilder.PostgreSql();
         db.Entity<Order>(out var o);
         db.Entity<OrderLine>(out var ol);
-        db.Append($"SELECT {o.Id}, {o.CustomerId}, {ol.Price}, {ol.Quantity} FROM {o} AS o JOIN {ol} AS ol ON {o.Id} = {ol.OrderId} WHERE {o.CustomerId} = {_customerId}");
-        return db.Build().Sql;
+        // Uses explicit AS text which naturally forces JIT execution tracking
+        return db.AppendJit($"SELECT {o.Id}, {o.CustomerId}, {ol.Price}, {ol.Quantity} FROM {o} AS o JOIN {ol} AS ol ON {o.Id} = {ol.OrderId} WHERE {o.CustomerId} = {_customerId}").Build().Sql;
     }
 
     [Benchmark]
-    public string SqlInterpolTemplate_AliasedJoin()
+    public string SqlInterpol_Join_AOT()
     {
         var db = SqlBuilder.PostgreSql();
-        db.Append(_aliasedJoinTemplate, new { CustomerId = _customerId });
-        return db.Build().Sql;
+        db.Context.Options.EntityAutoAliasing = true; // Enables hands-free macro resolution!
+        db.Entity<Order>(out var o);
+        db.Entity<OrderLine>(out var ol);
+        
+        // 🌟 BYPASSING TRIPWIRES: Notice no literal 'AS' or manual text aliases are written here.
+        // Auto-aliasing compiles this query cleanly into 100% Native AOT speed.
+        return db.Append($"SELECT {o.Id}, {o.CustomerId}, {ol.Price}, {ol.Quantity} FROM {o} JOIN {ol} ON {o.Id} = {ol.OrderId} WHERE {o.CustomerId} = {_customerId}").Build().Sql;
+    }
+
+    [Benchmark]
+    public string SqlInterpol_Join_Template()
+    {
+        var db = SqlBuilder.PostgreSql();
+        return db.Append(_aliasedJoinTemplate, new { CustomerId = _customerId }).Build().Sql;
     }
 }

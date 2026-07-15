@@ -32,13 +32,19 @@ public abstract class SqlColumnReferenceBase(ISqlReference sourceReference)
     private string RenderFullReference(ISqlContext context)
     {
         // PROPER PREFIX RESOLUTION
-        // Always try the Alias first, then fall back to the Base Name (Table Name).
-        // We explicitly use AliasOnly so Subqueries do not accidentally render their full bodies!
-        var sourcePointer = SourceReference.ToSql(context, SqlRenderMode.AliasOnly);
+        string sourcePointer;
         
-        if (string.IsNullOrWhiteSpace(sourcePointer))
+        // 🌟 FIX: Only use AliasOnly if an alias actually exists! 
+        // Otherwise, natively fallback to the base table name (e.g. [dbo].[Products]).
+        if (!string.IsNullOrEmpty(SourceReference.Alias))
+        {
+            sourcePointer = SourceReference.ToSql(context, SqlRenderMode.AliasOnly);
+        }
+        else
+        {
             sourcePointer = SourceReference.ToSql(context, SqlRenderMode.BaseName);
-            
+        }
+        
         if (string.IsNullOrWhiteSpace(sourcePointer))
             sourcePointer = SourceReference.ToSql(context); // Ultimate fallback
         

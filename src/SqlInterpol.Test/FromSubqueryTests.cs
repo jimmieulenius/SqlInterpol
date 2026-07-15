@@ -37,7 +37,8 @@ public class FromSubqueryTests
                     {stats}
                 ) AS stats
                 JOIN {c} ON {stats.CategoryId} = {c.Id}
-                """).Build();
+                """)
+                .Build();
         });
 
         // Assert

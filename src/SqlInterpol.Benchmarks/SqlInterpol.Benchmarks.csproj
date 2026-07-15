@@ -8,6 +8,11 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
+    <Features>InterceptorsPreview</Features>
+    <!-- <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+    <CompilerGeneratedFilesOutputPath>Generated</CompilerGeneratedFilesOutputPath> -->
+    <InterceptorsNamespaces>$(InterceptorsNamespaces);SqlInterpol.Generators.Generated</InterceptorsNamespaces>
   </PropertyGroup>
 
   <ItemGroup>
@@ -23,6 +28,13 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SqlInterpol.Analyzers\SqlInterpol.Analyzers.csproj" ReferenceOutputAssembly="false" OutputItemType="Analyzer" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference 
+      Include="..\SqlInterpol.Generators\SqlInterpol.Generators.csproj" 
+      OutputItemType="Analyzer" 
+      ReferenceOutputAssembly="false" />
   </ItemGroup>
 
 </Project>

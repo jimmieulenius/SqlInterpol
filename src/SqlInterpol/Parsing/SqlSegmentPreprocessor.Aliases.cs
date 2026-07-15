@@ -79,6 +79,7 @@ public partial class SqlSegmentPreprocessor
             throw new InvalidOperationException($"Could not find registered entity of type '{dynCol.EntityType.Name}' in context.");
 
         ISqlReference activeRef = targetEntity.Reference;
+
         if (forwardAlias != null && string.IsNullOrWhiteSpace(activeRef.Alias))
         {
             activeRef = new TemporaryAliasReference(activeRef, context.Dialect.QuoteIdentifier(forwardAlias));
@@ -86,6 +87,7 @@ public partial class SqlSegmentPreprocessor
 
         var entityMeta = SqlMetadataRegistry.GetMetadata(dynCol.EntityType);
         var memberMeta = entityMeta.Columns.Keys.FirstOrDefault(k => k.Name.Equals(dynCol.PropertyName, StringComparison.OrdinalIgnoreCase));
+
         if (memberMeta == null)
             throw new ArgumentException($"Property '{dynCol.PropertyName}' not found on '{dynCol.EntityType.Name}'.");
 
@@ -98,8 +100,6 @@ public partial class SqlSegmentPreprocessor
 
         if (!TryParseAlias(text.AsSpan(), out var parseResult))
         {
-            // FIX: Ignore leading whitespaces and closing parentheses ')' 
-            // just like TryParseAlias does, before checking for a dangling AS.
             int idx = 0;
             while (idx < text.Length)
             {
@@ -107,8 +107,8 @@ public partial class SqlSegmentPreprocessor
                 if (char.IsWhiteSpace(c) || c == ')') idx++;
                 else break;
             }
-            var trimmed = text.AsSpan(idx);
 
+            var trimmed = text.AsSpan(idx);
             if (trimmed.Length > 0)
             {
                 // Preserve dangling "AS " so hole-bound aliases still work!
@@ -125,9 +125,6 @@ public partial class SqlSegmentPreprocessor
 
         string prefix = text[..parseResult.PrefixLength];
         
-        // FIX: Check for structural boundaries IN THE PREFIX before the alias!
-        // If the prefix contains a comma or parenthesis before the alias string, 
-        // the target we were tracking is no longer legally aliasable.
         bool boundaryCrossed = false;
         foreach (char c in prefix) 
         {
@@ -137,7 +134,6 @@ public partial class SqlSegmentPreprocessor
 
         if (boundaryCrossed)
         {
-            // We crossed a structural boundary. Abort extraction.
             state.LastAliasableTarget = null;
             state.LastEntityRef = null;
             return false; 
@@ -149,14 +145,12 @@ public partial class SqlSegmentPreprocessor
 
         ApplyAliasToTarget(quotedAlias, state);
 
-        // FIX: Clear tracking immediately after applying so it doesn't absorb multiple aliases!
         state.LastAliasableTarget = null;
         state.LastEntityRef = null;
 
         bool isTargetSelfDeclaring = state.Refined.Count > 0 && 
             (state.Refined[^1].RenderMode == SqlRenderMode.Declaration || state.Refined[^1].Value is ISqlDeclaration);
 
-        // Emit the prefix (e.g., leading spaces or parentheses before the AS)
         if (prefix.Length > 0) 
         {
             if (isTargetSelfDeclaring)
@@ -202,9 +196,19 @@ public partial class SqlSegmentPreprocessor
         if (!state.ExpectsAlias || segment.Type == SqlSegmentType.Literal) return false;
         state.ExpectsAlias = false;
 
+        // 🌟 FIX: Safely check for ISqlProjection inside the block to avoid compiler unassigned variable errors!
         if (segment.Type == SqlSegmentType.Projection || segment.Value is ISqlProjection)
         {
             state.Refined.Add(new SqlSegment(segment.Type, segment.Value, SqlRenderMode.AliasOnly, segment.Tags));
+            
+            if (segment.Value is ISqlProjection proj)
+            {
+                ApplyAliasToTarget(state.Context.Dialect.QuoteIdentifier(proj.PropertyName), state);
+            }
+            
+            // Clear tracking after applying hole-bound alias!
+            state.LastAliasableTarget = null;
+            state.LastEntityRef = null;
             return true;
         }
 
@@ -212,9 +216,9 @@ public partial class SqlSegmentPreprocessor
 
         // Extract raw alias from segment value if it's a string hole (e.g., {{"stats"}})
         if (segment.Value is string explicitHoleAlias)
-        {
-             customAliasString = state.Context.Dialect.QuoteIdentifier(explicitHoleAlias.Trim('[', ']', '"', '`', ' ', '<', '>'));
-             ApplyAliasToTarget(customAliasString, state);
+        { 
+            customAliasString = state.Context.Dialect.QuoteIdentifier(explicitHoleAlias.Trim('[', ']', '"', '`', ' ', '<', '>')); 
+            ApplyAliasToTarget(customAliasString, state);
         }
         else if (segment.Value is ISqlEntityBase entityTarget)
         {
@@ -262,12 +266,15 @@ public partial class SqlSegmentPreprocessor
     private class TemporaryAliasReference : ISqlReference, ISqlAliasable
     {
         private readonly ISqlReference _baseRef;
+        
         public string? Alias { get; set; }
         public string? FallbackAlias => _baseRef.FallbackAlias;
+        
         public bool IsAliasQuoted { get; set; }
         public ISqlFragment Source => _baseRef.Source; 
-
+        
         public TemporaryAliasReference(ISqlReference baseRef, string alias) { _baseRef = baseRef; Alias = alias; IsAliasQuoted = true; }
+        
         public string ToSql(ISqlContext context, SqlRenderMode renderMode = SqlRenderMode.Default) => !string.IsNullOrWhiteSpace(Alias) ? Alias : _baseRef.ToSql(context, renderMode);
     }
 
@@ -276,11 +283,22 @@ public partial class SqlSegmentPreprocessor
         private readonly ISqlReference _baseRef;
         public AliaslessReference(ISqlReference baseRef) { _baseRef = baseRef; }
         
-        public string? Alias { get => null; set { if (_baseRef is ISqlAliasable a) a.Alias = value; } }
+        public string? Alias 
+        { 
+            get => null; 
+            set { if (_baseRef is ISqlAliasable a) a.Alias = value; } 
+        }
+        
         public string? FallbackAlias => null; 
-        public bool IsAliasQuoted { get => false; set { } }
+        
+        public bool IsAliasQuoted 
+        { 
+            get => false; 
+            set { } 
+        }
+        
         public ISqlFragment Source => _baseRef.Source; 
-
+        
         public string ToSql(ISqlContext context, SqlRenderMode renderMode = SqlRenderMode.Default) => _baseRef.ToSql(context, renderMode);
     }
 }

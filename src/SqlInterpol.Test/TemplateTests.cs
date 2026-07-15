@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
 
@@ -28,6 +29,22 @@ public class TemplateTests
         public int CustomerId { get; set; }
     }
 
+    private static readonly ConcurrentDictionary<SqlDialectKind, ISqlTemplate> _activeOrderTemplates = new();
+
+    private static ISqlTemplate CompileOrderTemplate(ISqlDialect dialect)
+    {
+        var db = new SqlBuilder(dialect);
+        db.Entity<OrderModel>(out var o);
+        
+        db.Template(out var template, $$"""
+            SELECT {{o.Id}}, {{o.CustomerId}}
+            FROM {{o}} AS o1
+            WHERE {{o.CustomerId}} = {{Sql.Arg("CustId")}}
+            """);
+            
+        return template;
+    }
+
     [Theory]
     [MemberData(nameof(TemplateSelectData))]
     public void Template_Select(SqlTestCase testCase)
@@ -35,19 +52,16 @@ public class TemplateTests
         testCase.Action(() =>
         {
             var db = testCase.CreateBuilder();
-            db.Entity<OrderModel>(out var o);
+            
+            db.Entity<OrderModel>(out var o, "o1"); 
 
-            // 1. Compile the template ahead of time (Zero AST allocations on subsequent executions)
-            db.Template(out var activeOrderTemplate, $$"""
-                SELECT {{o.Id}}, {{o.CustomerId}}
-                FROM {{o}} AS o1
-                WHERE {{o.CustomerId}} = {{Sql.Arg("CustId")}}
-                """);
+            var activeOrderTemplate = _activeOrderTemplates.GetOrAdd(
+                db.Context.Dialect.Kind, 
+                kind => CompileOrderTemplate(db.Context.Dialect));
 
-            // 2. Render and dynamically compose around the template
             return db.Append(activeOrderTemplate, new { CustId = 5 })
                      .AppendLine()
-                     .Append($"ORDER BY {o.Id} DESC")
+                     .Append($"ORDER BY {o.Id} DESC") 
                      .Build();
         });
 

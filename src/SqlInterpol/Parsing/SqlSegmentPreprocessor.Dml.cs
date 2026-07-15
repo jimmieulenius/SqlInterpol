@@ -27,11 +27,30 @@ public partial class SqlSegmentPreprocessor
 
     private bool ProcessTargetTracking(SqlSegment segment, IReadOnlyList<SqlSegment> segments, SqlPreprocessorState state)
     {
+        // 🌟 FIX: Safely promote dynamic or raw columns to Projections and register them 
+        // as the active aliasable target so Lexer AS queries can attach natively!
         if (segment.Value is SqlDynamicColumnFragment dynCol)
         {
             var colRef = ResolveDynamicColumn(dynCol, segments, state.Context);
             var mode = segment.RenderMode ?? (state.ForceBaseNamePhase ? SqlRenderMode.BaseName : null);
             state.Refined.Add(new SqlSegment(SqlSegmentType.Projection, colRef, mode, segment.Tags));
+            state.LastAliasableTarget = colRef;
+            return true;
+        }
+
+        if (segment.Value is SqlColumnReferenceBase colRefBase)
+        {
+            var mode = segment.RenderMode ?? (state.ForceBaseNamePhase ? SqlRenderMode.BaseName : null);
+            state.Refined.Add(new SqlSegment(SqlSegmentType.Projection, colRefBase, mode, segment.Tags));
+            state.LastAliasableTarget = colRefBase;
+            return true;
+        }
+
+        if (segment.Value is ISqlProjection projection)
+        {
+            var mode = segment.RenderMode ?? (state.ForceBaseNamePhase ? SqlRenderMode.BaseName : null);
+            state.Refined.Add(new SqlSegment(SqlSegmentType.Projection, projection, mode, segment.Tags));
+            if (projection is ISqlAliasable aliasable) state.LastAliasableTarget = aliasable;
             return true;
         }
 
@@ -106,6 +125,7 @@ public partial class SqlSegmentPreprocessor
                             {
                                 var text = (string)state.Refined[j].Value!;
                                 if (string.IsNullOrWhiteSpace(text)) continue;
+
                                 if (text.TrimEnd().EndsWith(")")) hasExplicitColumns = true;
                                 break;
                             }
@@ -161,7 +181,7 @@ public partial class SqlSegmentPreprocessor
         }
         else if (segment.Type == SqlSegmentType.Projection)
         {
-            state.LastAliasableTarget = segment.Value;
+            state.LastAliasableTarget = segment.Value as ISqlAliasable ?? segment.Value;
             var mode = segment.RenderMode ?? (state.ForceBaseNamePhase ? SqlRenderMode.BaseName : null);
             state.Refined.Add(new SqlSegment(segment.Type, segment.Value, mode, segment.Tags));
             return true;
