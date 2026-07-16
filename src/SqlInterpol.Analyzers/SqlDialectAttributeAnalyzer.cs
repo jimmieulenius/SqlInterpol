@@ -8,7 +8,7 @@ namespace SqlInterpol.Analyzers;
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public class SqlDialectAttributeAnalyzer : DiagnosticAnalyzer
 {
-    public const string DiagnosticId = "SQLIA11";
+    public const string DiagnosticId = "SQLIA06";
 
     private static readonly DiagnosticDescriptor Rule = new(
         id: DiagnosticId,

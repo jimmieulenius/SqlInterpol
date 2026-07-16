@@ -15,7 +15,9 @@ public static class JitExtensions
     {
         // Because 'handler' is a variable reference here (not an inline string literal),
         // the AOT generator safely emits its fallback: builder.Append(ref handler);
+#pragma warning disable SQLIA01 // This is a safe passthrough for benchmark JIT forcing
         return builder.Append(ref handler);
+#pragma warning restore SQLIA01
     }
 }
 
@@ -27,9 +29,10 @@ public class QueryBuildBenchmarks
     private readonly int _customerId = 42;
     private readonly decimal _minPrice = 9.99m;
 
-    private static ISqlTemplate _simpleSelectTemplate;
-    private static ISqlTemplate _filteredSelectTemplate;
-    private static ISqlTemplate _joinTemplate;
+    // FIX CS8618: Tell the compiler BenchmarkDotNet will initialize these in [GlobalSetup]
+    private static ISqlTemplate _simpleSelectTemplate = default!;
+    private static ISqlTemplate _filteredSelectTemplate = default!;
+    private static ISqlTemplate _joinTemplate = default!;
 
     [GlobalSetup]
     public void Setup()

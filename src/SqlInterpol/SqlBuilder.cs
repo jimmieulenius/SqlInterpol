@@ -206,9 +206,9 @@ public partial class SqlBuilder : ISqlEntityRegistry
     /// </summary>
     public SqlBuilder Template(out ISqlTemplate template, [InterpolatedStringHandlerArgument("")] ref SqlQueryInterpolatedStringHandler handler)
     {
-        #pragma warning disable SQLIA10
+        #pragma warning disable SQLIA07
         template = Template(ref handler);
-        #pragma warning restore SQLIA10
+        #pragma warning restore SQLIA07
 
         return this;
     }
