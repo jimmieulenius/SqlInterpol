@@ -6,7 +6,6 @@ namespace SqlInterpol.Test;
 
 public class TemplateTests
 {
-    // Local lightweight payloads used to guarantee reflection order determinism
     public class OrderIdPayload
     {
         public int Id { get; set; }
@@ -30,6 +29,8 @@ public class TemplateTests
     }
 
     private static readonly ConcurrentDictionary<SqlDialectKind, ISqlTemplate> _activeOrderTemplates = new();
+    private static readonly ConcurrentDictionary<SqlDialectKind, ISqlTemplate> _manualInsertTemplates = new();
+    private static readonly ConcurrentDictionary<SqlDialectKind, ISqlTemplate> _manualUpdateTemplates = new();
 
     private static ISqlTemplate CompileOrderTemplate(ISqlDialect dialect)
     {
@@ -42,6 +43,35 @@ public class TemplateTests
             WHERE {{o.CustomerId}} = {{Sql.Arg("CustId")}}
             """);
             
+        return template;
+    }
+
+    private static ISqlTemplate CompileManualInsertTemplate(ISqlDialect dialect)
+    {
+        var db = new SqlBuilder(dialect);
+        db.Entity<OrderModel>(out var o);
+
+        // The macro dynamically expands into (Col1, Col2) VALUES ({0}, {1}) and maps the args natively!
+        db.Template(out var template, $$"""
+            INSERT INTO {{o}}
+            VALUES {{Sql.Expand<OrderInsertPayload>()}}
+            """);
+
+        return template;
+    }
+
+    private static ISqlTemplate CompileManualUpdateTemplate(ISqlDialect dialect)
+    {
+        var db = new SqlBuilder(dialect);
+        db.Entity<OrderModel>(out var o);
+
+        // Passing "Id" excludes it from the SET list, allowing us to map it safely in the WHERE clause!
+        db.Template(out var template, $$"""
+            UPDATE {{o}}
+            SET {{Sql.Expand<OrderUpdatePayload>("Id")}}
+            WHERE {{o.Id:col}} = {{Sql.Arg("Id")}}
+            """);
+
         return template;
     }
 
@@ -141,15 +171,12 @@ public class TemplateTests
         testCase.Action(() =>
         {
             var db = testCase.CreateBuilder();
-            db.Entity<OrderModel>(out var o);
 
-            // The macro dynamically expands into (Col1, Col2) VALUES ({0}, {1}) and maps the args natively!
-            db.Template(out var manualInsertTemplate, $$"""
-                INSERT INTO {{o}}
-                VALUES {{Sql.Expand<OrderInsertPayload>()}}
-                """);
+            var template = _manualInsertTemplates.GetOrAdd(
+                db.Context.Dialect.Kind,
+                kind => CompileManualInsertTemplate(db.Context.Dialect));
 
-            return db.Append(manualInsertTemplate, new OrderInsertPayload { Id = 101, CustomerId = 5 }).Build();
+            return db.Append(template, new OrderInsertPayload { Id = 101, CustomerId = 5 }).Build();
         });
 
         testCase.Assert();
@@ -162,24 +189,16 @@ public class TemplateTests
         testCase.Action(() =>
         {
             var db = testCase.CreateBuilder();
-            db.Entity<OrderModel>(out var o);
 
-            // Passing "Id" excludes it from the SET list, allowing us to map it safely in the WHERE clause!
-            db.Template(out var manualUpdateTemplate, $$"""
-                UPDATE {{o}}
-                SET {{Sql.Expand<OrderUpdatePayload>("Id")}}
-                WHERE {{o.Id:col}} = {{Sql.Arg("Id")}}
-                """);
+            var template = _manualUpdateTemplates.GetOrAdd(
+                db.Context.Dialect.Kind,
+                kind => CompileManualUpdateTemplate(db.Context.Dialect));
 
-            return db.Append(manualUpdateTemplate, new OrderUpdatePayload { Id = 101, CustomerId = 500 }).Build();
+            return db.Append(template, new OrderUpdatePayload { Id = 101, CustomerId = 500 }).Build();
         });
 
         testCase.Assert();
     }
-
-    // =========================================================================
-    // THEORY DATA
-    // =========================================================================
 
     public static TheoryData<SqlTestCase> TemplateSelectData =>
         [
