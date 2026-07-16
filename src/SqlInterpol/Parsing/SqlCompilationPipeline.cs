@@ -4,16 +4,10 @@ namespace SqlInterpol.Parsing;
 /// The grand orchestrator that executes Lexical Analysis (Preprocessor) and 
 /// Semantic Parsing (Rewriters) before handing off to the Dialect for code generation.
 /// </summary>
-public class SqlCompilationPipeline
+public class SqlCompilationPipeline(ISqlSegmentPreprocessor preprocessor, IEnumerable<ISqlSegmentRewriter> rewriters)
 {
-    private readonly ISqlSegmentPreprocessor _preprocessor;
-    private readonly ISqlSegmentRewriter[] _rewriters;
-
-    public SqlCompilationPipeline(ISqlSegmentPreprocessor preprocessor, IEnumerable<ISqlSegmentRewriter> rewriters)
-    {
-        _preprocessor = preprocessor;
-        _rewriters = rewriters.ToArray();
-    }
+    private readonly ISqlSegmentPreprocessor _preprocessor = preprocessor;
+    private readonly ISqlSegmentRewriter[] _rewriters = rewriters.ToArray();
 
     public IReadOnlyList<SqlSegment> Compile(IReadOnlyList<SqlSegment> rawSegments, ISqlContext context)
     {
