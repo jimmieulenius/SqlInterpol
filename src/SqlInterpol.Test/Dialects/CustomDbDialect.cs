@@ -12,11 +12,15 @@ public static partial class SqlDialectKindExtensions
 }
 
 // 2. SqlDialect
+[SqlDialect(OpenQuote = _openQuote, CloseQuote = _closeQuote)]
 public class CustomDbSqlDialect : SqlDialectBase
 {
+    private const string _openQuote = "<<";
+    private const string _closeQuote = ">>";
+
     public override string ParameterPrefix => "!!"; // Unique prefix for testing
-    public override string OpenQuote => "<<";       // Unique quotes for testing
-    public override string CloseQuote => ">>";
+    public override string OpenQuote => _openQuote;       // Unique quotes for testing
+    public override string CloseQuote => _closeQuote;
     public override SqlDialectKind Kind => SqlDialectKind.CustomDb;
 
     public override IReadOnlySet<SqlFeature> SupportedFeatures { get; } = new HashSet<SqlFeature>

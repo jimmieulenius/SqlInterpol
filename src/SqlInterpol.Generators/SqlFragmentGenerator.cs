@@ -32,7 +32,7 @@ public class SqlQueryGenerator : IIncrementalGenerator
         {
             var diagnostic = Diagnostic.Create(
                 new DiagnosticDescriptor(
-                    id: "SQLGEN001",
+                    id: "SQLIG01",
                     title: "Invalid SqlQuery Container",
                     messageFormat: "The class '{0}' must be static to contain a [SqlQuery] method",
                     category: "Usage",
@@ -50,7 +50,7 @@ public class SqlQueryGenerator : IIncrementalGenerator
         {
             var diagnostic = Diagnostic.Create(
                 new DiagnosticDescriptor(
-                    id: "SQLGEN002",
+                    id: "SQLG02",
                     title: "Invalid SqlQuery Signature",
                     messageFormat: "The method '{0}' cannot be an extension method. Remove the 'this' modifier from the first parameter. The source generator will automatically emit the 'this' modifier on the generated public wrapper.",
                     category: "Usage",

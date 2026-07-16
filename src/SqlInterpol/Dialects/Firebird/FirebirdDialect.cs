@@ -8,8 +8,12 @@ namespace SqlInterpol;
 /// The Firebird dialect: positional parameters, strict maximum parameter limits,
 /// FIRST/SKIP pagination layout, and explicit feature gatekeeping.
 /// </summary>
+[SqlDialect(OpenQuote = _openQuote, CloseQuote = _closeQuote)]
 public partial class FirebirdDialect : SqlDialectBase
 {
+    private const string _openQuote = "\"";
+    private const string _closeQuote = "\"";
+
     [GeneratedRegex(@"\bAS\b", RegexOptions.IgnoreCase)]
     private static partial Regex AsKeywordRegex();
 
@@ -17,10 +21,10 @@ public partial class FirebirdDialect : SqlDialectBase
     public override SqlDialectKind Kind => SqlDialectKind.Firebird;
     
     /// <inheritdoc />
-    public override string OpenQuote => "\"";
+    public override string OpenQuote => _openQuote;
     
     /// <inheritdoc />
-    public override string CloseQuote => "\"";
+    public override string CloseQuote => _closeQuote;
     
     /// <inheritdoc />
     public override string ParameterPrefix => "@p";

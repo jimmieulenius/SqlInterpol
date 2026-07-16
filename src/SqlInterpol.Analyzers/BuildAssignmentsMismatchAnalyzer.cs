@@ -11,7 +11,7 @@ namespace SqlInterpol.Analyzers;
 public class BuildAssignmentsMismatchAnalyzer : DiagnosticAnalyzer
 {
     private static readonly DiagnosticDescriptor Rule = new(
-        id: "SQLI002",
+        id: "SQLIA02",
         title: "DTO property does not exist on entity",
         messageFormat: "Property '{0}' on the DTO does not exist on entity '{1}'. This will throw at runtime.",
         category: "Correctness",

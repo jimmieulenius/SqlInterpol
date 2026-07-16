@@ -10,7 +10,7 @@ namespace SqlInterpol.Analyzers;
 public class RequireInterpolatedStringAnalyzer : DiagnosticAnalyzer
 {
     private static readonly DiagnosticDescriptor Rule = new(
-        id: "SQLI001",
+        id: "SQLIA01",
         title: "Require Interpolated String for SqlBuilder",
         messageFormat: "Do not pass raw variables to SqlBuilder.Append. Use an interpolated string (e.g. $\"{{var}}\") so parameters are safely tracked.",
         category: "Security",

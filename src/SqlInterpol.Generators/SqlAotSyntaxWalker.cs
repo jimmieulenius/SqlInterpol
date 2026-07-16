@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -21,7 +19,6 @@ public class SqlAotSyntaxWalker : CSharpSyntaxWalker
         if (node.Expression is MemberAccessExpressionSyntax memberAccess)
         {
             var methodName = memberAccess.Name.Identifier.Text;
-
             if (methodName == "Entity" && memberAccess.Name is GenericNameSyntax genericName)
             {
                 TrackEntityDeclaration(node, genericName);
@@ -30,12 +27,12 @@ public class SqlAotSyntaxWalker : CSharpSyntaxWalker
             {
                 var isInsideQuery = node.Ancestors().OfType<InvocationExpressionSyntax>()
                     .Any(inv => inv.Expression is MemberAccessExpressionSyntax ma && ma.Name.Identifier.Text == "Query");
-
+                
                 if (!isInsideQuery)
                 {
                     var symbol = _semanticModel.GetSymbolInfo(node).Symbol as IMethodSymbol;
                     if (symbol != null && symbol.Parameters.Length > 0 && 
-                        symbol.Parameters[0].Type.Name.Contains("SqlQueryInterpolatedStringHandler"))
+                         symbol.Parameters[0].Type.Name.Contains("SqlQueryInterpolatedStringHandler"))
                     {
                         string handlerType = symbol.Parameters[0].Type.ToDisplayString();
                         CurrentContext.AppendCalls.Add(new AppendCallContext(node, methodName, handlerType));
@@ -54,7 +51,6 @@ public class SqlAotSyntaxWalker : CSharpSyntaxWalker
                 }
             }
         }
-
         base.VisitInvocationExpression(node);
     }
 
@@ -66,7 +62,6 @@ public class SqlAotSyntaxWalker : CSharpSyntaxWalker
         string? customSchema = null;
         bool wasAutoAliased = true;
 
-        // 🌟 FLUENT API CONFIGURATION ANALYZER 🌟
         int positionalIndex = 0;
         foreach (var argument in node.ArgumentList.Arguments)
         {
@@ -105,7 +100,6 @@ public class SqlAotSyntaxWalker : CSharpSyntaxWalker
 
         var typeArg = genericName.TypeArgumentList.Arguments.First();
         var typeSymbol = _semanticModel.GetTypeInfo(typeArg).Type as INamedTypeSymbol;
-
         string typeName = typeArg.ToString();
         string mappedTableName = typeName;
         string? mappedSchemaName = null;
@@ -115,7 +109,7 @@ public class SqlAotSyntaxWalker : CSharpSyntaxWalker
         {
             var sqlTableAttr = typeSymbol.GetAttributes()
                 .FirstOrDefault(a => a.AttributeClass?.Name is "SqlTableAttribute" or "SqlTable");
-
+            
             if (sqlTableAttr != null)
             {
                 if (sqlTableAttr.ConstructorArguments.Length > 0)
@@ -137,29 +131,33 @@ public class SqlAotSyntaxWalker : CSharpSyntaxWalker
 
             foreach (var member in typeSymbol.GetMembers().OfType<IPropertySymbol>())
             {
-                if (member.IsStatic || member.IsIndexer) continue; // 🌟 FIXED: Typo cleanly removed!
+                if (member.IsStatic || member.IsIndexer) continue; 
                 if (member.Name == "EqualityContract") continue;
-
                 var attributes = member.GetAttributes();
                 if (attributes.Any(a => a.AttributeClass?.Name is "SqlIgnoreAttribute" or "SqlIgnore")) continue;
-
+                
                 var propType = member.Type;
                 if (propType.TypeKind == TypeKind.Class && 
-                    propType.SpecialType != SpecialType.System_String && 
-                    propType.ToDisplayString() != "byte[]")
+                     propType.SpecialType != SpecialType.System_String && 
+                     propType.ToDisplayString() != "byte[]")
                 {
                     continue;
                 }
 
                 string colName = member.Name;
                 var sqlColumnAttr = attributes.FirstOrDefault(a => a.AttributeClass?.Name is "SqlColumnAttribute" or "SqlColumn");
-
+                
                 if (sqlColumnAttr != null && sqlColumnAttr.ConstructorArguments.Length > 0)
                 {
-                    var mappedName = sqlColumnAttr.ConstructorArguments[0].Value?.ToString();
-                    if (!string.IsNullOrEmpty(mappedName)) colName = mappedName;
+                    // FIX CS8600: Explicit nullable annotation for extraction buffer mapping[cite: 3]
+                    string? mappedName = sqlColumnAttr.ConstructorArguments[0].Value?.ToString();
+                    if (!string.IsNullOrEmpty(mappedName)) 
+                    {
+                        // FIX CS8604: Null-forgiving constraint safely bypasses flow assessment warnings[cite: 3]
+                        colName = mappedName!; 
+                    }
                 }
-                
+                                
                 columns.Add(new ColumnMap(member.Name, colName));
             }
             
@@ -175,7 +173,7 @@ public class SqlAotSyntaxWalker : CSharpSyntaxWalker
             mappedTableName, 
             mappedSchemaName, 
             explicitAlias, 
-            wasAutoAliased,
+            wasAutoAliased, 
             columns);
             
         CurrentContext.Entities[variableName] = declaration;

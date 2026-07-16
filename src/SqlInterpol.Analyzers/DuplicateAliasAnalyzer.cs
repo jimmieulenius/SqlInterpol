@@ -13,7 +13,7 @@ namespace SqlInterpol.Analyzers;
 public class DuplicateAliasAnalyzer : DiagnosticAnalyzer
 {
     private static readonly DiagnosticDescriptor DuplicateRule = new(
-        id: "SQLI008",
+        id: "SQLIA08",
         title: "Duplicate SQL Alias",
         messageFormat: "The alias '{0}' is defined multiple times in this scope. This will cause a SQL execution error.",
         category: "Naming",
@@ -21,7 +21,7 @@ public class DuplicateAliasAnalyzer : DiagnosticAnalyzer
         isEnabledByDefault: true);
 
     private static readonly DiagnosticDescriptor ShadowRule = new(
-        id: "SQLI009",
+        id: "SQLA09",
         title: "Alias shadows physical column",
         messageFormat: "The explicit alias '{0}' matches an existing physical column on a queried table. Ensure this does not cause ambiguity.",
         category: "Naming",

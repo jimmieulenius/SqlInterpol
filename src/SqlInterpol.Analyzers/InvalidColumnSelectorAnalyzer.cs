@@ -11,7 +11,7 @@ namespace SqlInterpol.Analyzers;
 public class InvalidColumnSelectorAnalyzer : DiagnosticAnalyzer
 {
     private static readonly DiagnosticDescriptor Rule = new(
-        id: "SQLI006",
+        id: "SQLIA06",
         title: "Invalid Column Selector Expression",
         messageFormat: "Column selectors must be simple property accesses (e.g., x => x.PropertyName). Complex expressions or method calls are not supported.",
         category: "Usage",

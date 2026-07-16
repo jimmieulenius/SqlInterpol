@@ -7,16 +7,20 @@ namespace SqlInterpol; // Root namespace for instant discoverability
 /// The PostgreSQL dialect: <c>$N</c>-style parameters, double-quote identifiers, and dialect-specific
 /// rendering for row locking, multi-table DELETE (USING), and SELECT INTO.
 /// </summary>
+[SqlDialect(OpenQuote = _openQuote, CloseQuote = _closeQuote)]
 public class PostgreSqlDialect : SqlDialectBase
 {
+    private const string _openQuote = "\"";
+    private const string _closeQuote = "\"";
+
     /// <inheritdoc />
     public override SqlDialectKind Kind => SqlDialectKind.PostgreSql;
     
     /// <inheritdoc />
-    public override string OpenQuote => "\"";
+    public override string OpenQuote => _openQuote;
     
     /// <inheritdoc />
-    public override string CloseQuote => "\"";
+    public override string CloseQuote => _closeQuote;
     
     /// <inheritdoc />
     public override string ParameterPrefix => "$";

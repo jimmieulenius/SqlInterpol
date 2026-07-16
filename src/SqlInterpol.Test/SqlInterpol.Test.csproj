@@ -7,14 +7,12 @@
     <IsPackable>false</IsPackable>
       
     <SqlInterpolDialects>PostgreSql,SqlServer</SqlInterpolDialects>
-    
-    <!-- <InterceptorsPreviewNamespaces>$(InterceptorsPreviewNamespaces);SqlInterpol.Generators.Generated</InterceptorsPreviewNamespaces>
-    
-    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles> -->
+    <SqlInterpolDisableAot>false</SqlInterpolDisableAot>
   </PropertyGroup>
 
   <ItemGroup>
     <CompilerVisibleProperty Include="SqlInterpolDialects" />
+    <CompilerVisibleProperty Include="SqlInterpolDisableAot" />
   </ItemGroup>
 
   <ItemGroup>
@@ -42,11 +40,9 @@
   </ItemGroup>
 
   <PropertyGroup>
-    <!-- 1. Enable C# 12 Interceptors in this project -->
     <Features>InterceptorsPreview</Features>
     <InterceptorsNamespaces>$(InterceptorsNamespaces);SqlInterpol.Generators.Generated</InterceptorsNamespaces>
     
-    <!-- 2. Force the compiler to save the generated code to your hard drive -->
     <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
     <CompilerGeneratedFilesOutputPath>obj/Generated</CompilerGeneratedFilesOutputPath>
   </PropertyGroup>

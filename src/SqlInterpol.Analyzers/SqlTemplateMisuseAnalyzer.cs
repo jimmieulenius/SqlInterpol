@@ -10,7 +10,7 @@ namespace SqlInterpol.Analyzers;
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public class SqlTemplateMisuseAnalyzer : DiagnosticAnalyzer
 {
-    public const string DiagnosticId = "SQLI010";
+    public const string DiagnosticId = "SQLIA10";
     private const string Category = "Performance";
 
     private static readonly LocalizableString Title = "Template initialized on execution path";

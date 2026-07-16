@@ -7,16 +7,20 @@ namespace SqlInterpol;
 /// The SQL Server dialect: bracket identifiers, OFFSET/FETCH paging, WITH (UPDLOCK) row locking,
 /// OUTPUT-based RETURNING emulation, and MERGE-based upsert transpilation.
 /// </summary>
+[SqlDialect(OpenQuote = _openQuote, CloseQuote = _closeQuote)]
 public class SqlServerDialect : SqlDialectBase
 {
+    private const string _openQuote = "[";
+    private const string _closeQuote = "]";
+
     /// <inheritdoc />
     public override SqlDialectKind Kind => SqlDialectKind.SqlServer;
     
     /// <inheritdoc />
-    public override string OpenQuote => "[";
+    public override string OpenQuote => _openQuote;
     
     /// <inheritdoc />
-    public override string CloseQuote => "]";
+    public override string CloseQuote => _closeQuote;
     
     /// <inheritdoc />
     public override string ParameterPrefix => "@p";

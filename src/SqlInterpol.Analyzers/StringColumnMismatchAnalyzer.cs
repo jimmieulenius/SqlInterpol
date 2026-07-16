@@ -11,7 +11,7 @@ namespace SqlInterpol.Analyzers;
 public class StringColumnMismatchAnalyzer : DiagnosticAnalyzer
 {
     private static readonly DiagnosticDescriptor Rule = new(
-        id: "SQLI003",
+        id: "SQLIA03",
         title: "Unknown column name on entity",
         messageFormat: "Column name '{0}' does not exist on entity '{1}'. This will produce invalid SQL.",
         category: "Correctness",

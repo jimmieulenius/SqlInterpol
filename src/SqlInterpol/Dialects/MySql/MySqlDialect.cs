@@ -8,16 +8,20 @@ namespace SqlInterpol;
 /// The MySQL/MariaDB dialect: backtick identifiers, <c>@pN</c> parameters, ON DUPLICATE KEY UPDATE
 /// emulation of upserts, and MySQL-style multi-table UPDATE/DELETE syntax.
 /// </summary>
+[SqlDialect(OpenQuote = _openQuote, CloseQuote = _closeQuote)]
 public class MySqlDialect : SqlDialectBase
 {
+    private const string _openQuote = "`";
+    private const string _closeQuote = "`";
+
     /// <inheritdoc />
     public override SqlDialectKind Kind => SqlDialectKind.MySql;
     
     /// <inheritdoc />
-    public override string OpenQuote => "`";
+    public override string OpenQuote => _openQuote;
     
     /// <inheritdoc />
-    public override string CloseQuote => "`";
+    public override string CloseQuote => _closeQuote;
     
     /// <inheritdoc />
     public override string ParameterPrefix => "@p";

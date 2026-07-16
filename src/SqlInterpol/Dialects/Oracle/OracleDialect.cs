@@ -8,16 +8,20 @@ namespace SqlInterpol;
 /// The Oracle dialect: colon-prefixed parameters, double-quote identifiers, OFFSET/FETCH paging,
 /// MERGE-based multi-table UPDATE, EXISTS-based multi-table DELETE, and MINUS for EXCEPT.
 /// </summary>
+[SqlDialect(OpenQuote = _openQuote, CloseQuote = _closeQuote)]
 public class OracleDialect : SqlDialectBase
 {
     /// <inheritdoc />
     public override SqlDialectKind Kind => SqlDialectKind.Oracle;
     
+    private const string _openQuote = "\"";
+    private const string _closeQuote = "\"";
+
     /// <inheritdoc />
-    public override string OpenQuote => "\"";
+    public override string OpenQuote => _openQuote;
     
     /// <inheritdoc />
-    public override string CloseQuote => "\"";
+    public override string CloseQuote => _closeQuote;
     
     /// <inheritdoc />
     public override string ParameterPrefix => ":";
