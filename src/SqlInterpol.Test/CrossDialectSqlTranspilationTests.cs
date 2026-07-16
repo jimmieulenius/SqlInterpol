@@ -2,14 +2,11 @@ using SqlInterpol.Test.Models;
 
 namespace SqlInterpol.Test;
 
-public class XvSqlTranspilationTests
+public class CrossDialectSqlTranspilationTests
 {
-    // ========================================================================
-    // 1. KEYWORD TRANSPILATION (PAGING)
-    // ========================================================================
     [Theory]
     [MemberData(nameof(PagingToggleData))]
-    public void XvSql_Paging_Toggle(bool xvSql, SqlTestCase testCase)
+    public void Paging_Toggle(bool xvSql, SqlTestCase testCase)
     {
         var db = testCase.CreateBuilder();
         
@@ -23,6 +20,53 @@ public class XvSqlTranspilationTests
             
             // Act: Use string interpolation so the AST can extract the parameter nodes!
             return [db.Append($"SELECT * FROM Products LIMIT {limit} OFFSET {offset}").Build()];
+        });
+
+        testCase.Assert();
+    }
+
+    [Theory]
+    [MemberData(nameof(PagingHardcodedToggleData))]
+    public void Paging_Hardcoded_Toggle(bool xvSql, SqlTestCase testCase)
+    {
+        var db = testCase.CreateBuilder();
+        
+        testCase.Action(() => 
+        {
+            db.Context.Options.CrossVendorSqlTranspilation = xvSql;
+            
+            // Act: Passing a pure, hardcoded string. No interpolation holes!
+            return [db.Append($"SELECT * FROM Products LIMIT 10 OFFSET 20").Build()];
+        });
+
+        testCase.Assert();
+    }
+
+    [Theory]
+    [MemberData(nameof(RowLockingToggleData))]
+    public void RowLocking_Toggle(bool xvSql, SqlTestCase testCase)
+    {
+        var db = testCase.CreateBuilder();
+
+        testCase.Action(() => 
+        {
+            db.Context.Options.CrossVendorSqlTranspilation = xvSql;
+            return [db.Append($"SELECT * FROM Products FOR UPDATE").Build()];
+        });
+
+        testCase.Assert();
+    }
+
+    [Theory]
+    [MemberData(nameof(SelectIntoToggleData))]
+    public void SelectInto_Toggle(bool xvSql, SqlTestCase testCase)
+    {
+        var db = testCase.CreateBuilder();
+
+        testCase.Action(() => 
+        {
+            db.Context.Options.CrossVendorSqlTranspilation = xvSql;
+            return [db.Append($"SELECT Id INTO #Temp FROM Products").Build()];
         });
 
         testCase.Assert();
@@ -83,23 +127,6 @@ public class XvSqlTranspilationTests
         }
     }
 
-    [Theory]
-    [MemberData(nameof(PagingHardcodedToggleData))]
-    public void XvSql_Paging_Hardcoded_Toggle(bool xvSql, SqlTestCase testCase)
-    {
-        var db = testCase.CreateBuilder();
-        
-        testCase.Action(() => 
-        {
-            db.Context.Options.CrossVendorSqlTranspilation = xvSql;
-            
-            // Act: Passing a pure, hardcoded string. No interpolation holes!
-            return [db.Append($"SELECT * FROM Products LIMIT 10 OFFSET 20").Build()];
-        });
-
-        testCase.Assert();
-    }
-
     public static TheoryData<bool, SqlTestCase> PagingHardcodedToggleData
     {
         get
@@ -134,24 +161,6 @@ public class XvSqlTranspilationTests
         }
     }
 
-    // ========================================================================
-    // 2. EXCEPTION GATEKEEPING (ROW LOCKING)
-    // ========================================================================
-    [Theory]
-    [MemberData(nameof(RowLockingToggleData))]
-    public void XvSql_RowLocking_Toggle(bool xvSql, SqlTestCase testCase)
-    {
-        var db = testCase.CreateBuilder();
-
-        testCase.Action(() => 
-        {
-            db.Context.Options.CrossVendorSqlTranspilation = xvSql;
-            return [db.Append($"SELECT * FROM Products FOR UPDATE").Build()];
-        });
-
-        testCase.Assert();
-    }
-
     public static TheoryData<bool, SqlTestCase> RowLockingToggleData
     {
         get
@@ -184,24 +193,6 @@ public class XvSqlTranspilationTests
 
             return data;
         }
-    }
-
-    // ========================================================================
-    // 3. AST REWRITER BYPASS (SELECT INTO)
-    // ========================================================================
-    [Theory]
-    [MemberData(nameof(SelectIntoToggleData))]
-    public void XvSql_SelectInto_Toggle(bool xvSql, SqlTestCase testCase)
-    {
-        var db = testCase.CreateBuilder();
-
-        testCase.Action(() => 
-        {
-            db.Context.Options.CrossVendorSqlTranspilation = xvSql;
-            return [db.Append($"SELECT Id INTO #Temp FROM Products").Build()];
-        });
-
-        testCase.Assert();
     }
 
     public static TheoryData<bool, SqlTestCase> SelectIntoToggleData
