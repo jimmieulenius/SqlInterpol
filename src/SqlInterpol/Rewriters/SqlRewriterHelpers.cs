@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+
 namespace SqlInterpol;
 
 /// <summary>
@@ -17,8 +20,8 @@ public static class SqlRewriterHelpers
         out int nextIndex,
         out string trailingText)
     {
-        limitNode = default;
-        offsetNode = default;
+        limitNode = default!;
+        offsetNode = default!;
         nextIndex = currentIndex;
         trailingText = string.Empty;
 
@@ -113,8 +116,8 @@ public static class SqlRewriterHelpers
         out SqlSegment offsetParam, 
         out int nextIndex)
     {
-        limitParam = default;
-        offsetParam = default;
+        limitParam = default!;
+        offsetParam = default!;
         nextIndex = currentIndex;
 
         int p1Idx = currentIndex + 1;

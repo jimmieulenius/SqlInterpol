@@ -268,7 +268,7 @@ public partial class SqlSegmentPreprocessor
         private readonly ISqlReference _baseRef;
         
         public string? Alias { get; set; }
-        public string? FallbackAlias => _baseRef.FallbackAlias;
+        public string FallbackAlias => _baseRef.FallbackAlias; // FIX: Strict non-nullable string
         
         public bool IsAliasQuoted { get; set; }
         public ISqlFragment Source => _baseRef.Source; 
@@ -289,7 +289,7 @@ public partial class SqlSegmentPreprocessor
             set { if (_baseRef is ISqlAliasable a) a.Alias = value; } 
         }
         
-        public string? FallbackAlias => null; 
+        public string FallbackAlias => string.Empty; // FIX: Strict non-nullable string
         
         public bool IsAliasQuoted 
         { 

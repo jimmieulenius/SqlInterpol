@@ -5,14 +5,13 @@ public partial class SqlBuilder : ISqlGeneratorBuilder
     // Explicitly map the ISqlContext to the builder's internal SqlContext
     ISqlContext ISqlGeneratorBuilder.Context => Context;
 
-    void ISqlGeneratorBuilder.AppendRaw(string rawSql, params string[] segmentTags)
+    void ISqlGeneratorBuilder.AppendRaw(string rawSql, params string[]? segmentTags)
     {
         _segments.Add(new SqlSegment(SqlSegmentType.Raw, rawSql, renderMode: null, tags: segmentTags));
     }
 
     void ISqlGeneratorBuilder.AppendSegment(SqlSegment segment)
     {
-        // 🌟 FAST-TRACK UNROLLING: 
         if (segment.Type == SqlSegmentType.Raw && segment.Value is SqlSegmentCollectionFragment collection)
         {
             string indent = "";
@@ -56,7 +55,6 @@ public partial class SqlBuilder : ISqlGeneratorBuilder
 
     string ISqlGeneratorBuilder.ResolveAlias(string variableName, string defaultTableName, bool wasAutoAliased)
     {
-        // 🌟 FIX: Strictly return the active alias or empty, so AOT can properly route fallbacks!
         if (ScopedVariables.TryGetValue(variableName, out var entity))
         {
             ISqlEntityBase? eBase = entity as ISqlEntityBase;
