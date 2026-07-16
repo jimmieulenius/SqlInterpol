@@ -1,15 +1,22 @@
+using SqlInterpol.Configuration;
+using SqlInterpol.Processing;
+using SqlInterpol.Schema;
+using SqlInterpol.Segments;
+
 namespace SqlInterpol;
 
 public partial class SqlBuilder : ISqlGeneratorBuilder
 {
-    // Explicitly map the ISqlContext to the builder's internal SqlContext
+    /// <inheritdoc />
     ISqlContext ISqlGeneratorBuilder.Context => Context;
 
+    /// <inheritdoc />
     void ISqlGeneratorBuilder.AppendRaw(string rawSql, params string[]? segmentTags)
     {
         _segments.Add(new SqlSegment(SqlSegmentType.Raw, rawSql, renderMode: null, tags: segmentTags));
     }
 
+    /// <inheritdoc />
     void ISqlGeneratorBuilder.AppendSegment(SqlSegment segment)
     {
         if (segment.Type == SqlSegmentType.Raw && segment.Value is SqlSegmentCollectionFragment collection)
@@ -53,6 +60,7 @@ public partial class SqlBuilder : ISqlGeneratorBuilder
         }
     }
 
+    /// <inheritdoc />
     string ISqlGeneratorBuilder.ResolveAlias(string variableName, string defaultTableName, bool wasAutoAliased)
     {
         if (ScopedVariables.TryGetValue(variableName, out var entity))
@@ -74,6 +82,7 @@ public partial class SqlBuilder : ISqlGeneratorBuilder
         return "";
     }
 
+    /// <inheritdoc />
     void ISqlGeneratorBuilder.AppendDeclaration(string tableName, string? schema, string variableName, bool wasAutoAliased)
     {
         var genDb = (ISqlGeneratorBuilder)this;
@@ -84,7 +93,7 @@ public partial class SqlBuilder : ISqlGeneratorBuilder
         
         if (!string.IsNullOrEmpty(alias) && alias != tableName)
         {
-            genDb.AppendRaw(" AS ", Parsing.SqlSegmentTag.TableAliasAsKeyword);
+            genDb.AppendRaw(" AS ", SqlSegmentTag.TableAliasAsKeyword);
             genDb.AppendRaw(dialect.QuoteIdentifier(alias));
         }
     }

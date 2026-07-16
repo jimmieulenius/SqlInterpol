@@ -1,4 +1,7 @@
 using System.Runtime.CompilerServices;
+using SqlInterpol.Execution;
+using SqlInterpol.Schema;
+using SqlInterpol.Segments;
 
 namespace SqlInterpol;
 
@@ -21,6 +24,17 @@ public static partial class SqlBuilderExtensions
         return null;
     }
 
+    /// <summary>
+    /// Registers a new entity reference into the builder's local scope for interpolation.
+    /// </summary>
+    /// <typeparam name="T">The model type to register.</typeparam>
+    /// <param name="builder">The builder instance.</param>
+    /// <param name="dummyPoco">An uninitialized reference used strictly for property routing in lambdas or interpolation holes.</param>
+    /// <param name="alias">An optional explicit alias to use for this entity.</param>
+    /// <param name="name">An optional override for the physical table or view name.</param>
+    /// <param name="schema">An optional override for the physical database schema.</param>
+    /// <param name="varName">The compiler-injected variable name used for scoping.</param>
+    /// <returns>The current builder instance for method chaining.</returns>
     public static SqlBuilder Entity<T>(
         this SqlBuilder builder, 
         out T dummyPoco, 
@@ -37,13 +51,19 @@ public static partial class SqlBuilderExtensions
         
         var entity = ((ISqlEntityRegistry)builder).RegisterEntity<T>(name: name, schema: schema, alias: sqlAlias);
         if (!string.IsNullOrEmpty(cleanVarName)) builder.ScopedVariables[cleanVarName] = entity;
-
         return builder;
     }
 
     /// <summary>
     /// Re-maps an outer variable scope name to an internal method parameter variable name.
     /// </summary>
+    /// <typeparam name="T">The model type to map.</typeparam>
+    /// <param name="builder">The builder instance.</param>
+    /// <param name="sourceKey">The name of the variable from the outer scope.</param>
+    /// <param name="localDummy">An uninitialized reference mapped to the local variable name.</param>
+    /// <param name="localKey">The compiler-injected local variable name used for scoping.</param>
+    /// <returns>The current builder instance for method chaining.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when the source key cannot be resolved from the active builder scope.</exception>
     public static SqlBuilder Entity<T>(
         this SqlBuilder builder,
         string? sourceKey,
@@ -62,8 +82,8 @@ public static partial class SqlBuilderExtensions
 
         var cleanSource = CleanKey(sourceKey);
         var cleanLocal = CleanKey(localKey);
-
         bool successfullyMapped = false;
+
         if (!string.IsNullOrEmpty(cleanSource) && !string.IsNullOrEmpty(cleanLocal))
         {
             if (builder.ScopedVariables.TryGetValue(sourceKey!, out var node) ||
@@ -86,9 +106,6 @@ public static partial class SqlBuilderExtensions
             }
         }
 
-        // =====================================================================
-        // CRITICAL RUNTIME GUARD CLAUSE
-        // =====================================================================
         if (!successfullyMapped && !string.IsNullOrEmpty(cleanSource))
         {
             throw new InvalidOperationException(
@@ -99,13 +116,16 @@ public static partial class SqlBuilderExtensions
         return builder;
     }
 
-    // =========================================================================
-    // 1. INLINE INJECTION OVERLOADS (Renamed from Subquery to Query)
-    // =========================================================================
-
     /// <summary>
     /// Captures the SQL written by <paramref name="action"/> into an isolated, strongly-typed <see cref="ISqlQuery{T}"/> scope.
     /// </summary>
+    /// <typeparam name="T">The model type representing the resulting query projection.</typeparam>
+    /// <param name="builder">The builder instance.</param>
+    /// <param name="dummyPoco">An uninitialized reference used to strongly type the query projection.</param>
+    /// <param name="action">The delegate action defining the query structure.</param>
+    /// <param name="alias">An optional explicit alias to use for this subquery.</param>
+    /// <param name="varName">The compiler-injected variable name used for scoping.</param>
+    /// <returns>A captured query fragment that can be interpolated back into the main stream.</returns>
     public static ISqlQuery<T> Query<T>(
         this SqlBuilder builder,
         T dummyPoco,
@@ -126,6 +146,13 @@ public static partial class SqlBuilderExtensions
     /// <summary>
     /// Wraps an existing standalone <see cref="ISqlQuery"/> into a strongly-typed <see cref="ISqlQuery{T}"/> contextual view.
     /// </summary>
+    /// <typeparam name="T">The model type representing the resulting query projection.</typeparam>
+    /// <param name="builder">The builder instance.</param>
+    /// <param name="dummyPoco">An uninitialized reference used to strongly type the query projection.</param>
+    /// <param name="existingQuery">The previously captured untyped query.</param>
+    /// <param name="alias">An optional explicit alias to use for this subquery.</param>
+    /// <param name="varName">The compiler-injected variable name used for scoping.</param>
+    /// <returns>A strongly-typed query fragment.</returns>
     public static ISqlQuery<T> Query<T>(
         this SqlBuilder builder,
         T dummyPoco,
@@ -142,13 +169,17 @@ public static partial class SqlBuilderExtensions
         return typedQuery;
     }
 
-    // =========================================================================
-    // 2. FLUENT CHAINING OVERLOADS (Renamed from Subquery to Query)
-    // =========================================================================
-
     /// <summary>
     /// Captures an isolated query block into an output variable while maintaining the builder's fluent chain.
     /// </summary>
+    /// <typeparam name="T">The model type representing the resulting query projection.</typeparam>
+    /// <param name="builder">The builder instance.</param>
+    /// <param name="dummyPoco">An uninitialized reference used to strongly type the query projection.</param>
+    /// <param name="capturedSubquery">The output parameter where the captured query will be assigned.</param>
+    /// <param name="action">The delegate action defining the query structure.</param>
+    /// <param name="alias">An optional explicit alias to use for this subquery.</param>
+    /// <param name="varName">The compiler-injected variable name used for scoping.</param>
+    /// <returns>The current builder instance for method chaining.</returns>
     public static SqlBuilder Query<T>(
         this SqlBuilder builder,
         T dummyPoco,
@@ -172,6 +203,13 @@ public static partial class SqlBuilderExtensions
     /// <summary>
     /// Fluently registers an existing query object into the current builder's scope as a strongly-typed entity view.
     /// </summary>
+    /// <typeparam name="T">The model type representing the resulting query projection.</typeparam>
+    /// <param name="builder">The builder instance.</param>
+    /// <param name="dummyPoco">An uninitialized reference mapped into the local scope.</param>
+    /// <param name="existingQuery">The previously captured untyped query to map.</param>
+    /// <param name="alias">An optional explicit alias to use for this subquery.</param>
+    /// <param name="varName">The compiler-injected variable name used for scoping.</param>
+    /// <returns>The current builder instance for method chaining.</returns>
     public static SqlBuilder Query<T>(
         this SqlBuilder builder,
         out T dummyPoco,
@@ -193,10 +231,16 @@ public static partial class SqlBuilderExtensions
         return builder;
     }
 
-    // =========================================================================
-    // 3. DYNAMIC METADATA RESOLUTION
-    // =========================================================================
-
+    /// <summary>
+    /// Dynamically constructs a column projection fragment from a string property name.
+    /// </summary>
+    /// <typeparam name="T">The entity type.</typeparam>
+    /// <param name="builder">The builder instance.</param>
+    /// <param name="dummyPoco">The scoped entity variable targeted for property lookup.</param>
+    /// <param name="propertyName">The name of the property to resolve.</param>
+    /// <param name="varName">The compiler-injected variable name representing the targeted entity.</param>
+    /// <returns>A structural fragment representing the resolved column projection.</returns>
+    /// <exception cref="ArgumentException">Thrown when the target variable name is not registered in the active builder scope.</exception>
     public static ISqlFragment Column<T>(
         this SqlBuilder builder,
         T dummyPoco,
@@ -204,7 +248,6 @@ public static partial class SqlBuilderExtensions
         [CallerArgumentExpression(nameof(dummyPoco))] string? varName = null)
     {
         string? cleanVarName = ExtractVariableName(varName);
-
         if (!string.IsNullOrEmpty(cleanVarName) && builder.ScopedVariables.TryGetValue(cleanVarName, out var entity))
         {
             ISqlEntityBase? entityBase = entity as ISqlEntityBase;
@@ -218,11 +261,10 @@ public static partial class SqlBuilderExtensions
                 var meta = SqlMetadataRegistry.GetMetadata(entityBase.ModelType);
                 var memberMeta = meta.Columns.Keys.FirstOrDefault(k => k.Name.Equals(propertyName, StringComparison.OrdinalIgnoreCase));
                 string physicalColumnName = memberMeta != null ? meta.Columns[memberMeta] : propertyName;
-
+                
                 return new SqlColumnReference(entityBase.Reference, physicalColumnName, propertyName);
             }
         }
-
         throw new ArgumentException($"Cannot resolve dynamic column '{propertyName}' because '{cleanVarName}' is not a registered entity in the current scope.");
     }
 }
