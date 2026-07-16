@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using SqlInterpol.Parsing;
 
@@ -208,7 +206,10 @@ public partial class SqlBuilder : ISqlEntityRegistry
     /// </summary>
     public SqlBuilder Template(out ISqlTemplate template, [InterpolatedStringHandlerArgument("")] ref SqlQueryInterpolatedStringHandler handler)
     {
+        #pragma warning disable SQLIA10
         template = Template(ref handler);
+        #pragma warning restore SQLIA10
+
         return this;
     }
 

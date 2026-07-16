@@ -5,7 +5,6 @@ using SqlInterpol.Parsing;
 
 namespace SqlInterpol.Benchmarks;
 
-// 🌟 THE JIT BYPASS EXTENSION 🌟
 // The AOT Analyzer explicitly looks for "Append" or "AppendLine".
 // By renaming the call to "AppendJit", the analyzer skips interception.
 public static class JitExtensions

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -24,28 +25,32 @@ public class StringColumnMismatchAnalyzer : DiagnosticAnalyzer
     {
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
         context.EnableConcurrentExecution();
-        context.RegisterSyntaxNodeAction(AnalyzeElementAccess, SyntaxKind.ElementAccessExpression);
+        context.RegisterSyntaxNodeAction(AnalyzeInvocation, SyntaxKind.InvocationExpression);
     }
 
-    private void AnalyzeElementAccess(SyntaxNodeAnalysisContext context)
+    private void AnalyzeInvocation(SyntaxNodeAnalysisContext context)
     {
-        var elementAccess = (ElementAccessExpressionSyntax)context.Node;
+        var invocation = (InvocationExpressionSyntax)context.Node;
+        if (invocation.Expression is not MemberAccessExpressionSyntax memberAccess) return;
 
-        // Must have exactly one string literal argument
-        if (elementAccess.ArgumentList.Arguments.Count != 1) return;
-        var argExpr = elementAccess.ArgumentList.Arguments[0].Expression;
+        // Only target specific dynamic lookup methods
+        var methodName = memberAccess.Name.Identifier.Text;
+        if (methodName != "Column" && methodName != "OrderBy" && methodName != "OrderByDescending") return;
+
+        if (invocation.ArgumentList.Arguments.Count == 0) return;
+        var argExpr = invocation.ArgumentList.Arguments[0].Expression;
+        
+        // We only care if they hardcoded a string. If they pass a variable, we assume they know what they are doing.
         if (!argExpr.IsKind(SyntaxKind.StringLiteralExpression)) return;
 
-        // Verify the indexer resolves to ISqlEntityBase.this[string] (non-generic overload)
-        var symbolInfo = context.SemanticModel.GetSymbolInfo(elementAccess, context.CancellationToken);
-        if (symbolInfo.Symbol is not IPropertySymbol indexerSymbol) return;
-        if (indexerSymbol.Parameters.Length != 1) return;
-        if (indexerSymbol.Parameters[0].Type.SpecialType != SpecialType.System_String) return;
-        if (indexerSymbol.ContainingType.Name != "ISqlEntityBase") return;
-        if (indexerSymbol.ContainingType.TypeArguments.Length != 0) return; // must be the non-generic interface
+        var symbolInfo = context.SemanticModel.GetSymbolInfo(invocation, context.CancellationToken);
+        if (symbolInfo.Symbol is not IMethodSymbol methodSymbol) return;
+
+        // Make sure it's being called on an ISqlEntityBase
+        if (!methodSymbol.ContainingType.AllInterfaces.Any(i => i.Name == "ISqlEntityBase")) return;
 
         // Extract T from ISqlEntityBase<T> on the receiver's type
-        var receiverType = context.SemanticModel.GetTypeInfo(elementAccess.Expression, context.CancellationToken).Type;
+        var receiverType = context.SemanticModel.GetTypeInfo(memberAccess.Expression, context.CancellationToken).Type;
         if (receiverType == null) return;
 
         ITypeSymbol? modelType = null;
@@ -59,8 +64,6 @@ public class StringColumnMismatchAnalyzer : DiagnosticAnalyzer
         }
         if (modelType == null) return;
 
-        // Build the set of valid column names for T:
-        // column name = [SqlColumn("name")].Name ?? PropertyName  (mirrors SqlMetadataRegistry)
         var validColumnNames = new HashSet<string>(System.StringComparer.Ordinal);
         foreach (var member in modelType.GetMembers())
         {
@@ -83,6 +86,7 @@ public class StringColumnMismatchAnalyzer : DiagnosticAnalyzer
         }
 
         var requestedName = (string)((LiteralExpressionSyntax)argExpr).Token.Value!;
+
         if (!validColumnNames.Contains(requestedName))
         {
             context.ReportDiagnostic(Diagnostic.Create(Rule, argExpr.GetLocation(), requestedName, modelType.Name));

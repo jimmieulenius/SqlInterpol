@@ -5,10 +5,7 @@
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
-    <!-- Required so ANTLR4 runtime DLL is copied to output alongside the analyzer DLL.
-         Roslyn's analyzer host resolves dependencies from the same directory. -->
-    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-
+    
     <NoWarn>$(NoWarn);RS2008</NoWarn>
   </PropertyGroup>
 
@@ -19,37 +16,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Antlr4.Runtime.Standard" Version="4.13.1" />
-    <PackageReference Include="Antlr4BuildTasks" Version="12.14.0" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" PrivateAssets="all" />
     <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.4" PrivateAssets="all" />
-  </ItemGroup>
-
-  <!-- <ItemGroup>
-    <Antlr4 Include="Grammars\PostgreSQLLexer.g4">
-      <Package>SqlInterpol.Analyzers.Grammars</Package>
-      <Visitor>False</Visitor>
-      <Listener>False</Listener>
-    </Antlr4>
-    
-    <Antlr4 Include="Grammars\PostgreSQLParser.g4">
-      <Package>SqlInterpol.Analyzers.Grammars</Package>
-      <Visitor>False</Visitor>
-      <Listener>False</Listener>
-    </Antlr4>
-  </ItemGroup> -->
-  <ItemGroup>
-    <Antlr4 Include="Grammars\SqlInterpolLexer.g4">
-      <Package>SqlInterpol.Analyzers.Grammars</Package>
-      <Visitor>False</Visitor>
-      <Listener>False</Listener>
-    </Antlr4>
-    
-    <Antlr4 Include="Grammars\SqlInterpolParser.g4">
-      <Package>SqlInterpol.Analyzers.Grammars</Package>
-      <Visitor>False</Visitor>
-      <Listener>False</Listener>
-    </Antlr4>
   </ItemGroup>
 
 </Project>
