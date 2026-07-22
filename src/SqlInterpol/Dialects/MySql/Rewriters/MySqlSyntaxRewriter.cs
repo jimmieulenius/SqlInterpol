@@ -1,18 +1,32 @@
-using SqlInterpol.Parsing;
-using SqlInterpol.Rewriters;
+using SqlInterpol.Configuration;
+using SqlInterpol.Pipeline;
+using SqlInterpol.Segments;
 
 namespace SqlInterpol.Dialects.MySql;
 
+/// <summary>
+/// A structural rewriter for MySQL and MariaDB that transforms standard upsert syntax into 
+/// <c>ON DUPLICATE KEY UPDATE</c>, manages deferred lock hints, and restructures multi-table updates.
+/// </summary>
 public class MySqlSyntaxRewriter : SqlSyntaxRewriterBase
 {
     private SqlLockMode? _deferredLock;
 
+    /// <inheritdoc />
+    public override IReadOnlyList<SqlSegment> Rewrite(IReadOnlyList<SqlSegment> segments, ISqlContext context)
+    {
+        _deferredLock = null; // Ensure clean state per pass across multiple queries
+        return base.Rewrite(segments, context);
+    }
+
+    /// <inheritdoc />
     protected override bool TryRewriteLock(SqlLockFragment lockFrag, IReadOnlyList<SqlSegment> segments, List<SqlSegment> rewritten, ref int i)
     {
         _deferredLock = lockFrag.Mode;
         return true; 
     }
 
+    /// <inheritdoc />
     protected override bool TryRewriteUpsert(SqlSegment segment, IReadOnlyList<SqlSegment> segments, List<SqlSegment> rewritten, ref int i)
     {
         bool isOnConflict = segment.HasTag(SqlSegmentTag.OnConflictKeyword) || 
@@ -52,13 +66,16 @@ public class MySqlSyntaxRewriter : SqlSyntaxRewriterBase
         return false;
     }
 
+    /// <inheritdoc />
     protected override void ApplyDeferredTransforms(List<SqlSegment> rewritten, ISqlContext context)
     {
         if (_deferredLock == SqlLockMode.Update) rewritten.Add(new SqlSegment(SqlSegmentType.Literal, "\nFOR UPDATE"));
         else if (_deferredLock == SqlLockMode.Share) rewritten.Add(new SqlSegment(SqlSegmentType.Literal, "\nFOR SHARE"));
+        
         base.ApplyDeferredTransforms(rewritten, context);
     }
 
+    /// <inheritdoc />
     protected override SqlMultiTableUpdateFragment? CreateMultiTableUpdate(SqlUpdateAsFragment upAsFrag, SqlSetFragment setFrag, List<SqlSegment> rewritten, int whereKeywordIdx, ISqlContext context)
     {
         var targetEntity = upAsFrag.Target;

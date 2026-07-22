@@ -1,6 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using SqlInterpol.Configuration;
-using SqlInterpol.Processing;
+using SqlInterpol.Pipeline;
 
 namespace SqlInterpol;
 

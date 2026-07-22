@@ -1,4 +1,3 @@
-using SqlInterpol.Execution;
 using SqlInterpol.Segments;
 
 namespace SqlInterpol;

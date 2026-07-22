@@ -1,7 +1,9 @@
+using SqlInterpol.Configuration;
 using SqlInterpol.Dialects.SqlServer;
-using SqlInterpol.Dialects;
+using SqlInterpol.Schema;
+using SqlInterpol.Segments;
 
-namespace SqlInterpol;
+namespace SqlInterpol.Dialects;
 
 /// <summary>
 /// The SQL Server dialect: bracket identifiers, OFFSET/FETCH paging, WITH (UPDLOCK) row locking,
@@ -44,7 +46,7 @@ public class SqlServerDialect : SqlDialectBase
     public override int QueryParametersMaxCount => 2099;
 
     /// <summary>
-    /// Injects the SQL Server-specific syntax rewriter into the compilation pipeline.
+    /// Injects the SQL Server-specific syntax rewriter into the segment processing pipeline.
     /// The underlying <see cref="SqlRewriterCollection"/> automatically guarantees it is only added once.
     /// </summary>
     public override SqlInterpolOptions GetDefaultOptions()

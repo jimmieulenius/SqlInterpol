@@ -1,7 +1,11 @@
-using SqlInterpol.Dialects;
+using SqlInterpol.Configuration;
 
-namespace SqlInterpol;
+namespace SqlInterpol.Dialects;
 
+/// <summary>
+/// A generic SQL dialect that uses backticks for identifier quoting.
+/// Used as a fallback or baseline for MySQL/MariaDB-like environments.
+/// </summary>
 [SqlDialect(OpenQuote = _openQuote, CloseQuote = _closeQuote)]
 public sealed class GenericBacktickDialect : SqlDialectBase
 {

@@ -1,18 +1,27 @@
-using SqlInterpol.Parsing;
-using SqlInterpol.Rewriters;
+using System;
+using System.Collections.Generic;
+using SqlInterpol.Configuration;
+using SqlInterpol.Pipeline;
+using SqlInterpol.Segments;
 
 namespace SqlInterpol.Dialects.Firebird;
 
+/// <summary>
+/// A structural rewriter for Firebird that handles query pagination (FIRST/SKIP) 
+/// and safely repositions deferred locking hints (WITH LOCK) to the end of the query.
+/// </summary>
 public class FirebirdSyntaxRewriter : SqlSyntaxRewriterBase
 {
     private SqlLockMode? _deferredLock;
 
+    /// <inheritdoc />
     public override IReadOnlyList<SqlSegment> Rewrite(IReadOnlyList<SqlSegment> segments, ISqlContext context)
     {
-        _deferredLock = null; // Ensure clean state per pass
+        _deferredLock = null; // Ensure clean state per pass across multiple queries
         return base.Rewrite(segments, context);
     }
 
+    /// <inheritdoc />
     protected override bool TryRewriteLock(SqlLockFragment lockFrag, IReadOnlyList<SqlSegment> segments, List<SqlSegment> rewritten, ref int i)
     {
         if (lockFrag.Mode == SqlLockMode.Update)
@@ -23,6 +32,7 @@ public class FirebirdSyntaxRewriter : SqlSyntaxRewriterBase
         return false;
     }
 
+    /// <inheritdoc />
     protected override bool TryRewritePaging(SqlSegment segment, IReadOnlyList<SqlSegment> segments, List<SqlSegment> rewritten, ref int i)
     {
         if (!segment.HasTag(SqlSegmentTag.Paging) || !SqlRewriterHelpers.TryExtractPagingParameters(segments, i, out var limitParam, out var offsetParam, out int nextIndex)) return false;
@@ -42,6 +52,7 @@ public class FirebirdSyntaxRewriter : SqlSyntaxRewriterBase
         return true;
     }
 
+    /// <inheritdoc />
     protected override void ApplyDeferredTransforms(List<SqlSegment> rewritten, ISqlContext context)
     {
         if (_deferredLock == SqlLockMode.Update) rewritten.Add(new SqlSegment(SqlSegmentType.Literal, "\nWITH LOCK"));

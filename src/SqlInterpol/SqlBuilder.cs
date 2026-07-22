@@ -1,8 +1,7 @@
 using System.Runtime.CompilerServices;
 using SqlInterpol.Configuration;
-using SqlInterpol.Dialects;
 using SqlInterpol.Execution;
-using SqlInterpol.Processing;
+using SqlInterpol.Pipeline;
 using SqlInterpol.Schema;
 using SqlInterpol.Segments;
 
@@ -135,7 +134,7 @@ public partial class SqlBuilder : ISqlEntityRegistry
 
     /// <summary>
     /// Compiles an interpolated SQL string into a high-performance, reusable template.
-    /// The resulting template bypasses stream compilation during execution, natively injecting arguments in O(1) time.
+    /// The resulting template bypasses stream processing during execution, natively injecting arguments in O(1) time.
     /// </summary>
     /// <param name="handler">The compiler-routed interpolation handler tracking the token stream.</param>
     /// <returns>The compiled SQL template.</returns>
@@ -145,11 +144,11 @@ public partial class SqlBuilder : ISqlEntityRegistry
         handler.TransferSegments(segments);
 
         var preprocessor = Context.Options.Preprocessor ?? SqlSegmentPreprocessor.Instance;
-        var pipeline = new SqlSegmentPipeline(preprocessor, Context.Options.Rewriters);
+        var pipeline = new SqlPipeline(preprocessor, Context.Options.Rewriters);
         
         var compiledSegments = pipeline.Process(segments, Context);
 
-        var vsb = new SqlInterpol.Processing.ValueStringBuilder(stackalloc char[2048]);
+        var vsb = new ValueStringBuilder(stackalloc char[2048]);
         try
         {
             var templateArgs = new List<SqlTemplateArgument>();
@@ -295,11 +294,10 @@ public partial class SqlBuilder : ISqlEntityRegistry
         var finalInputSegments = resolvedSegments != null ? (IReadOnlyList<SqlSegment>)resolvedSegments : segmentsToBuild;
 
         var preprocessor = Context.Options.Preprocessor ?? SqlSegmentPreprocessor.Instance;
-        var pipeline = new SqlSegmentPipeline(preprocessor, Context.Options.Rewriters);
+        var pipeline = new SqlPipeline(preprocessor, Context.Options.Rewriters);
         
         var compiledSegments = pipeline.Process(finalInputSegments, Context);
 
-        var errors = new List<string>();
         foreach (var segment in compiledSegments)
         {
             SqlFeature? requiredFeature = null;
@@ -343,16 +341,11 @@ public partial class SqlBuilder : ISqlEntityRegistry
 
             if (requiredFeature.HasValue && !Context.Dialect.SupportedFeatures.Contains(requiredFeature.Value))
             {
-                errors.Add($"'{featureName}' is not supported by {Context.Dialect.Kind}.");
+                throw new SqlDialectException(Context.Dialect.Kind, featureName!);
             }
         }
 
-        if (errors.Count > 0)
-        {
-            throw new SqlDialectException($"Dialect capabilities validation failed:{Environment.NewLine}- " + string.Join($"{Environment.NewLine}- ", errors));
-        }
-
-        var vsb = new SqlInterpol.Processing.ValueStringBuilder(stackalloc char[2048]);
+        var vsb = new ValueStringBuilder(stackalloc char[2048]);
 
         try
         {
@@ -382,6 +375,7 @@ public partial class SqlBuilder : ISqlEntityRegistry
         if (value is ISqlEntityBase entity) 
             return new SqlSegment(SqlSegmentType.Unresolved, entity);
 
+        // Explicit structural fragments bypass parameterization
         if (value is ISqlFragment fragment) 
             return new SqlSegment(SqlSegmentType.Raw, fragment);
 

@@ -1,10 +1,10 @@
-using SqlInterpol.Dialects;
+using SqlInterpol.Configuration;
 
-namespace SqlInterpol;
+namespace SqlInterpol.Dialects;
 
 /// <summary>
 /// Represents the standard ANSI SQL dialect. 
-/// Used as the default engine for compiling vendor-neutral templates.
+/// Used as the default engine for processing and rendering vendor-neutral templates.
 /// </summary>
 [SqlDialect(OpenQuote = _openQuote, CloseQuote = _closeQuote)]
 public class AnsiDialect : SqlDialectBase

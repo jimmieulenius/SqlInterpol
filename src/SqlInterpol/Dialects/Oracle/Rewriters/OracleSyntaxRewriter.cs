@@ -1,5 +1,6 @@
-using SqlInterpol.Parsing;
-using SqlInterpol.Rewriters;
+using SqlInterpol.Configuration;
+using SqlInterpol.Pipeline;
+using SqlInterpol.Segments;
 
 namespace SqlInterpol.Dialects.Oracle;
 
@@ -11,6 +12,12 @@ namespace SqlInterpol.Dialects.Oracle;
 public class OracleSyntaxRewriter : SqlSyntaxRewriterBase
 {
     private SqlLockMode? _deferredLock;
+
+    public override IReadOnlyList<SqlSegment> Rewrite(IReadOnlyList<SqlSegment> segments, ISqlContext context)
+    {
+        _deferredLock = null; // Ensure clean state per pass across multiple queries
+        return base.Rewrite(segments, context);
+    }
 
     // Activates the alias dropping routine in the base class!
     protected override bool DropTableAliasAsKeyword => true;

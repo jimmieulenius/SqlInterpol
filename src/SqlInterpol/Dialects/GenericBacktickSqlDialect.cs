@@ -1,3 +1,5 @@
+using SqlInterpol.Configuration;
+
 namespace SqlInterpol.Dialects;
 
 /// <summary>
@@ -10,9 +12,15 @@ public sealed class GenericBacktickSqlDialect : SqlDialectBase
     private const string _openQuote = "`";
     private const string _closeQuote = "`";
 
+    /// <inheritdoc />
     public override SqlDialectKind Kind => SqlDialectKind.GenericBacktick;
     
+    /// <inheritdoc />
     public override string OpenQuote => _openQuote;
+    
+    /// <inheritdoc />
     public override string CloseQuote => _closeQuote;
+    
+    /// <inheritdoc />
     public override string ParameterPrefix => "@"; 
 }

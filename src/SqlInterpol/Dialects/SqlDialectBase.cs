@@ -1,4 +1,7 @@
-using System.Text.RegularExpressions;
+using System.Text;
+using SqlInterpol.Configuration;
+using SqlInterpol.Pipeline;
+using SqlInterpol.Segments;
 
 namespace SqlInterpol.Dialects;
 
@@ -181,7 +184,7 @@ public abstract class SqlDialectBase : ISqlDialect
     protected virtual string RenderUpdateSubquery(SqlUpdateSubqueryFragment fragment, ISqlContext context)
     {
         var quotedAlias = QuoteIdentifier(fragment.Alias);
-        var subquerySql = Regex.Replace(fragment.Subquery.ToSql(context), @"\s+", " ").Trim();
+        var subquerySql = CollapseWhitespace(fragment.Subquery.ToSql(context));
         
         var setSql = fragment.SetClause.ToSql(context).Trim();
         string setPrefix = setSql.StartsWith("SET", StringComparison.OrdinalIgnoreCase) ? "" : "SET ";
@@ -224,7 +227,7 @@ public abstract class SqlDialectBase : ISqlDialect
             _ => fragment.TargetTable.ToString()!
         };
 
-        var vsb = new System.Text.StringBuilder();
+        var vsb = new StringBuilder();
         for (int i = 0; i < fragment.SourceSegments.Count; i++)
         {
             if (i == fragment.IntoSegmentIndex) vsb.Append($"{Environment.NewLine}INTO {target}");
@@ -233,5 +236,36 @@ public abstract class SqlDialectBase : ISqlDialect
         }
         if (fragment.IntoSegmentIndex >= fragment.SourceSegments.Count) vsb.Append($"{Environment.NewLine}INTO {target}");
         return vsb.ToString();
+    }
+    
+    /// <summary>
+    /// Highly efficient helper to collapse multiple contiguous whitespace characters into a single space.
+    /// Replaces the need for <c>Regex.Replace(..., @"\s+", " ")</c>.
+    /// </summary>
+    protected static string CollapseWhitespace(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return string.Empty;
+        
+        var sb = new StringBuilder(input.Length);
+        bool inWhitespace = false;
+        
+        foreach (char c in input)
+        {
+            if (char.IsWhiteSpace(c))
+            {
+                if (!inWhitespace)
+                {
+                    sb.Append(' ');
+                    inWhitespace = true;
+                }
+            }
+            else
+            {
+                sb.Append(c);
+                inWhitespace = false;
+            }
+        }
+        
+        return sb.ToString().Trim();
     }
 }

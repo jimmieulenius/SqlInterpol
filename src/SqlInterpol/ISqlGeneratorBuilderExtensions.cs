@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using SqlInterpol.Configuration;
+using SqlInterpol.Infrastructure;
 using SqlInterpol.Segments;
 
 namespace SqlInterpol;

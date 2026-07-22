@@ -1,7 +1,8 @@
-using SqlInterpol.Dialects;
+using SqlInterpol.Configuration;
 using SqlInterpol.Dialects.PostgreSql;
+using SqlInterpol.Segments;
 
-namespace SqlInterpol; // Root namespace for instant discoverability
+namespace SqlInterpol.Dialects;
 
 /// <summary>
 /// The PostgreSQL dialect: <c>$N</c>-style parameters, double-quote identifiers, and dialect-specific
@@ -46,7 +47,7 @@ public class PostgreSqlDialect : SqlDialectBase
     public override int QueryParametersMaxCount => 65535;
 
     /// <summary>
-    /// Injects the PostgreSQL-specific syntax rewriter into the compilation pipeline.
+    /// Injects the PostgreSQL-specific syntax rewriter into the segment processing pipeline.
     /// </summary>
     public override SqlInterpolOptions GetDefaultOptions()
     {

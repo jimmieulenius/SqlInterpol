@@ -1,8 +1,10 @@
 using System.Text.RegularExpressions;
+using SqlInterpol.Configuration;
 using SqlInterpol.Dialects.Oracle;
-using SqlInterpol.Dialects;
+using SqlInterpol.Pipeline;
+using SqlInterpol.Segments;
 
-namespace SqlInterpol;
+namespace SqlInterpol.Dialects;
 
 /// <summary>
 /// The Oracle dialect: colon-prefixed parameters, double-quote identifiers, OFFSET/FETCH paging,
@@ -42,7 +44,7 @@ public class OracleDialect : SqlDialectBase
     public override int QueryParametersMaxCount => 65535;
 
     /// <summary>
-    /// Injects the Oracle-specific syntax rewriter into the compilation pipeline.
+    /// Injects the Oracle-specific syntax rewriter into the segment processing pipeline.
     /// </summary>
     public override SqlInterpolOptions GetDefaultOptions()
     {

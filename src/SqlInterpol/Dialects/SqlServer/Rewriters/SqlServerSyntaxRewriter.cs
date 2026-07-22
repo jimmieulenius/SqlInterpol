@@ -1,14 +1,27 @@
-using SqlInterpol.Parsing;
-using SqlInterpol.Rewriters;
+using SqlInterpol.Configuration;
+using SqlInterpol.Pipeline;
+using SqlInterpol.Schema;
+using SqlInterpol.Segments;
 
 namespace SqlInterpol.Dialects.SqlServer;
 
+/// <summary>
+/// A structural rewriter for SQL Server that transpiles Boolean/concatenation operators,
+/// repositions locking hints (WITH (UPDLOCK, etc.)), emulates RETURNING with OUTPUT inserted.*,
+/// transforms standard upserts into MERGE statements, and handles OFFSET/FETCH paging.
+/// </summary>
 public class SqlServerSyntaxRewriter : SqlSyntaxRewriterBase
 {
+    /// <inheritdoc />
     protected override string TranspileTrueKeyword(string value) => "1";
+    
+    /// <inheritdoc />
     protected override string TranspileFalseKeyword(string value) => "0";
+    
+    /// <inheritdoc />
     protected override string TranspileConcatOperator(string value) => "+";
 
+    /// <inheritdoc />
     protected override string ProcessLiteral(string literal)
     {
         if (literal.Contains("WITH RECURSIVE", StringComparison.OrdinalIgnoreCase)) 
@@ -16,6 +29,7 @@ public class SqlServerSyntaxRewriter : SqlSyntaxRewriterBase
         return literal;
     }
 
+    /// <inheritdoc />
     protected override bool TryRewriteLock(SqlLockFragment lockFrag, IReadOnlyList<SqlSegment> segments, List<SqlSegment> rewritten, ref int i)
     {
         int lastTableReferenceIndex = rewritten.FindLastIndex(s => s.Type == SqlSegmentType.Reference && s.Value is ISqlEntityBase);
@@ -43,6 +57,7 @@ public class SqlServerSyntaxRewriter : SqlSyntaxRewriterBase
         return false;
     }
 
+    /// <inheritdoc />
     protected override bool TryRewriteUpsert(SqlSegment segment, IReadOnlyList<SqlSegment> segments, List<SqlSegment> rewritten, ref int i)
     {
         bool isOnConflict = segment.HasTag(SqlSegmentTag.OnConflictKeyword) || 
@@ -93,6 +108,7 @@ public class SqlServerSyntaxRewriter : SqlSyntaxRewriterBase
         return false;
     }
 
+    /// <inheritdoc />
     protected override bool TryRewriteReturning(SqlSegment segment, IReadOnlyList<SqlSegment> segments, List<SqlSegment> rewritten, ref int i)
     {
         if (!segment.HasTag(SqlSegmentTag.ReturningKeyword)) return false;
@@ -139,6 +155,7 @@ public class SqlServerSyntaxRewriter : SqlSyntaxRewriterBase
         return false;
     }
 
+    /// <inheritdoc />
     protected override bool TryRewritePaging(SqlSegment segment, IReadOnlyList<SqlSegment> segments, List<SqlSegment> rewritten, ref int i)
     {
         if (!segment.HasTag(SqlSegmentTag.Paging) || !SqlRewriterHelpers.TryExtractPagingNodes(segments, i, out var limitNode, out var offsetNode, out int nextIndex, out string trailingText)) 
@@ -165,6 +182,7 @@ public class SqlServerSyntaxRewriter : SqlSyntaxRewriterBase
         return true;
     }
 
+    /// <inheritdoc />
     protected override SqlMultiTableUpdateFragment? CreateMultiTableUpdate(SqlUpdateAsFragment upAsFrag, SqlSetFragment setFrag, List<SqlSegment> rewritten, int whereKeywordIdx, ISqlContext context)
     {
         var targetEntity = upAsFrag.Target;

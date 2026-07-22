@@ -1,8 +1,10 @@
 using System.Text.RegularExpressions;
+using SqlInterpol.Configuration;
 using SqlInterpol.Dialects.MySql;
-using SqlInterpol.Dialects;
+using SqlInterpol.Pipeline;
+using SqlInterpol.Segments;
 
-namespace SqlInterpol;
+namespace SqlInterpol.Dialects;
 
 /// <summary>
 /// The MySQL/MariaDB dialect: backtick identifiers, <c>@pN</c> parameters, ON DUPLICATE KEY UPDATE
@@ -43,7 +45,7 @@ public class MySqlDialect : SqlDialectBase
     public override int QueryParametersMaxCount => 65535;
 
     /// <summary>
-    /// Injects the MySQL-specific syntax rewriter into the compilation pipeline.
+    /// Injects the MySQL-specific syntax rewriter into the segment processing pipeline.
     /// </summary>
     public override SqlInterpolOptions GetDefaultOptions()
     {

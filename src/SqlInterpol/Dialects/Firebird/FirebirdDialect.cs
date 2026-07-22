@@ -1,8 +1,9 @@
 using System.Text.RegularExpressions;
-using SqlInterpol.Dialects;
+using SqlInterpol.Configuration;
 using SqlInterpol.Dialects.Firebird;
+using SqlInterpol.Segments;
 
-namespace SqlInterpol;
+namespace SqlInterpol.Dialects;
 
 /// <summary>
 /// The Firebird dialect: positional parameters, strict maximum parameter limits,
