@@ -1,5 +1,6 @@
-
-using SqlInterpol.Parsing;
+using SqlInterpol.Configuration;
+using SqlInterpol.Schema;
+using SqlInterpol.Segments;
 
 namespace SqlInterpol.Test.Models;
 

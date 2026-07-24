@@ -1,22 +1,16 @@
-using SqlInterpol.Segments;
-
 namespace SqlInterpol.Schema;
 
 /// <summary>
-/// Represents a registered database entity (like a table or view) within a SQL query.
+/// Represents a fully concrete, mapped SQL entity.
 /// </summary>
-public interface ISqlEntity : ISqlFragment
+public interface ISqlEntity : ISqlEntityBase
 {
-    /// <summary>
-    /// Gets the CLR model type that this entity maps to.
-    /// </summary>
-    System.Type ModelType { get; }
 }
 
 /// <summary>
-/// Represents a registered database entity bound to a specific CLR model type.
+/// Represents a fully concrete SQL entity bound to a specific CLR model type.
 /// </summary>
 /// <typeparam name="T">The CLR model type.</typeparam>
-public interface ISqlEntity<T> : ISqlEntity
+public interface ISqlEntity<T> : ISqlEntityBase<T>, ISqlEntity
 {
 }

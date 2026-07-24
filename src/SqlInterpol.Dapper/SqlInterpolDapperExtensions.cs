@@ -1,5 +1,7 @@
 ﻿using System.Data;
 using Dapper;
+using SqlInterpol.Configuration;
+using SqlInterpol.Dialects;
 
 namespace SqlInterpol.Dapper;
 

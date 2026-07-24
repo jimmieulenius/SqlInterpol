@@ -1,8 +1,6 @@
-using System;
-using System.Linq;
+using SqlInterpol.Configuration;
 using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
-using Xunit;
 
 namespace SqlInterpol.Test;
 

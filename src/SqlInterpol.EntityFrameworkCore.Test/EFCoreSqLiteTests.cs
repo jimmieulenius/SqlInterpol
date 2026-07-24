@@ -1,6 +1,7 @@
 ﻿using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using SqlInterpol.EFCore;
+using SqlInterpol.Schema;
 
 namespace SqlInterpol.IntegrationTests;
 

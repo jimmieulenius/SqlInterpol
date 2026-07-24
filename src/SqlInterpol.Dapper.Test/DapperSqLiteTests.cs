@@ -2,6 +2,7 @@
 using Microsoft.Data.Sqlite;
 using SqlInterpol;
 using SqlInterpol.Dapper;
+using SqlInterpol.Schema;
 
 namespace SqlInterpol.IntegrationTests;
 

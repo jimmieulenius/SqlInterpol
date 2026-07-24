@@ -1,4 +1,6 @@
-    using SqlInterpol.Configuration;
+using System;
+using System.Collections.Generic;
+using SqlInterpol.Configuration;
 using SqlInterpol.Schema;
 using SqlInterpol.Segments;
 
@@ -190,7 +192,7 @@ public class SqlCoreSyntaxRewriter : ISqlSegmentRewriter
                     var targetEntity = (ISqlEntityBase)rewritten[targetIdx].Value!;
 
                     if (targetEntity is not ISqlQueryFragment && !context.Dialect.SupportedFeatures.Contains(SqlFeature.DeleteAs)) 
-                        throw new SqlDialectException($"'DELETE' with a target table alias is not supported by {context.Dialect.Kind}.");
+                        throw new SqlDialectException(context.Dialect.Kind.ToString(), "DELETE AS");
 
                     string delText = rewritten[delIdx].Value?.ToString() ?? "";
                     int deleteKeywordIdx = delText.LastIndexOf("DELETE", StringComparison.OrdinalIgnoreCase);
@@ -208,7 +210,7 @@ public class SqlCoreSyntaxRewriter : ISqlSegmentRewriter
                 }
                 else if (!context.Dialect.SupportedFeatures.Contains(SqlFeature.DeleteAs))
                 {
-                    throw new SqlDialectException($"'DELETE' with a target table alias is not supported by {context.Dialect.Kind}.");
+                    throw new SqlDialectException(context.Dialect.Kind.ToString(), "DELETE AS");
                 }
             }
             else if (segment.HasTag(SqlSegmentTag.UpdateAsKeyword))
@@ -226,7 +228,7 @@ public class SqlCoreSyntaxRewriter : ISqlSegmentRewriter
                     var targetEntity = (ISqlEntityBase)rewritten[targetIdx].Value!;
 
                     if (targetEntity is not ISqlQueryFragment && !context.Dialect.SupportedFeatures.Contains(SqlFeature.UpdateAs)) 
-                        throw new SqlDialectException($"'UPDATE' with a target table alias is not supported by {context.Dialect.Kind}.");
+                        throw new SqlDialectException(context.Dialect.Kind.ToString(), "UPDATE AS");
 
                     string updateText = rewritten[localUpdateIdx].Value?.ToString() ?? "";
                     int updateKeywordIdx = updateText.LastIndexOf("UPDATE", StringComparison.OrdinalIgnoreCase);
@@ -244,7 +246,7 @@ public class SqlCoreSyntaxRewriter : ISqlSegmentRewriter
                 }
                 else if (!context.Dialect.SupportedFeatures.Contains(SqlFeature.UpdateAs))
                 {
-                    throw new SqlDialectException($"'UPDATE' with a target table alias is not supported by {context.Dialect.Kind}.");
+                    throw new SqlDialectException(context.Dialect.Kind.ToString(), "UPDATE AS");
                 }
             }
 

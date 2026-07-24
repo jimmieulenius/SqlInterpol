@@ -1,7 +1,9 @@
 using System.Text.RegularExpressions;
-using SqlInterpol.Parsing;
 using SqlInterpol.Test.Models;
 using SqlInterpol.Test.Dialects;
+using SqlInterpol.Configuration;
+using SqlInterpol.Pipeline;
+using SqlInterpol.Segments;
 
 namespace SqlInterpol.Test;
 
@@ -95,7 +97,7 @@ public class CustomRewriterTests
 
 public class SoftDeleteRewriter : ISqlSegmentRewriter
 {
-    public bool IsApplicable(ISqlCompilationState state) => state.HasTag(SqlSegmentTag.DeleteKeyword);
+    public bool IsApplicable(ISqlPipelineState state) => state.HasTag(SqlSegmentTag.DeleteKeyword);
 
     public IReadOnlyList<SqlSegment> Rewrite(IReadOnlyList<SqlSegment> segments, ISqlContext context)
     {

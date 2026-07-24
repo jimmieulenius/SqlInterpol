@@ -1,5 +1,8 @@
+using System;
+using System.Collections.Generic;
 using System.Text;
 using SqlInterpol.Configuration;
+using SqlInterpol.Pipeline;
 using SqlInterpol.Schema;
 
 namespace SqlInterpol.Segments;
@@ -72,8 +75,7 @@ public class SqlNestedQueryFragment : ISqlQueryFragment, ISqlEntityBase, ISqlSeg
         if (mode == SqlRenderMode.AsAlias) return escapedAlias != null ? $"{SqlKeyword.As.Value} {escapedAlias}" : string.Empty;
 
         var sb = new StringBuilder();
-        
-        var renderer = context.Renderer;
+        var renderer = context.Options?.Renderer ?? SqlSegmentRenderer.Instance;
 
         for (int i = 0; i < Segments.Count; i++)
         {

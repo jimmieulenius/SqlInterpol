@@ -1,7 +1,8 @@
+using SqlInterpol.Schema;
 
 namespace SqlInterpol.Test.Models;
 
-[SqlTable("Orders", Schema = "dbo")]
+[SqlTable(name: "Orders", schema: "dbo")]
     public record OrderWithIgnoreModel
     {
         public int Id { get; init; }

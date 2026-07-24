@@ -1,9 +1,11 @@
+using SqlInterpol.Schema;
+
 namespace SqlInterpol.Test.Models;
 
 public enum ProductStatus { OutOfStock = 0, Available = 1 }
 public enum ProductCategoryType { Electronics = 1, Furniture = 2 }
 
-[SqlTable("tbl_complex_products")]
+[SqlTable(name: "tbl_complex_products")]
 public class ComplexProduct
 {
     public int Id { get; set; }

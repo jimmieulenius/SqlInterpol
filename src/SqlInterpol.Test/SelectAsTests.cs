@@ -1,5 +1,7 @@
 using SqlInterpol.Test.Models;
 using SqlInterpol.Test.Dialects;
+using SqlInterpol.Schema;
+using SqlInterpol.Configuration;
 
 namespace SqlInterpol.Test;
 

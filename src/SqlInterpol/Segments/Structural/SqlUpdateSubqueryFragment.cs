@@ -1,5 +1,4 @@
 using SqlInterpol.Configuration;
-using SqlInterpol.Schema;
 
 namespace SqlInterpol.Segments;
 
@@ -10,11 +9,11 @@ namespace SqlInterpol.Segments;
 /// <param name="alias">The assigned alias.</param>
 /// <param name="setClause">The SET clause.</param>
 /// <param name="whereClause">The optional WHERE clause.</param>
-public class SqlUpdateSubqueryFragment(ISqlQuery subquery, string alias, ISqlFragment setClause, ISqlFragment? whereClause) 
+public class SqlUpdateSubqueryFragment(ISqlQueryFragment subquery, string alias, ISqlFragment setClause, ISqlFragment? whereClause) 
     : ISqlFragment
 {
     /// <summary>Gets the inline subquery.</summary>
-    public ISqlQuery Subquery { get; } = subquery;
+    public ISqlQueryFragment Subquery { get; } = subquery;
 
     /// <summary>Gets the assigned alias.</summary>
     public string Alias { get; } = alias;

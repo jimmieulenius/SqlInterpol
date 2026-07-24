@@ -1,3 +1,4 @@
+using SqlInterpol.Configuration;
 using SqlInterpol.Test.Dialects;
 
 namespace SqlInterpol.Test.Helpers;

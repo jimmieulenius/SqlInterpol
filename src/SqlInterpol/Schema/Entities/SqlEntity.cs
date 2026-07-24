@@ -6,26 +6,20 @@ namespace SqlInterpol;
 
 /// <summary>
 /// Abstract base for concrete SQL entity implementations (<see cref="SqlTable{T}"/>, <see cref="SqlView{T}"/>),
-/// providing name, schema, alias management, and mode-aware SQL rendering.[cite: 3]
+/// providing name, schema, alias management, and mode-aware SQL rendering.
 /// </summary>
 /// <typeparam name="T">The CLR type mapped to this SQL entity.</typeparam>
 public abstract class SqlEntity<T> : SqlEntityBase<T>, ISqlEntity<T>
 {
     /// <summary>Gets the physical table or view name.</summary>
     public string Name { get; }
-
+    
     /// <summary>Gets the schema that owns this entity, or <see langword="null"/> for the default schema.</summary>
     public string? Schema { get; }
 
     /// <summary>
-    /// Initializes the entity with a physical name, optional schema, and optional alias.[cite: 3]
+    /// Initializes the entity with a physical name, optional schema, and optional alias.
     /// </summary>
-    /// <param name="name">The physical table or view name.</param>
-    /// <param name="schema">The schema, or <see langword="null"/> to omit schema qualification.</param>
-    /// <param name="alias">
-    /// The SQL alias for this entity in query clauses. When provided, it is quoted by default.
-    /// When <see langword="null"/>, the CLR type name is used as the fallback alias.[cite: 3]
-    /// </param>
     protected SqlEntity(string name, string? schema = null, string? alias = null)
     {
         Name = name;
@@ -35,14 +29,14 @@ public abstract class SqlEntity<T> : SqlEntityBase<T>, ISqlEntity<T>
         { 
             Alias = alias,
             FallbackAlias = typeof(T).Name,
-            IsAliasQuoted = !string.IsNullOrWhiteSpace(alias)
+            IsAliasQuoted = true // Always quote auto/fallback aliases for safety
         };
         
         Declaration = new SqlDeclaration(this);
     }
 
     /// <summary>
-    /// Renders this entity to a SQL string according to the specified <paramref name="mode"/>.[cite: 3]
+    /// Renders this entity to a SQL string according to the specified <paramref name="mode"/>.
     /// </summary>
     public override string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
     {
@@ -51,15 +45,15 @@ public abstract class SqlEntity<T> : SqlEntityBase<T>, ISqlEntity<T>
             SqlRenderMode.Declaration => RenderDeclaration(context),
             
             SqlRenderMode.BaseName => Role == SqlEntityRole.Cte 
-                ? context.Dialect.QuoteIdentifier(Name) // CTEs are strictly schema-less[cite: 3]
+                ? context.Dialect.QuoteIdentifier(Name) // CTEs are strictly schema-less
                 : context.Dialect.QuoteEntityName(Name, Schema),
-            
+                
             SqlRenderMode.AliasOnly => string.IsNullOrWhiteSpace(Reference.Alias) 
-                ? string.Empty 
+                ? (string.IsNullOrWhiteSpace(Reference.FallbackAlias) ? string.Empty : (Reference.IsAliasQuoted ? context.Dialect.QuoteIdentifier(Reference.FallbackAlias) : Reference.FallbackAlias))
                 : Reference.IsAliasQuoted
                     ? context.Dialect.QuoteIdentifier(Reference.Alias)
                     : Reference.Alias,
-            
+                    
             _ => RenderReference(context)
         };
     }
@@ -69,26 +63,33 @@ public abstract class SqlEntity<T> : SqlEntityBase<T>, ISqlEntity<T>
         var baseName = Role == SqlEntityRole.Cte 
             ? context.Dialect.QuoteIdentifier(Name)
             : context.Dialect.QuoteEntityName(Name, Schema);
+            
+        // Incorporate FallbackAlias seamlessly at runtime
+        var aliasToUse = Reference.Alias ?? Reference.FallbackAlias;
         
-        if (string.IsNullOrWhiteSpace(Reference.Alias))
+        if (string.IsNullOrWhiteSpace(aliasToUse))
         {
             return baseName;
         }
+
         string finalAlias = Reference.IsAliasQuoted
-            ? context.Dialect.QuoteIdentifier(Reference.Alias)
-            : Reference.Alias;
-        
+            ? context.Dialect.QuoteIdentifier(aliasToUse)
+            : aliasToUse;
+            
         return context.Dialect.ApplyAlias(baseName, finalAlias);
     }
 
     private string RenderReference(ISqlContext context)
     {
-        if (!string.IsNullOrWhiteSpace(Reference.Alias))
+        var aliasToUse = Reference.Alias ?? Reference.FallbackAlias;
+        
+        if (!string.IsNullOrWhiteSpace(aliasToUse))
         {
             return Reference.IsAliasQuoted
-                ? context.Dialect.QuoteIdentifier(Reference.Alias)
-                : Reference.Alias;
+                ? context.Dialect.QuoteIdentifier(aliasToUse)
+                : aliasToUse;
         }
+
         return Role == SqlEntityRole.Cte 
             ? context.Dialect.QuoteIdentifier(Name)
             : context.Dialect.QuoteEntityName(Name, Schema);

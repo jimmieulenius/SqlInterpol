@@ -1,3 +1,5 @@
+using SqlInterpol.Configuration;
+using SqlInterpol.Segments;
 
 namespace SqlInterpol.Test.Models;
 

@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using SqlInterpol.Configuration;
 using SqlInterpol.Execution;
@@ -13,7 +16,7 @@ namespace SqlInterpol;
 public partial class SqlBuilder : ISqlEntityRegistry
 {
     private List<SqlSegment> _segments = [];
-    private readonly List<ISqlEntity> _entities = [];
+    private readonly List<ISqlEntityBase> _entities = [];
 
     /// <summary>
     /// Tracks variable names mapped from caller argument expressions for zero-allocation property routing.
@@ -25,7 +28,7 @@ public partial class SqlBuilder : ISqlEntityRegistry
     /// </summary>
     public SqlContext Context { get; }
     
-    private ISqlSegmentRenderer Renderer => Context.Renderer;
+    private ISqlSegmentRenderer Renderer => Context.Options?.Renderer ?? SqlSegmentRenderer.Instance;
     
     internal IReadOnlyList<SqlSegment> Segments => _segments;
     
@@ -199,7 +202,9 @@ public partial class SqlBuilder : ISqlEntityRegistry
     /// <returns>The current builder instance for method chaining.</returns>
     public SqlBuilder Template(out ISqlTemplate template, [InterpolatedStringHandlerArgument("")] ref SqlQueryInterpolatedStringHandler handler)
     {
+#pragma warning disable SQLIA07
         template = Template(ref handler);
+#pragma warning restore SQLIA07
         return this;
     }
 
@@ -341,7 +346,7 @@ public partial class SqlBuilder : ISqlEntityRegistry
 
             if (requiredFeature.HasValue && !Context.Dialect.SupportedFeatures.Contains(requiredFeature.Value))
             {
-                throw new SqlDialectException(Context.Dialect.Kind, featureName!);
+                throw new SqlDialectException(Context.Dialect.Kind.ToString(), featureName!);
             }
         }
 
@@ -382,7 +387,7 @@ public partial class SqlBuilder : ISqlEntityRegistry
         return new SqlSegment(SqlSegmentType.Unresolved, value);
     }
 
-    ISqlEntity<T> ISqlEntityRegistry.RegisterEntity<T>(string? name, string? schema, string? alias)
+    ISqlEntityBase<T> ISqlEntityRegistry.RegisterEntity<T>(string? name, string? schema, string? alias)
     {
         var entity = CreateEntity<T>(name, schema, alias);
         _entities.Add(entity);
@@ -390,16 +395,17 @@ public partial class SqlBuilder : ISqlEntityRegistry
         return entity;
     }
 
-    internal ISqlEntity<T> CreateEntity<T>(string? name = null, string? schema = null, string? alias = null)
+    internal ISqlEntityBase<T> CreateEntity<T>(string? name = null, string? schema = null, string? alias = null)
     {
         var meta = SqlMetadataRegistry.GetMetadata<T>();
         string physicalName = name ?? meta.Name;
         string? physicalSchema = schema ?? meta.Schema;
 
-        return meta.Type switch
+        if (meta.Type == SqlEntityType.View)
         {
-            SqlEntityType.View => new SqlView<T>(physicalName, physicalSchema, alias),
-            _ => new SqlTable<T>(physicalName, physicalSchema, alias)
-        };
+            return new SqlView<T>(physicalName, physicalSchema, alias);
+        }
+        
+        return new SqlTable<T>(physicalName, physicalSchema, alias);
     }
 }

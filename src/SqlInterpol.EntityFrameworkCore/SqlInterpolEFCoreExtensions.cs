@@ -1,7 +1,10 @@
-﻿using System.Data.Common;
+﻿using System;
+using System.Data.Common;
 using System.Reflection;
 using Microsoft.EntityFrameworkCore;
+using SqlInterpol.Configuration;
 using SqlInterpol.Dialects;
+using SqlInterpol.Schema;
 
 namespace SqlInterpol.EFCore;
 
@@ -121,19 +124,16 @@ public static class SqlInterpolEFCoreExtensions
                 .Property(propertyInfo.Name)
                 .HasColumnName(columnName);
 
-            if (SqlMetadataRegistry.IsScalarType(propertyInfo.PropertyType))
+            var underlyingType = Nullable.GetUnderlyingType(propertyInfo.PropertyType) ?? propertyInfo.PropertyType;
+            
+            if (underlyingType.IsEnum)
             {
-                var underlyingType = Nullable.GetUnderlyingType(propertyInfo.PropertyType) ?? propertyInfo.PropertyType;
-                
-                if (underlyingType.IsEnum)
-                {
-                    var enumAttr = propertyInfo.GetCustomAttribute<SqlEnumFormatAttribute>();
-                    var format = enumAttr?.Format ?? options.EnumFormat;
+                var enumAttr = propertyInfo.GetCustomAttribute<SqlEnumFormatAttribute>();
+                var format = enumAttr?.Format ?? options.EnumFormat;
 
-                    if (format == SqlEnumFormat.String)
-                    {
-                        propertyBuilder.HasConversion<string>();
-                    }
+                if (format == SqlEnumFormat.String)
+                {
+                    propertyBuilder.HasConversion<string>();
                 }
             }
         }

@@ -1,4 +1,5 @@
-using SqlInterpol.Parsing;
+using SqlInterpol.Configuration;
+using SqlInterpol.Pipeline;
 using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
 

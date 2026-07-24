@@ -1,4 +1,6 @@
 
+using SqlInterpol.Schema;
+
 namespace SqlInterpol.Test.Models;
 
 [SqlTable("Stats")]

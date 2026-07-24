@@ -1,7 +1,8 @@
+using SqlInterpol.Schema;
 
 namespace SqlInterpol.Test.Models;
 
-[SqlTable(Schema = "dbo")]
+[SqlTable(schema: "dbo")]
 public record CategoryStats
 {
     public int CategoryId { get; init; }

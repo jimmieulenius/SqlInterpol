@@ -1,3 +1,6 @@
+using SqlInterpol.Configuration;
+using SqlInterpol.Schema;
+using SqlInterpol.Segments;
 using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
 

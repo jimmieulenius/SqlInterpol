@@ -1,3 +1,4 @@
+using SqlInterpol.Configuration;
 using SqlInterpol.Test.Helpers;
 using Xunit.Abstractions;
 

@@ -14,5 +14,5 @@ public interface ISqlEntityRegistry
     /// <param name="schema">An optional explicit schema name.</param>
     /// <param name="alias">An optional explicit alias.</param>
     /// <returns>The registered SQL entity instance.</returns>
-    ISqlEntity<T> RegisterEntity<T>(string? name = null, string? schema = null, string? alias = null);
+    ISqlEntityBase<T> RegisterEntity<T>(string? name = null, string? schema = null, string? alias = null);
 }

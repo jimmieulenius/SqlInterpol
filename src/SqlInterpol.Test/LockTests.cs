@@ -1,3 +1,4 @@
+using SqlInterpol.Configuration;
 using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
 
@@ -60,7 +61,7 @@ public class LockTests
                 new SqlTestCase(
                     SqlDialectKind.CustomDb,
                     expectedExceptionType: typeof(SqlDialectException),
-                    expectedExceptionMessage: $"Dialect capabilities validation failed:{Environment.NewLine}- 'FOR UPDATE' is not supported by CustomDb."
+                    expectedExceptionMessage: "The SQL dialect 'CustomDb' does not support the operation or fragment type: 'FOR UPDATE'."
                 ),
                 new SqlTestCase(
                     SqlDialectKind.Firebird,
@@ -113,7 +114,7 @@ public class LockTests
                 new SqlTestCase(
                     SqlDialectKind.SqLite,
                     expectedExceptionType: typeof(SqlDialectException),
-                    expectedExceptionMessage: $"Dialect capabilities validation failed:{Environment.NewLine}- 'FOR UPDATE' is not supported by SqLite."
+                    expectedExceptionMessage: "The SQL dialect 'SqLite' does not support the operation or fragment type: 'FOR UPDATE'."
                 ),
                 new SqlTestCase(
                     SqlDialectKind.SqlServer,
@@ -141,12 +142,12 @@ public class LockTests
                 new SqlTestCase(
                     SqlDialectKind.CustomDb,
                     expectedExceptionType: typeof(SqlDialectException),
-                    expectedExceptionMessage: $"Dialect capabilities validation failed:{Environment.NewLine}- 'FOR SHARE' is not supported by CustomDb."
+                    expectedExceptionMessage: "The SQL dialect 'CustomDb' does not support the operation or fragment type: 'FOR SHARE'."
                 ),
                 new SqlTestCase(
                     SqlDialectKind.Firebird,
                     expectedExceptionType: typeof(SqlDialectException),
-                    expectedExceptionMessage: $"Dialect capabilities validation failed:{Environment.NewLine}- 'FOR SHARE' is not supported by Firebird."
+                    expectedExceptionMessage: "The SQL dialect 'Firebird' does not support the operation or fragment type: 'FOR SHARE'."
                 ),
                 new SqlTestCase(
                     SqlDialectKind.MySql,
@@ -163,7 +164,7 @@ public class LockTests
                 new SqlTestCase(
                     SqlDialectKind.Oracle,
                     expectedExceptionType: typeof(SqlDialectException),
-                    expectedExceptionMessage: $"Dialect capabilities validation failed:{Environment.NewLine}- 'FOR SHARE' is not supported by Oracle."
+                    expectedExceptionMessage: "The SQL dialect 'Oracle' does not support the operation or fragment type: 'FOR SHARE'."
                 ),
                 new SqlTestCase(
                     SqlDialectKind.PostgreSql,
@@ -180,7 +181,7 @@ public class LockTests
                 new SqlTestCase(
                     SqlDialectKind.SqLite,
                     expectedExceptionType: typeof(SqlDialectException),
-                    expectedExceptionMessage: $"Dialect capabilities validation failed:{Environment.NewLine}- 'FOR SHARE' is not supported by SqLite."
+                    expectedExceptionMessage: "The SQL dialect 'SqLite' does not support the operation or fragment type: 'FOR SHARE'."
                 ),
                 new SqlTestCase(
                     SqlDialectKind.SqlServer,

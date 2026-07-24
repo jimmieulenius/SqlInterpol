@@ -1,3 +1,4 @@
+using SqlInterpol.Configuration;
 using SqlInterpol.Test.Models;
 
 namespace SqlInterpol.Test;

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using SqlInterpol.Configuration;
 using SqlInterpol.Segments;
@@ -50,7 +51,8 @@ public class SqlSelectIntoRewriter : ISqlSegmentRewriter
         // If it doesn't support SELECT INTO *and* lacks CREATE TABLE AS SELECT, abort.
         if (!context.Dialect.SupportedFeatures.Contains(SqlFeature.CreateTableAsSelect))
         {
-            throw new SqlDialectException("'SELECT INTO' is not supported");
+            // FIX: Used the 2-parameter constructor for SqlDialectException
+            throw new SqlDialectException(context.Dialect.Kind.ToString(), "SELECT INTO");
         }
 
         SqlSegment? targetSegment = null;

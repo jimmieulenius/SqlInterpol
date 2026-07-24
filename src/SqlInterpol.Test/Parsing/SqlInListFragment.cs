@@ -1,7 +1,7 @@
-using System;
 using System.Collections;
 using System.Text;
-using SqlInterpol.Parsing;
+using SqlInterpol.Configuration;
+using SqlInterpol.Segments;
 
 namespace SqlInterpol.Test.Parsing;
 

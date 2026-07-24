@@ -1,5 +1,7 @@
 using System.Collections;
-using SqlInterpol.Parsing;
+using SqlInterpol.Configuration;
+using SqlInterpol.Pipeline;
+using SqlInterpol.Segments;
 
 namespace SqlInterpol.Test.Parsing;
 

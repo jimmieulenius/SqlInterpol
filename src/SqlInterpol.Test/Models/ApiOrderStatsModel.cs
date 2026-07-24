@@ -1,7 +1,8 @@
+using SqlInterpol.Schema;
 
 namespace SqlInterpol.Test.Models;
 
-[SqlTable("OrderStats")]
+[SqlTable(name: "OrderStats")]
 public record ApiOrderStatsModel
 {
     public int CustomerId { get; init; }

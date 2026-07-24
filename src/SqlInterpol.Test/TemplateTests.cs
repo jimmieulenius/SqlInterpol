@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using SqlInterpol.Configuration;
 using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
 

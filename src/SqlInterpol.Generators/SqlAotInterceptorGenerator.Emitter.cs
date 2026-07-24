@@ -26,6 +26,12 @@ public partial class SqlAotInterceptorGenerator
         sb.AppendLine("using System;");
         sb.AppendLine("using System.Runtime.CompilerServices;");
         sb.AppendLine("using SqlInterpol;");
+        // FIX: Add missing namespaces to the generated file to resolve ISqlGeneratorBuilder and other moved types!
+        sb.AppendLine("using SqlInterpol.Configuration;");
+        sb.AppendLine("using SqlInterpol.Execution;");
+        sb.AppendLine("using SqlInterpol.Infrastructure;");
+        sb.AppendLine("using SqlInterpol.Schema;");
+        sb.AppendLine("using SqlInterpol.Segments;");
         sb.AppendLine("");
         sb.AppendLine("namespace System.Runtime.CompilerServices");
         sb.AppendLine("{");
@@ -85,7 +91,7 @@ public partial class SqlAotInterceptorGenerator
                 if (arguments.Count == 0)
                 {
                     if (appendCall.MethodName == "AppendLine")
-                        sb.AppendLine("            genDb.AppendSegment(new SqlInterpol.SqlSegment(SqlInterpol.SqlSegmentType.Literal, \"\\n\"));");
+                        sb.AppendLine("            genDb.AppendSegment(new SqlInterpol.Segments.SqlSegment(SqlInterpol.Segments.SqlSegmentType.Literal, \"\\n\"));");
                     
                     sb.AppendLine("            return builder;");
                     sb.AppendLine("        }");
@@ -101,7 +107,7 @@ public partial class SqlAotInterceptorGenerator
                     {
                         sb.AppendLine("            builder.Append(ref handler); // JIT Dynamic Fallback");
                         if (appendCall.MethodName == "AppendLine")
-                            sb.AppendLine("            genDb.AppendSegment(new SqlInterpol.SqlSegment(SqlInterpol.SqlSegmentType.Literal, \"\\n\"));");
+                            sb.AppendLine("            genDb.AppendSegment(new SqlInterpol.Segments.SqlSegment(SqlInterpol.Segments.SqlSegmentType.Literal, \"\\n\"));");
                         
                         sb.AppendLine("            return builder;");
                         sb.AppendLine("        }");
@@ -134,7 +140,7 @@ public partial class SqlAotInterceptorGenerator
                 else if (firstArg is LiteralExpressionSyntax literal)
                 {
                     var text = literal.Token.ValueText.Replace("\"", "\\\"").Replace("\r", "\\r").Replace("\n", "\\n");
-                    sb.AppendLine($"            genDb.AppendSegment(new SqlInterpol.SqlSegment(SqlInterpol.SqlSegmentType.Literal, \"{text}\"));");
+                    sb.AppendLine($"            genDb.AppendSegment(new SqlInterpol.Segments.SqlSegment(SqlInterpol.Segments.SqlSegmentType.Literal, \"{text}\"));");
                 }
                 else
                 {
@@ -143,7 +149,7 @@ public partial class SqlAotInterceptorGenerator
 
                 if (appendCall.MethodName == "AppendLine")
                 {
-                    sb.AppendLine("            genDb.AppendSegment(new SqlInterpol.SqlSegment(SqlInterpol.SqlSegmentType.Literal, \"\\n\"));");
+                    sb.AppendLine("            genDb.AppendSegment(new SqlInterpol.Segments.SqlSegment(SqlInterpol.Segments.SqlSegmentType.Literal, \"\\n\"));");
                 }
 
                 sb.AppendLine("            return builder;");
@@ -212,7 +218,7 @@ public partial class SqlAotInterceptorGenerator
             if (compileTimeBuffer.Length > 0)
             {
                 var text = compileTimeBuffer.ToString().Replace("\"", "\\\"").Replace("\r", "\\r").Replace("\n", "\\n");
-                sb.AppendLine($"                    genDb.AppendSegment(new SqlInterpol.SqlSegment(SqlInterpol.SqlSegmentType.Literal, \"{text}\"));");
+                sb.AppendLine($"                    genDb.AppendSegment(new SqlInterpol.Segments.SqlSegment(SqlInterpol.Segments.SqlSegmentType.Literal, \"{text}\"));");
                 compileTimeBuffer.Clear();
             }
         };
@@ -504,7 +510,7 @@ public partial class SqlAotInterceptorGenerator
                         sb.AppendLine($"                    // AOT Mapped Inline Alias Table: {tableDecl.VariableName} -> {inlineAlias}");
                         
                         sb.AppendLine($"                    var segVal_{segmentIndex} = handler.GetSegment({segmentIndex}).Value;");
-                        sb.AppendLine($"                    if (segVal_{segmentIndex} is SqlInterpol.ISqlEntityBase entBase_{segmentIndex} && entBase_{segmentIndex}.Reference is SqlInterpol.ISqlAliasable aliasable_{segmentIndex})");
+                        sb.AppendLine($"                    if (segVal_{segmentIndex} is SqlInterpol.Schema.ISqlEntityBase entBase_{segmentIndex} && entBase_{segmentIndex}.Reference is SqlInterpol.Schema.ISqlAliasable aliasable_{segmentIndex})");
                         sb.AppendLine($"                    {{");
                         sb.AppendLine($"                        aliasable_{segmentIndex}.Alias = \"{Escape(inlineAlias)}\";");
                         sb.AppendLine($"                        aliasable_{segmentIndex}.IsAliasQuoted = false;");
@@ -527,7 +533,7 @@ public partial class SqlAotInterceptorGenerator
                             sb.AppendLine($"                    if (autoAliasing && {wasAuto}) alias_{segmentIndex} = \"{Escape(tableDecl.VariableName)}\";");
 
                             sb.AppendLine($"                    var segVal_{segmentIndex} = handler.GetSegment({segmentIndex}).Value;");
-                            sb.AppendLine($"                    if (segVal_{segmentIndex} is SqlInterpol.ISqlEntityBase entBase_{segmentIndex})");
+                            sb.AppendLine($"                    if (segVal_{segmentIndex} is SqlInterpol.Schema.ISqlEntityBase entBase_{segmentIndex})");
                             sb.AppendLine($"                    {{");
                             sb.AppendLine($"                        if (!string.IsNullOrEmpty(entBase_{segmentIndex}.Reference.Alias)) alias_{segmentIndex} = entBase_{segmentIndex}.Reference.Alias;");
                             sb.AppendLine($"                        else if (string.IsNullOrEmpty(alias_{segmentIndex})) alias_{segmentIndex} = entBase_{segmentIndex}.Reference.FallbackAlias ?? \"{Escape(tableDecl.MappedTableName)}\";");
@@ -553,7 +559,7 @@ public partial class SqlAotInterceptorGenerator
                         sb.AppendLine($"                    if (!suppressAutoAlias_{segmentIndex}) alias_{segmentIndex} = genDb.ResolveAlias(\"{Escape(tableDecl.VariableName)}\", \"\", {wasAuto});");
                         
                         sb.AppendLine($"                    var segVal_{segmentIndex} = handler.GetSegment({segmentIndex}).Value;");
-                        sb.AppendLine($"                    if (segVal_{segmentIndex} is SqlInterpol.ISqlEntityBase entBase_{segmentIndex} && entBase_{segmentIndex}.Reference is SqlInterpol.ISqlAliasable aliasable_{segmentIndex})");
+                        sb.AppendLine($"                    if (segVal_{segmentIndex} is SqlInterpol.Schema.ISqlEntityBase entBase_{segmentIndex} && entBase_{segmentIndex}.Reference is SqlInterpol.Schema.ISqlAliasable aliasable_{segmentIndex})");
                         sb.AppendLine($"                    {{");
                         sb.AppendLine($"                        aliasable_{segmentIndex}.Alias = alias_{segmentIndex};");
                         sb.AppendLine($"                        aliasable_{segmentIndex}.IsAliasQuoted = false;");
@@ -576,7 +582,7 @@ public partial class SqlAotInterceptorGenerator
         
         flushLiteral();
         
-        sb.AppendLine("                    break;");
+        sb.AppendLine("                break;");
         sb.AppendLine("                }");
     }
 }

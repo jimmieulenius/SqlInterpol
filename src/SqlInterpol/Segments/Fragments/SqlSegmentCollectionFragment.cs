@@ -1,5 +1,7 @@
+using System.Collections.Generic;
 using System.Text;
 using SqlInterpol.Configuration;
+using SqlInterpol.Pipeline;
 
 namespace SqlInterpol.Segments;
 
@@ -16,10 +18,13 @@ public class SqlSegmentCollectionFragment(IReadOnlyList<SqlSegment> segments) : 
     public string ToSql(ISqlContext context, SqlRenderMode renderMode = SqlRenderMode.Default)
     {
         var sb = new StringBuilder();
+        var renderer = context.Options?.Renderer ?? SqlSegmentRenderer.Instance;
+
         for (int i = 0; i < Segments.Count; i++)
         {
-            sb.Append(context.Renderer.Render(context, Segments[i], i, Segments));
+            sb.Append(renderer.Render(context, Segments[i], i, Segments));
         }
+        
         return sb.ToString();
     }
 }

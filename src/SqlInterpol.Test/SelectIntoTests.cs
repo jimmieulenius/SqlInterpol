@@ -1,3 +1,4 @@
+using SqlInterpol.Configuration;
 using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
 
@@ -65,12 +66,12 @@ public class SelectIntoTests
         new SqlTestCase(
             SqlDialectKind.CustomDb, 
             typeof(SqlDialectException), 
-            "'SELECT INTO' is not supported"
+            "The SQL dialect 'CustomDb' does not support the operation or fragment type: 'SELECT INTO'."
         ),
         new SqlTestCase(
             SqlDialectKind.Firebird, 
             typeof(SqlDialectException), 
-            "'SELECT INTO' is not supported"
+            "The SQL dialect 'Firebird' does not support the operation or fragment type: 'SELECT INTO'."
         ),
         new SqlTestCase(
             SqlDialectKind.MySql,
@@ -129,12 +130,12 @@ public class SelectIntoTests
         new SqlTestCase(
             SqlDialectKind.CustomDb, 
             typeof(SqlDialectException), 
-            "'SELECT INTO' is not supported"
+            "The SQL dialect 'CustomDb' does not support the operation or fragment type: 'SELECT INTO'."
         ),
         new SqlTestCase(
             SqlDialectKind.Firebird, 
             typeof(SqlDialectException), 
-            "'SELECT INTO' is not supported"
+            "The SQL dialect 'Firebird' does not support the operation or fragment type: 'SELECT INTO'."
         ),
         new SqlTestCase(
             SqlDialectKind.MySql,
