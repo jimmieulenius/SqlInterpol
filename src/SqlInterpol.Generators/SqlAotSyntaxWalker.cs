@@ -19,14 +19,14 @@ public class SqlAotSyntaxWalker : CSharpSyntaxWalker
         if (node.Expression is MemberAccessExpressionSyntax memberAccess)
         {
             var methodName = memberAccess.Name.Identifier.Text;
-            if (methodName == "Entity" && memberAccess.Name is GenericNameSyntax genericName)
+            if (methodName == GeneratorConstants.MethodEntity && memberAccess.Name is GenericNameSyntax genericName)
             {
                 TrackEntityDeclaration(node, genericName);
             }
-            else if (methodName is "Append" or "AppendLine")
+            else if (methodName is GeneratorConstants.MethodAppend or GeneratorConstants.MethodAppendLine)
             {
                 var isInsideQuery = node.Ancestors().OfType<InvocationExpressionSyntax>()
-                    .Any(inv => inv.Expression is MemberAccessExpressionSyntax ma && ma.Name.Identifier.Text == "Query");
+                    .Any(inv => inv.Expression is MemberAccessExpressionSyntax ma && ma.Name.Identifier.Text == GeneratorConstants.MethodQuery);
                 
                 if (!isInsideQuery)
                 {
@@ -39,7 +39,7 @@ public class SqlAotSyntaxWalker : CSharpSyntaxWalker
                     }
                 }
             }
-            else if (methodName == "Query")
+            else if (methodName == GeneratorConstants.MethodQuery)
             {
                 if (node.ArgumentList.Arguments.Count > 0)
                 {

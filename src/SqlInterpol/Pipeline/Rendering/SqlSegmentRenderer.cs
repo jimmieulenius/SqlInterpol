@@ -199,31 +199,14 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
         return false;
     }
 
-    private string ApplyAutoIndentation(string rendered, int index, IReadOnlyList<SqlSegment> segments)
+    private static string ApplyAutoIndentation(string rendered, int index, IReadOnlyList<SqlSegment> segments)
     {
-        // 🌟 FIX: Allow Raw strings to trigger auto-indentation just like Literals!
-        if (index <= 0 || (segments[index - 1].Type != SqlSegmentType.Literal && segments[index - 1].Type != SqlSegmentType.Raw))
-        {
-            return rendered;
-        }
+        if (index <= 0) return rendered;
+        var prev = segments[index - 1];
+        if (prev.Type != SqlSegmentType.Literal && prev.Type != SqlSegmentType.Raw) return rendered;
 
-        var prevLiteral = segments[index - 1].Value?.ToString();
-        if (string.IsNullOrEmpty(prevLiteral)) return rendered;
-
-        int lastNewline = prevLiteral.LastIndexOf('\n');
-        if (lastNewline < 0) return rendered;
-
-        var indentChars = prevLiteral[(lastNewline + 1)..]
-            .TakeWhile(c => c == ' ' || c == '\t')
-            .ToArray();
-
-        if (indentChars.Length > 0)
-        {
-            var indent = new string(indentChars);
-            return rendered.Replace("\n", $"\n{indent}");
-        }
-
-        return rendered;
+        var indent = SqlIndentationHelper.ExtractTrailingLineIndent(prev.Value?.ToString());
+        return SqlIndentationHelper.ApplyIndent(rendered, indent);
     }
 
     private SqlRenderMode ResolveRenderMode(ISqlContext context, int index, SqlSegment segment, IReadOnlyList<SqlSegment> segments)
@@ -298,10 +281,6 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
             {
                 return SqlRenderMode.Default;
             }
-        }
-        else if (lookahead < segments.Count && segments[lookahead].Type == SqlSegmentType.Raw)
-        {
-            return SqlRenderMode.BaseName;
         }
 
         if (entity.Reference is ISqlReference reference && !string.IsNullOrEmpty(reference.Alias))

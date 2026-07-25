@@ -1,21 +1,45 @@
 using System.Buffers;
 using System.Runtime.CompilerServices;
+using SqlInterpol.Pipeline;
 using SqlInterpol.Schema;
 using SqlInterpol.Segments;
 
 namespace SqlInterpol;
 
+/// <summary>
+/// A high-performance, zero-allocation interpolated string handler that defers evaluation
+/// of interpolation holes until the builder requests them, enabling both the AOT interceptor
+/// path (which calls <see cref="GetSegment"/>) and the JIT fallback path
+/// (which calls <see cref="TransferSegments"/>).
+/// </summary>
 [InterpolatedStringHandler]
 public ref struct SqlQueryInterpolatedStringHandler
 {
     private readonly SqlBuilder _builder;
 
-    // ZERO-ALLOCATION BUCKET
+    /// <summary>
+    /// A deferred representation of a single literal or formatted hole in the interpolated string.
+    /// Stored in a pooled array to avoid per-hole heap allocations.
+    /// </summary>
     public struct PendingHole
     {
+        /// <summary>Gets or sets a value indicating whether this slot holds a raw SQL literal.</summary>
         public bool IsLiteral;
+
+        /// <summary>
+        /// When <see cref="IsLiteral"/> is <see langword="true"/>, holds the literal text.
+        /// When <see langword="false"/>, holds an optional format specifier (e.g., <c>"alias"</c>, <c>"decl"</c>).
+        /// </summary>
         public string? StringValue;
+
+        /// <summary>When <see cref="IsLiteral"/> is <see langword="false"/>, holds the interpolated value.</summary>
         public object? ObjectValue;
+
+        /// <summary>
+        /// The C# source expression captured via
+        /// <see cref="System.Runtime.CompilerServices.CallerArgumentExpressionAttribute"/>
+        /// (e.g., <c>"p.Name"</c>), used for entity variable and property column resolution.
+        /// </summary>
         public string? Expression;
     }
 
@@ -55,8 +79,15 @@ public ref struct SqlQueryInterpolatedStringHandler
     }
 
     /// <summary>
-    /// Evaluates a specific formatted hole ON DEMAND. Used exclusively by the AOT Generator fallback.
+    /// Evaluates a specific formatted hole on demand. Used exclusively by the AOT interceptor
+    /// to access individual holes by index without iterating the full buffer.
     /// </summary>
+    /// <param name="formattedHoleIndex">The zero-based index into the formatted (non-literal) holes only.</param>
+    /// <returns>The evaluated <see cref="SqlSegment"/> for the requested hole.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when <paramref name="formattedHoleIndex"/> exceeds the number of formatted holes
+    /// captured by this handler.
+    /// </exception>
     public SqlSegment GetSegment(int formattedHoleIndex)
     {
         int holeCount = 0;
@@ -76,8 +107,11 @@ public ref struct SqlQueryInterpolatedStringHandler
     }
 
     /// <summary>
-    /// Invoked by the JIT engine to lazily evaluate the segment structure only when AOT is not available.
+    /// Invoked by the JIT engine to lazily evaluate the full segment structure when AOT
+    /// interception is not available. Transfers all accumulated holes into
+    /// <paramref name="destination"/> and returns the pooled buffer to <see cref="System.Buffers.ArrayPool{T}"/>.
     /// </summary>
+    /// <param name="destination">The segment list to populate.</param>
     internal void TransferSegments(List<SqlSegment> destination)
     {
         for (int i = 0; i < _count; i++)
@@ -94,31 +128,21 @@ public ref struct SqlQueryInterpolatedStringHandler
                 // Formatting indentation
                 if (segment.Type == SqlSegmentType.Raw && segment.Value is SqlSegmentCollectionFragment collection)
                 {
-                    string indent = "";
-                    if (destination.Count > 0 && destination[^1].Type == SqlSegmentType.Literal)
+                    string indent = string.Empty;
+                    if (destination.Count > 0)
                     {
-                        var prevText = destination[^1].Value?.ToString();
-                        if (!string.IsNullOrEmpty(prevText))
-                        {
-                            int lastNewline = prevText.LastIndexOf('\n');
-                            if (lastNewline >= 0)
-                            {
-                                int chars = 0;
-                                int k = lastNewline + 1;
-                                while (k < prevText.Length && (prevText[k] == ' ' || prevText[k] == '\t'))
-                                {
-                                    chars++;
-                                    k++;
-                                }
-                                if (chars > 0) indent = prevText.Substring(lastNewline + 1, chars);
-                            }
-                        }
+                        var prev = destination[^1];
+                        if (prev.Type == SqlSegmentType.Literal || prev.Type == SqlSegmentType.Raw)
+                            indent = SqlIndentationHelper.ExtractTrailingLineIndent(prev.Value?.ToString());
                     }
+
                     foreach (var innerSeg in collection.Segments)
                     {
-                        if (indent.Length > 0 && (innerSeg.Type == SqlSegmentType.Literal || innerSeg.Type == SqlSegmentType.Raw) && innerSeg.Value is string s && s.Contains('\n'))
+                        if (indent.Length > 0
+                            && (innerSeg.Type == SqlSegmentType.Literal || innerSeg.Type == SqlSegmentType.Raw)
+                            && innerSeg.Value is string s && s.Contains('\n'))
                         {
-                            destination.Add(new SqlSegment(innerSeg.Type, s.Replace("\n", "\n" + indent), innerSeg.RenderMode, innerSeg.Tags));
+                            destination.Add(new SqlSegment(innerSeg.Type, SqlIndentationHelper.ApplyIndent(s, indent), innerSeg.RenderMode, innerSeg.Tags));
                         }
                         else
                         {

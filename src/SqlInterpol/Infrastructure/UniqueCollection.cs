@@ -1,6 +1,7 @@
+using System;
 using System.Collections.ObjectModel;
 
-namespace SqlInterpol;
+namespace SqlInterpol.Infrastructure;
 
 /// <summary>
 /// A collection that guarantees uniqueness of its items based on a provided key selector.
@@ -10,6 +11,7 @@ namespace SqlInterpol;
 public class UniqueCollection<T> : Collection<T>
 {
     private readonly Func<T, object> _keySelector;
+    private readonly System.Collections.Generic.HashSet<object> _keySet = new();
 
     /// <summary>
     /// Initializes a new instance of the <see cref="UniqueCollection{T}"/> class.
@@ -24,36 +26,35 @@ public class UniqueCollection<T> : Collection<T>
     protected override void InsertItem(int index, T item)
     {
         if (item == null) throw new ArgumentNullException(nameof(item));
-        
-        var key = _keySelector(item);
-        if (this.Any(x => _keySelector(x).Equals(key)))
-        {
-            return; // Silently ignore duplicates to protect pipeline stability
-        }
-        base.InsertItem(index, item);
+        if (_keySet.Add(_keySelector(item)))
+            base.InsertItem(index, item);
+        // Silently ignore duplicates to protect pipeline stability
     }
 
     /// <inheritdoc />
     protected override void SetItem(int index, T item)
     {
         if (item == null) throw new ArgumentNullException(nameof(item));
-        
-        var key = _keySelector(item);
-        var existingIdx = IndexOfKey(key);
-        
-        if (existingIdx >= 0 && existingIdx != index)
-        {
+        var newKey = _keySelector(item);
+        var existingKey = _keySelector(this[index]);
+        if (!existingKey.Equals(newKey) && _keySet.Contains(newKey))
             return; // Silently ignore if this key already exists elsewhere
-        }
+        _keySet.Remove(existingKey);
+        _keySet.Add(newKey);
         base.SetItem(index, item);
     }
 
-    private int IndexOfKey(object key)
+    /// <inheritdoc />
+    protected override void RemoveItem(int index)
     {
-        for (int i = 0; i < Count; i++)
-        {
-            if (_keySelector(this[i]).Equals(key)) return i;
-        }
-        return -1;
+        _keySet.Remove(_keySelector(this[index]));
+        base.RemoveItem(index);
+    }
+
+    /// <inheritdoc />
+    protected override void ClearItems()
+    {
+        _keySet.Clear();
+        base.ClearItems();
     }
 }

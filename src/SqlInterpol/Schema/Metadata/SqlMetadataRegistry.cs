@@ -13,8 +13,20 @@ public static class SqlMetadataRegistry
     private static readonly ConcurrentDictionary<Type, PropertyInfo[]> _dtoPropertyCache = new();
     private static readonly ConcurrentDictionary<Type, IReadOnlyDictionary<string, Func<object, object?>>> _getterCache = new();
 
+    /// <summary>
+    /// Returns the cached <see cref="SqlEntityMetadata"/> for the CLR type <typeparamref name="T"/>,
+    /// resolving <see cref="SqlTableAttribute"/> / <see cref="SqlViewAttribute"/> and column mappings
+    /// on the first call and caching the result for all subsequent calls.
+    /// </summary>
+    /// <typeparam name="T">The mapped entity or view type.</typeparam>
+    /// <returns>The <see cref="SqlEntityMetadata"/> describing <typeparamref name="T"/>.</returns>
     public static SqlEntityMetadata GetMetadata<T>() => GetMetadata(typeof(T));
 
+    /// <summary>
+    /// Returns the cached <see cref="SqlEntityMetadata"/> for the given <paramref name="type"/>.
+    /// </summary>
+    /// <param name="type">The CLR type to inspect.</param>
+    /// <returns>The <see cref="SqlEntityMetadata"/> describing <paramref name="type"/>.</returns>
     public static SqlEntityMetadata GetMetadata(Type type)
     {
         return _metadataCache.GetOrAdd(type, t =>
@@ -59,6 +71,12 @@ public static class SqlMetadataRegistry
         });
     }
 
+    /// <summary>
+    /// Returns the cached array of public, non-complex, non-ignored instance properties for
+    /// <paramref name="type"/>, suitable for use in DTO-expansion scenarios.
+    /// </summary>
+    /// <param name="type">The DTO type whose properties to enumerate.</param>
+    /// <returns>A cached <see cref="PropertyInfo"/> array for the eligible properties.</returns>
     public static PropertyInfo[] GetDtoProperties(Type type)
     {
         return _dtoPropertyCache.GetOrAdd(type, t => t.GetProperties(BindingFlags.Public | BindingFlags.Instance)
@@ -75,6 +93,16 @@ public static class SqlMetadataRegistry
             .ToArray());
     }
 
+    /// <summary>
+    /// Returns a cached, case-insensitive dictionary of compiled property getters for the
+    /// given <paramref name="type"/>. Used by <see cref="SqlBuilder.Build"/> to inject
+    /// template arguments in O(1) time without re-invoking reflection.
+    /// </summary>
+    /// <param name="type">The argument object type to build getters for.</param>
+    /// <returns>
+    /// A dictionary mapping property names (case-insensitive) to compiled getter delegates
+    /// of the form <c>Func&lt;object, object?&gt;</c>.
+    /// </returns>
     public static IReadOnlyDictionary<string, Func<object, object?>> GetArgumentGetters(Type type)
     {
         return _getterCache.GetOrAdd(type, t =>

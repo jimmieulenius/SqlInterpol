@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -5,6 +6,7 @@ namespace SqlInterpol.Generators;
 
 public partial class SqlAotInterceptorGenerator
 {
+    private static readonly ConcurrentDictionary<string, Regex> _aliasRegexCache = new(StringComparer.OrdinalIgnoreCase);
     private static readonly Regex _returningRegex = new(
         $@"\b{SqlKeyword.Returning.Value}\b", 
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -139,11 +141,13 @@ public partial class SqlAotInterceptorGenerator
                             if (parts.Length > 0)
                             {
                                 string cleanAlias = parts[0].Trim('[', ']', '"', '\'', '`');
-                                var dynamicAliasRegex = new Regex(
-                                    @"[ \t]*\b" + SqlKeyword.As.Value + @"\s+\[?" + Regex.Escape(cleanAlias) + @"\]?\b", 
-                                    RegexOptions.IgnoreCase);
-                                
-                                result.ReplacementForNextText[i] = dynamicAliasRegex.Replace(rawText, "", 1);
+                                var aliasRegex = _aliasRegexCache.GetOrAdd(
+                                    cleanAlias,
+                                    static alias => new Regex(
+                                        @"[ \t]*\b" + SqlKeyword.As.Value + @"\s+\[?" + Regex.Escape(alias) + @"\]?\b",
+                                        RegexOptions.IgnoreCase | RegexOptions.Compiled));
+
+                                result.ReplacementForNextText[i] = aliasRegex.Replace(rawText, "", 1);
 
                                 if (isEntity) result.InlineAliases[((IdentifierNameSyntax)interpolation.Expression).Identifier.Text] = cleanAlias;
                                 else if (isProperty) result.InlinePropertyAliases[i] = cleanAlias;

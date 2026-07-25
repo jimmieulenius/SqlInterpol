@@ -1,9 +1,10 @@
 using SqlInterpol.Configuration;
 
-namespace SqlInterpol.Infrastructure;
+namespace SqlInterpol.Segments;
 
 /// <summary>
-/// Generates SQL parameters from the current context state into the active parameter collection.
+/// Implemented by SQL fragments that must eagerly materialize parameter placeholders
+/// into the active context before the rendering pass begins.
 /// </summary>
 public interface ISqlParameterGenerator
 {

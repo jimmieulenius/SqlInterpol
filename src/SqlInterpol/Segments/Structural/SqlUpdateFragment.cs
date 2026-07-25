@@ -1,5 +1,4 @@
 using SqlInterpol.Configuration;
-using SqlInterpol.Infrastructure;
 using SqlInterpol.Schema;
 
 namespace SqlInterpol.Segments;

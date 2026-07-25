@@ -1,3 +1,5 @@
+using SqlInterpol.Infrastructure;
+
 namespace SqlInterpol.Pipeline;
 
 /// <summary>

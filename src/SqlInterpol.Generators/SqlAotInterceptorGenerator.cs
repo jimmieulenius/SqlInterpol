@@ -14,14 +14,14 @@ public partial class SqlAotInterceptorGenerator : IIncrementalGenerator
             .Select(static (options, _) =>
             {
                 bool isDisabled = false;
-                if (options.GlobalOptions.TryGetValue("build_property.sqlinterpoldisableaot", out var disableAotString)
+                if (options.GlobalOptions.TryGetValue(GeneratorConstants.MsBuildDisableAot, out var disableAotString)
                     && bool.TryParse(disableAotString, out var disableAot))
                 {
                     isDisabled = disableAot;
                 }
 
-                ImmutableArray<string> dialects = ["PostgreSql"];
-                if (options.GlobalOptions.TryGetValue("build_property.sqlinterpoldialects", out var dialectsString)
+                ImmutableArray<string> dialects = [GeneratorConstants.DefaultDialect];
+                if (options.GlobalOptions.TryGetValue(GeneratorConstants.MsBuildDialects, out var dialectsString)
                      && !string.IsNullOrWhiteSpace(dialectsString))
                 {
                     dialects = [.. dialectsString.Split(',', ';').Select(d => d.Trim()).Where(d => !string.IsNullOrEmpty(d))];
@@ -37,7 +37,7 @@ public partial class SqlAotInterceptorGenerator : IIncrementalGenerator
                 if (invocation.Expression is MemberAccessExpressionSyntax memberAccess)
                 {
                     var name = memberAccess.Name.Identifier.Text;
-                    return name is "Append" or "AppendLine";
+                    return name is GeneratorConstants.MethodAppend or GeneratorConstants.MethodAppendLine;
                 }
                 return false;
             },
@@ -48,7 +48,7 @@ public partial class SqlAotInterceptorGenerator : IIncrementalGenerator
 
                 bool hasAdvancedComposition = containingMethod.DescendantNodes()
                     .OfType<MemberAccessExpressionSyntax>()
-                    .Any(ma => ma.Name.Identifier.Text == "Template");
+                    .Any(ma => ma.Name.Identifier.Text == GeneratorConstants.MethodTemplate);
 
                 if (hasAdvancedComposition) return null;
 
@@ -69,7 +69,7 @@ public partial class SqlAotInterceptorGenerator : IIncrementalGenerator
             {
                 var diagnostic = Diagnostic.Create(
                     new DiagnosticDescriptor(
-                        id: "SQLIG03",
+                        id: GeneratorConstants.DiagnosticAotDisabled,
                         title: "SqlInterpol AOT Disabled",
                         messageFormat: "SqlInterpol AOT generation has been disabled via the <SqlInterpolDisableAot> MSBuild property. Falling back to runtime JIT compilation.",
                         category: "Configuration",

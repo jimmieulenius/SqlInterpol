@@ -1,5 +1,6 @@
 using SqlInterpol.Configuration;
 using SqlInterpol.Infrastructure;
+using SqlInterpol.Pipeline;
 using SqlInterpol.Schema;
 using SqlInterpol.Segments;
 
@@ -21,32 +22,21 @@ public partial class SqlBuilder : ISqlGeneratorBuilder
     {
         if (segment.Type == SqlSegmentType.Raw && segment.Value is SqlSegmentCollectionFragment collection)
         {
-            string indent = "";
-            if (_segments.Count > 0 && (_segments[^1].Type == SqlSegmentType.Literal || _segments[^1].Type == SqlSegmentType.Raw))
+            string indent = string.Empty;
+            if (_segments.Count > 0)
             {
-                var prevText = _segments[^1].Value?.ToString();
-                if (!string.IsNullOrEmpty(prevText))
-                {
-                    int lastNewline = prevText.LastIndexOf('\n');
-                    if (lastNewline >= 0)
-                    {
-                        int chars = 0;
-                        int k = lastNewline + 1;
-                        while (k < prevText.Length && (prevText[k] == ' ' || prevText[k] == '\t')) 
-                        {
-                            chars++;
-                            k++;
-                        }
-                        if (chars > 0) indent = prevText.Substring(lastNewline + 1, chars);
-                    }
-                }
+                var prev = _segments[^1];
+                if (prev.Type == SqlSegmentType.Literal || prev.Type == SqlSegmentType.Raw)
+                    indent = SqlIndentationHelper.ExtractTrailingLineIndent(prev.Value?.ToString());
             }
-            
+
             foreach (var innerSeg in collection.Segments)
             {
-                if (indent.Length > 0 && (innerSeg.Type == SqlSegmentType.Literal || innerSeg.Type == SqlSegmentType.Raw) && innerSeg.Value is string s && s.Contains('\n'))
+                if (indent.Length > 0
+                    && (innerSeg.Type == SqlSegmentType.Literal || innerSeg.Type == SqlSegmentType.Raw)
+                    && innerSeg.Value is string s && s.Contains('\n'))
                 {
-                    _segments.Add(new SqlSegment(innerSeg.Type, s.Replace("\n", "\n" + indent), innerSeg.RenderMode, innerSeg.Tags));
+                    _segments.Add(new SqlSegment(innerSeg.Type, SqlIndentationHelper.ApplyIndent(s, indent), innerSeg.RenderMode, innerSeg.Tags));
                 }
                 else
                 {

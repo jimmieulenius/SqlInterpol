@@ -1,5 +1,4 @@
 using SqlInterpol.Configuration;
-using SqlInterpol.Pipeline;
 
 namespace SqlInterpol;
 

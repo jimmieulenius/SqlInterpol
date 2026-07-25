@@ -23,9 +23,9 @@ public interface ISqlGeneratorBuilder
     /// Appends a raw string directly to the SQL stream.
     /// </summary>
     /// <param name="rawSql">The literal string to append.</param>
-    /// <param name="segmentTag">Optional tags (e.g., <see cref="SqlSegmentTag.WhereKeyword"/>) 
+    /// <param name="segmentTags">Optional semantic tags (e.g., <see cref="SqlSegmentTag.WhereKeyword"/>) 
     /// used to synchronize the runtime state tracker during JIT fallback scenarios.</param>
-    void AppendRaw(string rawSql, params string[]? segmentTag);
+    void AppendRaw(string rawSql, params string[]? segmentTags);
 
     /// <summary>
     /// Appends a fully materialized segment (usually a parameter or a deferred fragment) to the stream.
