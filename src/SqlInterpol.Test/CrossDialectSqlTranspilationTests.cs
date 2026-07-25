@@ -1,4 +1,5 @@
 using SqlInterpol.Configuration;
+using SqlInterpol.Test.Dialects;
 using SqlInterpol.Test.Models;
 
 namespace SqlInterpol.Test;
@@ -9,20 +10,19 @@ public class CrossDialectSqlTranspilationTests
     [MemberData(nameof(PagingToggleData))]
     public void Paging_Toggle(bool xvSql, SqlTestCase testCase)
     {
+        // Arrange
         var db = testCase.CreateBuilder();
-        
-        // Arrange parameters just like a real application
         int limit = 10;
         int offset = 20;
         
+        // Act
         testCase.Action(() => 
         {
             db.Context.Options.CrossVendorSqlTranspilation = xvSql;
-            
-            // Act: Use string interpolation so the AST can extract the parameter nodes!
             return [db.Append($"SELECT * FROM Products LIMIT {limit} OFFSET {offset}").Build()];
         });
 
+        // Assert
         testCase.Assert();
     }
 
@@ -30,16 +30,17 @@ public class CrossDialectSqlTranspilationTests
     [MemberData(nameof(PagingHardcodedToggleData))]
     public void Paging_Hardcoded_Toggle(bool xvSql, SqlTestCase testCase)
     {
+        // Arrange
         var db = testCase.CreateBuilder();
         
+        // Act
         testCase.Action(() => 
         {
             db.Context.Options.CrossVendorSqlTranspilation = xvSql;
-            
-            // Act: Passing a pure, hardcoded string. No interpolation holes!
             return [db.Append($"SELECT * FROM Products LIMIT 10 OFFSET 20").Build()];
         });
 
+        // Assert
         testCase.Assert();
     }
 
@@ -47,14 +48,17 @@ public class CrossDialectSqlTranspilationTests
     [MemberData(nameof(RowLockingToggleData))]
     public void RowLocking_Toggle(bool xvSql, SqlTestCase testCase)
     {
+        // Arrange
         var db = testCase.CreateBuilder();
 
+        // Act
         testCase.Action(() => 
         {
             db.Context.Options.CrossVendorSqlTranspilation = xvSql;
             return [db.Append($"SELECT * FROM Products FOR UPDATE").Build()];
         });
 
+        // Assert
         testCase.Assert();
     }
 
@@ -62,14 +66,17 @@ public class CrossDialectSqlTranspilationTests
     [MemberData(nameof(SelectIntoToggleData))]
     public void SelectInto_Toggle(bool xvSql, SqlTestCase testCase)
     {
+        // Arrange
         var db = testCase.CreateBuilder();
 
+        // Act
         testCase.Action(() => 
         {
             db.Context.Options.CrossVendorSqlTranspilation = xvSql;
             return [db.Append($"SELECT Id INTO #Temp FROM Products").Build()];
         });
 
+        // Assert
         testCase.Assert();
     }
 
@@ -77,54 +84,162 @@ public class CrossDialectSqlTranspilationTests
     {
         get
         {
-            var data = new TheoryData<bool, SqlTestCase>();
-            
-            // p0 = Limit, p1 = Offset (Note: some dialects use 1-based indexing like Postgres $1, $2)
-            object[] expectedParams = [10, 20]; 
+            object?[] expectedParams = [10, 20];
 
-            // ====================================================================
-            // 1. META-SQL ENABLED (Transpilation ON)
-            // ====================================================================
-            
-            // SQL Server uses OFFSET first, so parameters are swapped: @p1 then @p0
-            data.Add(true, new SqlTestCase(SqlDialectKind.SqlServer, 
-                ["SELECT * FROM Products OFFSET @p1 ROWS FETCH NEXT @p0 ROWS ONLY"], expectedParams));
-            
-            // Oracle uses OFFSET first, parameters swapped: :1 then :0
-            data.Add(true, new SqlTestCase(SqlDialectKind.Oracle, 
-                ["SELECT * FROM Products OFFSET :1 ROWS FETCH NEXT :0 ROWS ONLY"], expectedParams));
-            
-            data.Add(true, new SqlTestCase(SqlDialectKind.PostgreSql, 
-                ["SELECT * FROM Products LIMIT $1 OFFSET $2"], expectedParams));
-                
-            data.Add(true, new SqlTestCase(SqlDialectKind.MySql, 
-                ["SELECT * FROM Products LIMIT @p0 OFFSET @p1"], expectedParams));
-                
-            data.Add(true, new SqlTestCase(SqlDialectKind.SqLite, 
-                ["SELECT * FROM Products LIMIT @p1 OFFSET @p2"], expectedParams));
+            return new TheoryData<bool, SqlTestCase>
+            {
+                // ====================================================================
+                // 1. META-SQL ENABLED (Transpilation ON)
+                // ====================================================================
+                {
+                    true, 
+                    new SqlTestCase(
+                        SqlDialectKind.CustomDb, 
+                        [
+                            """
+                            SELECT * FROM Products LIMIT !!100 OFFSET !!101
+                            """
+                        ], 
+                        expectedParameters: expectedParams
+                    )
+                },
+                {
+                    true, 
+                    new SqlTestCase(
+                        SqlDialectKind.MySql, 
+                        [
+                            """
+                            SELECT * FROM Products LIMIT @p0 OFFSET @p1
+                            """
+                        ], 
+                        expectedParameters: expectedParams
+                    )
+                },
+                {
+                    true, 
+                    new SqlTestCase(
+                        SqlDialectKind.Oracle, 
+                        [
+                            """
+                            SELECT * FROM Products OFFSET :1 ROWS FETCH NEXT :0 ROWS ONLY
+                            """
+                        ], 
+                        expectedParameters: expectedParams
+                    )
+                },
+                {
+                    true, 
+                    new SqlTestCase(
+                        SqlDialectKind.PostgreSql, 
+                        [
+                            """
+                            SELECT * FROM Products LIMIT $1 OFFSET $2
+                            """
+                        ], 
+                        expectedParameters: expectedParams
+                    )
+                },
+                {
+                    true, 
+                    new SqlTestCase(
+                        SqlDialectKind.SqLite, 
+                        [
+                            """
+                            SELECT * FROM Products LIMIT @p1 OFFSET @p2
+                            """
+                        ], 
+                        expectedParameters: expectedParams
+                    )
+                },
+                {
+                    true, 
+                    new SqlTestCase(
+                        SqlDialectKind.SqlServer, 
+                        [
+                            """
+                            SELECT * FROM Products OFFSET @p1 ROWS FETCH NEXT @p0 ROWS ONLY
+                            """
+                        ], 
+                        expectedParameters: expectedParams
+                    )
+                },
 
-            // ====================================================================
-            // 2. META-SQL DISABLED (Raw Pass-Through)
-            // ====================================================================
-            // When disabled, the structural rewrite is bypassed. The AST renderer just outputs 
-            // the literal "LIMIT ... OFFSET ..." with the correct dialect parameter prefixes!
-            
-            data.Add(false, new SqlTestCase(SqlDialectKind.SqlServer,  
-                ["SELECT * FROM Products LIMIT @p0 OFFSET @p1"], expectedParams));
-                
-            data.Add(false, new SqlTestCase(SqlDialectKind.Oracle,     
-                ["SELECT * FROM Products LIMIT :0 OFFSET :1"], expectedParams));
-                
-            data.Add(false, new SqlTestCase(SqlDialectKind.PostgreSql, 
-                ["SELECT * FROM Products LIMIT $1 OFFSET $2"], expectedParams));
-                
-            data.Add(false, new SqlTestCase(SqlDialectKind.MySql,      
-                ["SELECT * FROM Products LIMIT @p0 OFFSET @p1"], expectedParams));
-                
-            data.Add(false, new SqlTestCase(SqlDialectKind.SqLite,     
-                ["SELECT * FROM Products LIMIT @p1 OFFSET @p2"], expectedParams));
-
-            return data;
+                // ====================================================================
+                // 2. META-SQL DISABLED (Raw Pass-Through)
+                // ====================================================================
+                {
+                    false, 
+                    new SqlTestCase(
+                        SqlDialectKind.CustomDb, 
+                        [
+                            """
+                            SELECT * FROM Products LIMIT !!100 OFFSET !!101
+                            """
+                        ], 
+                        expectedParameters: expectedParams
+                    )
+                },
+                {
+                    false, 
+                    new SqlTestCase(
+                        SqlDialectKind.MySql, 
+                        [
+                            """
+                            SELECT * FROM Products LIMIT @p0 OFFSET @p1
+                            """
+                        ], 
+                        expectedParameters: expectedParams
+                    )
+                },
+                {
+                    false, 
+                    new SqlTestCase(
+                        SqlDialectKind.Oracle, 
+                        [
+                            """
+                            SELECT * FROM Products LIMIT :0 OFFSET :1
+                            """
+                        ], 
+                        expectedParameters: expectedParams
+                    )
+                },
+                {
+                    false, 
+                    new SqlTestCase(
+                        SqlDialectKind.PostgreSql, 
+                        [
+                            """
+                            SELECT * FROM Products LIMIT $1 OFFSET $2
+                            """
+                        ], 
+                        expectedParameters: expectedParams
+                    )
+                },
+                {
+                    false, 
+                    new SqlTestCase(
+                        SqlDialectKind.SqLite, 
+                        [
+                            """
+                            SELECT * FROM Products LIMIT @p1 OFFSET @p2
+                            """
+                        ], 
+                        expectedParameters: expectedParams
+                    )
+                },
+                {
+                    false, 
+                    new SqlTestCase(
+                        SqlDialectKind.SqlServer, 
+                        [
+                            """
+                            SELECT * FROM Products LIMIT @p0 OFFSET @p1
+                            """
+                        ], 
+                        expectedParameters: expectedParams
+                    )
+                }
+            };
         }
     }
 
@@ -132,33 +247,110 @@ public class CrossDialectSqlTranspilationTests
     {
         get
         {
-            var data = new TheoryData<bool, SqlTestCase>();
             string rawSql = "SELECT * FROM Products LIMIT 10 OFFSET 20";
 
-            // ====================================================================
-            // 1. META-SQL ENABLED (Transpilation ON)
-            // ====================================================================
-            // Notice there are no expected parameters. The integers are raw literals!
-            data.Add(true, new SqlTestCase(SqlDialectKind.SqlServer,  
-                ["SELECT * FROM Products OFFSET 20 ROWS FETCH NEXT 10 ROWS ONLY"]));
-                
-            data.Add(true, new SqlTestCase(SqlDialectKind.Oracle,     
-                ["SELECT * FROM Products OFFSET 20 ROWS FETCH NEXT 10 ROWS ONLY"]));
-                
-            data.Add(true, new SqlTestCase(SqlDialectKind.PostgreSql, [rawSql]));
-            data.Add(true, new SqlTestCase(SqlDialectKind.MySql,      [rawSql]));
-            data.Add(true, new SqlTestCase(SqlDialectKind.SqLite,     [rawSql]));
+            return new TheoryData<bool, SqlTestCase>
+            {
+                // ====================================================================
+                // 1. META-SQL ENABLED (Transpilation ON)
+                // ====================================================================
+                {
+                    true, 
+                    new SqlTestCase(
+                        SqlDialectKind.CustomDb, 
+                        [rawSql]
+                    )
+                },
+                {
+                    true, 
+                    new SqlTestCase(
+                        SqlDialectKind.MySql, 
+                        [rawSql]
+                    )
+                },
+                {
+                    true, 
+                    new SqlTestCase(
+                        SqlDialectKind.Oracle, 
+                        [
+                            """
+                            SELECT * FROM Products OFFSET 20 ROWS FETCH NEXT 10 ROWS ONLY
+                            """
+                        ]
+                    )
+                },
+                {
+                    true, 
+                    new SqlTestCase(
+                        SqlDialectKind.PostgreSql, 
+                        [rawSql]
+                    )
+                },
+                {
+                    true, 
+                    new SqlTestCase(
+                        SqlDialectKind.SqLite, 
+                        [rawSql]
+                    )
+                },
+                {
+                    true, 
+                    new SqlTestCase(
+                        SqlDialectKind.SqlServer, 
+                        [
+                            """
+                            SELECT * FROM Products OFFSET 20 ROWS FETCH NEXT 10 ROWS ONLY
+                            """
+                        ]
+                    )
+                },
 
-            // ====================================================================
-            // 2. META-SQL DISABLED (Raw Pass-Through)
-            // ====================================================================
-            data.Add(false, new SqlTestCase(SqlDialectKind.SqlServer,  [rawSql]));
-            data.Add(false, new SqlTestCase(SqlDialectKind.Oracle,     [rawSql]));
-            data.Add(false, new SqlTestCase(SqlDialectKind.PostgreSql, [rawSql]));
-            data.Add(false, new SqlTestCase(SqlDialectKind.MySql,      [rawSql]));
-            data.Add(false, new SqlTestCase(SqlDialectKind.SqLite,     [rawSql]));
-
-            return data;
+                // ====================================================================
+                // 2. META-SQL DISABLED (Raw Pass-Through)
+                // ====================================================================
+                {
+                    false, 
+                    new SqlTestCase(
+                        SqlDialectKind.CustomDb, 
+                        [rawSql]
+                    )
+                },
+                {
+                    false, 
+                    new SqlTestCase(
+                        SqlDialectKind.MySql, 
+                        [rawSql]
+                    )
+                },
+                {
+                    false, 
+                    new SqlTestCase(
+                        SqlDialectKind.Oracle, 
+                        [rawSql]
+                    )
+                },
+                {
+                    false, 
+                    new SqlTestCase(
+                        SqlDialectKind.PostgreSql, 
+                        [rawSql]
+                    )
+                },
+                {
+                    false, 
+                    new SqlTestCase(
+                        SqlDialectKind.SqLite, 
+                        [rawSql]
+                    )
+                },
+                {
+                    false, 
+                    new SqlTestCase(
+                        SqlDialectKind.SqlServer, 
+                        [rawSql]
+                    )
+                }
+            };
         }
     }
 
@@ -166,33 +358,105 @@ public class CrossDialectSqlTranspilationTests
     {
         get
         {
-            var data = new TheoryData<bool, SqlTestCase>();
             string rawSql = "SELECT * FROM Products FOR UPDATE";
-            
-            // When transpiled, the base rewriter cleanly defers the lock to a new line at the end of the query
             string transpiledSql = "SELECT * FROM Products\nFOR UPDATE";
 
-            // --- META-SQL ENABLED (Transpilation ON) ---
-            data.Add(true, new SqlTestCase(SqlDialectKind.SqlServer,  ["SELECT * FROM Products WITH (UPDLOCK)"]));
-            data.Add(true, new SqlTestCase(SqlDialectKind.PostgreSql, [transpiledSql]));
-            data.Add(true, new SqlTestCase(SqlDialectKind.Oracle,     [transpiledSql]));
-            data.Add(true, new SqlTestCase(SqlDialectKind.MySql,      [transpiledSql]));
-            
-            // SQLite throws an exception during Builder Validation, which formats it as a list of missing capabilities
-            string sqliteError = $"Dialect capabilities validation failed:{Environment.NewLine}- 'FOR UPDATE' is not supported by SqLite.";
-            data.Add(true, new SqlTestCase(SqlDialectKind.SqLite, typeof(SqlDialectException), sqliteError));
+            return new TheoryData<bool, SqlTestCase>
+            {
+                // --- META-SQL ENABLED (Transpilation ON) ---
+                {
+                    true, 
+                    new SqlTestCase(
+                        SqlDialectKind.CustomDb, 
+                        typeof(SqlDialectException), 
+                        "The SQL dialect 'CustomDb' does not support the operation or fragment type: 'FOR UPDATE'."
+                    )
+                },
+                {
+                    true, 
+                    new SqlTestCase(
+                        SqlDialectKind.MySql, 
+                        [transpiledSql]
+                    )
+                },
+                {
+                    true, 
+                    new SqlTestCase(
+                        SqlDialectKind.Oracle, 
+                        [transpiledSql]
+                    )
+                },
+                {
+                    true, 
+                    new SqlTestCase(
+                        SqlDialectKind.PostgreSql, 
+                        [transpiledSql]
+                    )
+                },
+                {
+                    true, 
+                    new SqlTestCase(
+                        SqlDialectKind.SqLite, 
+                        typeof(SqlDialectException), 
+                        "The SQL dialect 'SqLite' does not support the operation or fragment type: 'FOR UPDATE'."
+                    )
+                },
+                {
+                    true, 
+                    new SqlTestCase(
+                        SqlDialectKind.SqlServer, 
+                        [
+                            """
+                            SELECT * FROM Products WITH (UPDLOCK)
+                            """
+                        ]
+                    )
+                },
 
-            // --- META-SQL DISABLED (Raw Pass-Through) ---
-            // Notice how NO exceptions are thrown when Disabled! Stays completely inline.
-            data.Add(false, new SqlTestCase(SqlDialectKind.SqlServer,  [rawSql]));
-            data.Add(false, new SqlTestCase(SqlDialectKind.PostgreSql, [rawSql]));
-            data.Add(false, new SqlTestCase(SqlDialectKind.Oracle,     [rawSql]));
-            data.Add(false, new SqlTestCase(SqlDialectKind.MySql,      [rawSql]));
-            
-            // SQLite passes it through without throwing. The database will error later, but SqlInterpol succeeds.
-            data.Add(false, new SqlTestCase(SqlDialectKind.SqLite,     [rawSql])); 
-
-            return data;
+                // --- META-SQL DISABLED (Raw Pass-Through) ---
+                {
+                    false, 
+                    new SqlTestCase(
+                        SqlDialectKind.CustomDb, 
+                        [rawSql]
+                    )
+                },
+                {
+                    false, 
+                    new SqlTestCase(
+                        SqlDialectKind.MySql, 
+                        [rawSql]
+                    )
+                },
+                {
+                    false, 
+                    new SqlTestCase(
+                        SqlDialectKind.Oracle, 
+                        [rawSql]
+                    )
+                },
+                {
+                    false, 
+                    new SqlTestCase(
+                        SqlDialectKind.PostgreSql, 
+                        [rawSql]
+                    )
+                },
+                {
+                    false, 
+                    new SqlTestCase(
+                        SqlDialectKind.SqLite, 
+                        [rawSql]
+                    )
+                },
+                {
+                    false, 
+                    new SqlTestCase(
+                        SqlDialectKind.SqlServer, 
+                        [rawSql]
+                    )
+                }
+            };
         }
     }
 
@@ -200,32 +464,121 @@ public class CrossDialectSqlTranspilationTests
     {
         get
         {
-            var data = new TheoryData<bool, SqlTestCase>();
             string rawSql = "SELECT Id INTO #Temp FROM Products";
-
-            // --- META-SQL ENABLED (Transpilation ON) ---
-            data.Add(true, new SqlTestCase(SqlDialectKind.SqlServer,  [rawSql])); // Native
-            data.Add(true, new SqlTestCase(SqlDialectKind.PostgreSql, [rawSql])); // Native
-            
-            // Rewriter translates this to CREATE TABLE AS SELECT. 
-            // Note the preserved trailing space after 'Id ' from the original string literal!
             string createTableSql = "CREATE TABLE \"#Temp\" AS\nSELECT Id \nFROM Products";
-            data.Add(true, new SqlTestCase(SqlDialectKind.SqLite, [createTableSql]));
-            data.Add(true, new SqlTestCase(SqlDialectKind.Oracle, [createTableSql]));
-            data.Add(true, new SqlTestCase(SqlDialectKind.MySql,  ["CREATE TABLE `#Temp` AS\nSELECT Id \nFROM Products"]));
 
-            // Firebird throws directly from the Rewriter, so it's a simple error string
-            data.Add(true, new SqlTestCase(SqlDialectKind.Firebird, typeof(SqlDialectException), "'SELECT INTO' is not supported"));
+            return new TheoryData<bool, SqlTestCase>
+            {
+                // --- META-SQL ENABLED (Transpilation ON) ---
+                {
+                    true, 
+                    new SqlTestCase(
+                        SqlDialectKind.CustomDb, 
+                        typeof(SqlDialectException), 
+                        "The SQL dialect 'CustomDb' does not support the operation or fragment type: 'SELECT INTO'."
+                    )
+                },
+                {
+                    true, 
+                    new SqlTestCase(
+                        SqlDialectKind.Firebird, 
+                        typeof(SqlDialectException), 
+                        "The SQL dialect 'Firebird' does not support the operation or fragment type: 'SELECT INTO'."
+                    )
+                },
+                {
+                    true, 
+                    new SqlTestCase(
+                        SqlDialectKind.MySql, 
+                        [
+                            """
+                            CREATE TABLE `#Temp` AS
+                            SELECT Id 
+                            FROM Products
+                            """
+                        ]
+                    )
+                },
+                {
+                    true, 
+                    new SqlTestCase(
+                        SqlDialectKind.Oracle, 
+                        [createTableSql]
+                    )
+                },
+                {
+                    true, 
+                    new SqlTestCase(
+                        SqlDialectKind.PostgreSql, 
+                        [rawSql]
+                    )
+                },
+                {
+                    true, 
+                    new SqlTestCase(
+                        SqlDialectKind.SqLite, 
+                        [createTableSql]
+                    )
+                },
+                {
+                    true, 
+                    new SqlTestCase(
+                        SqlDialectKind.SqlServer, 
+                        [rawSql]
+                    )
+                },
 
-            // --- META-SQL DISABLED (Raw Pass-Through) ---
-            data.Add(false, new SqlTestCase(SqlDialectKind.SqlServer,  [rawSql]));
-            data.Add(false, new SqlTestCase(SqlDialectKind.PostgreSql, [rawSql]));
-            data.Add(false, new SqlTestCase(SqlDialectKind.SqLite,     [rawSql]));
-            data.Add(false, new SqlTestCase(SqlDialectKind.Oracle,     [rawSql]));
-            data.Add(false, new SqlTestCase(SqlDialectKind.MySql,      [rawSql]));
-            data.Add(false, new SqlTestCase(SqlDialectKind.Firebird,   [rawSql])); // No exception thrown!
-
-            return data;
+                // --- META-SQL DISABLED (Raw Pass-Through) ---
+                {
+                    false, 
+                    new SqlTestCase(
+                        SqlDialectKind.CustomDb, 
+                        [rawSql]
+                    )
+                },
+                {
+                    false, 
+                    new SqlTestCase(
+                        SqlDialectKind.Firebird, 
+                        [rawSql]
+                    )
+                },
+                {
+                    false, 
+                    new SqlTestCase(
+                        SqlDialectKind.MySql, 
+                        [rawSql]
+                    )
+                },
+                {
+                    false, 
+                    new SqlTestCase(
+                        SqlDialectKind.Oracle, 
+                        [rawSql]
+                    )
+                },
+                {
+                    false, 
+                    new SqlTestCase(
+                        SqlDialectKind.PostgreSql, 
+                        [rawSql]
+                    )
+                },
+                {
+                    false, 
+                    new SqlTestCase(
+                        SqlDialectKind.SqLite, 
+                        [rawSql]
+                    )
+                },
+                {
+                    false, 
+                    new SqlTestCase(
+                        SqlDialectKind.SqlServer, 
+                        [rawSql]
+                    )
+                }
+            };
         }
     }
 }

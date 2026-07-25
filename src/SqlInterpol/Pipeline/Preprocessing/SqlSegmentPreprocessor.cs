@@ -44,14 +44,14 @@ public partial class SqlSegmentPreprocessor : ISqlSegmentPreprocessor
 
             if (ProcessSubquery(segment, i, segments, state)) continue;
             
-            // 🌟 FIX: Check for hole-bound aliases BEFORE the Raw bypass, ensuring 
+            //   FIX: Check for hole-bound aliases BEFORE the Raw bypass, ensuring 
             // dynamic objects like {{p.Name}} injected after 'AS' are correctly captured!
             if (ProcessHoleBoundAlias(segment, state)) continue;
 
             // 2. The Core State Machine (Lightning Fast)
             if (segment.Type == SqlSegmentType.Raw)
             {
-                // 🌟 FIX: Safely route dynamic OrderBy fragments to be resolved!
+                //   FIX: Safely route dynamic OrderBy fragments to be resolved!
                 if (segment.Value is SqlDynamicColumnFragment || 
                     segment.Value is SqlDynamicOrderFragment || 
                     segment.Value is SqlColumnReferenceBase || 

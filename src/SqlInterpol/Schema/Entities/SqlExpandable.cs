@@ -1,25 +1,27 @@
-using SqlInterpol.Configuration;
 using SqlInterpol.Segments;
 
 namespace SqlInterpol.Schema;
 
 /// <summary>
-/// A macro fragment used to represent a C# DTO that should be expanded into structural 
-/// SQL sequences (like columns, values, or assignments) by the pipeline's semantic rewriters.
+/// Represents a strongly-typed template marker for expanding <typeparamref name="TDto"/> into SQL fragments.
 /// </summary>
-/// <typeparam name="TDto">The data transfer object type to expand.</typeparam>
-/// <param name="keys">Optional primary key property names to exclude during SET expansions.</param>
-public class SqlExpandable<TDto>(string[] keys) : ISqlFragment
+/// <typeparam name="TDto">The type of the data transfer object to expand.</typeparam>
+public readonly struct SqlExpandable<TDto> : ISqlExpandable
 {
-    /// <summary>Gets the array of key property names.</summary>
-    public string[] Keys { get; } = keys;
+    /// <inheritdoc />
+    public Type DtoType => typeof(TDto);
+
+    /// <inheritdoc />
+    public IReadOnlySet<string> KeyProperties { get; }
 
     /// <summary>
-    /// Throws a <see cref="NotSupportedException"/>, as this macro must be structurally rewritten 
-    /// by the pipeline before the rendering phase.
+    /// Initializes a new instance of the <see cref="SqlExpandable{TDto}"/> struct.
     /// </summary>
-    public string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
+    /// <param name="keys">An optional array of property names to treat as keys during parser expansion.</param>
+    public SqlExpandable(string[]? keys)
     {
-        throw new NotSupportedException("SqlExpandable is a macro fragment and must be structurally rewritten by the pipeline before rendering.");
+        KeyProperties = keys != null && keys.Length > 0 
+            ? new HashSet<string>(keys, StringComparer.OrdinalIgnoreCase) 
+            : [];
     }
 }

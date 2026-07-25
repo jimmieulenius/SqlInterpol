@@ -20,7 +20,7 @@ public abstract class SqlReference(ISqlFragment parent) : ISqlReference, ISqlAli
     public bool IsAliasQuoted { get; set; }
 
     /// <summary>Gets the alias to use when no explicit alias is set.</summary>
-    public string FallbackAlias { get; init; } = string.Empty;
+    public string FallbackAlias { get; set; } = string.Empty;
 
     /// <inheritdoc />
     public abstract string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default);

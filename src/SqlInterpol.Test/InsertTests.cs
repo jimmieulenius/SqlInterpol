@@ -138,29 +138,6 @@ public class InsertTests
     }
 
     [Theory]
-    [MemberData(nameof(UnsupportedReturningData))]
-    public void Insert_Returning_ThrowsException_ForUnsupportedDialect(SqlErrorTestCase testCase)
-    {
-        // Arrange
-        var db = testCase.CreateBuilder();
-        var newProduct = new { Name = "Test Product", CategoryId = 5, Price = 19.99m };
-
-        // Act
-        var exception = Record.Exception(() => 
-        {
-            db.Entity<Product>(out var p)
-                .Append($$"""
-                INSERT INTO {{p}} {{newProduct}}
-                RETURNING {{p.Id}}
-                """)
-                .Build();
-        });
-
-        // Assert
-        testCase.AssertException(exception);
-    }
-
-    [Theory]
     [MemberData(nameof(InsertWithIgnoreData))]
     public void Insert_WithIgnoredProperty(SqlTestCase testCase)
     {
@@ -500,6 +477,11 @@ public class InsertTests
             return
             [
                 new SqlTestCase(
+                    SqlDialectKind.CustomDb, 
+                    typeof(SqlDialectException),
+                    "The SQL dialect 'CustomDb' does not support the operation or fragment type: 'RETURNING'."
+                ),
+                new SqlTestCase(
                     SqlDialectKind.Firebird,
                     [
                         """
@@ -509,6 +491,11 @@ public class InsertTests
                         """
                     ],
                     expectedParameters: expectedParams
+                ),
+                new SqlTestCase(
+                    SqlDialectKind.MySql,
+                    typeof(SqlDialectException),
+                    "The SQL dialect 'MySql' does not support the operation or fragment type: 'RETURNING'."
                 ),
                 new SqlTestCase(
                     SqlDialectKind.Oracle,
@@ -567,6 +554,11 @@ public class InsertTests
             return
             [
                 new SqlTestCase(
+                    SqlDialectKind.CustomDb,
+                    typeof(SqlDialectException),
+                    "The SQL dialect 'CustomDb' does not support the operation or fragment type: 'RETURNING'."
+                ),
+                new SqlTestCase(
                     SqlDialectKind.Firebird,
                     [
                         """
@@ -576,6 +568,11 @@ public class InsertTests
                         """
                     ],
                     expectedParameters: expectedParams
+                ),
+                new SqlTestCase(
+                    SqlDialectKind.MySql,
+                    typeof(SqlDialectException),
+                    "The SQL dialect 'MySql' does not support the operation or fragment type: 'RETURNING'."
                 ),
                 new SqlTestCase(
                     SqlDialectKind.Oracle,
@@ -624,12 +621,6 @@ public class InsertTests
             ];
         }
     }
-
-    public static TheoryData<SqlErrorTestCase> UnsupportedReturningData =>
-    [
-        new SqlErrorTestCase(SqlDialectKind.CustomDb, typeof(SqlDialectException), "'RETURNING' is not supported"),
-        new SqlErrorTestCase(SqlDialectKind.MySql, typeof(SqlDialectException), "'RETURNING' is not supported")
-    ];
 
     public static TheoryData<SqlTestCase> InsertWithIgnoreData
     {
@@ -808,6 +799,12 @@ public class InsertTests
             ];
         }
     }
+
+    // TODO: Add tests using templates for Insert statements, including scenarios with ignored properties and complex types.
+    // [Theory]
+    // [MemberData(nameof(InsertTemplateData))]
+    // public void AppendInsert_Template(SqlTestCase testCase)
+    // { ... }
 
     public static TheoryData<SqlTestCase> InsertTemplateData
     {

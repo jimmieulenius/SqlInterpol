@@ -56,8 +56,8 @@ public class SqlCoreSyntaxRewriter : ISqlSegmentRewriter
     public IReadOnlyList<SqlSegment> Rewrite(IReadOnlyList<SqlSegment> segments, ISqlContext context)
     {
         var rewritten = new List<SqlSegment>(segments.Count);
-
         bool hasDelete = false, hasUpdate = false, hasDeleteAs = false, hasUpdateAs = false, hasFrom = false;
+
         foreach(var s in segments)
         {
             if (s.HasTag(SqlSegmentTag.DeleteKeyword)) hasDelete = true;
@@ -76,6 +76,12 @@ public class SqlCoreSyntaxRewriter : ISqlSegmentRewriter
                     if (ent.Reference != null)
                     {
                         SetAlias(ent.Reference, null);
+                        
+                        // FIX: Safely strip the fallback alias so the DML base table renders cleanly
+                        if (ent.Reference is SqlEntityReference entRef)
+                            entRef.FallbackAlias = string.Empty;
+                        else if (ent.Reference is SqlReference baseRef)
+                            baseRef.FallbackAlias = string.Empty;
                     }
                     break; 
                 }
@@ -132,7 +138,6 @@ public class SqlCoreSyntaxRewriter : ISqlSegmentRewriter
             else if (segment.HasTag(SqlSegmentTag.ForUpdateKeyword) && segment.Value is string updateText)
             {
                 TrimPrecedingWhitespace(rewritten);
-
                 int idx = updateText.IndexOf("FOR UPDATE", StringComparison.OrdinalIgnoreCase);
                 if (idx > -1)
                 {
@@ -149,7 +154,6 @@ public class SqlCoreSyntaxRewriter : ISqlSegmentRewriter
             else if (segment.HasTag(SqlSegmentTag.ForShareKeyword) && segment.Value is string shareText)
             {
                 TrimPrecedingWhitespace(rewritten);
-
                 int idx = shareText.IndexOf("FOR SHARE", StringComparison.OrdinalIgnoreCase);
                 if (idx > -1)
                 {
@@ -190,7 +194,6 @@ public class SqlCoreSyntaxRewriter : ISqlSegmentRewriter
                 if (delIdx > -1 && targetIdx > delIdx)
                 {
                     var targetEntity = (ISqlEntityBase)rewritten[targetIdx].Value!;
-
                     if (targetEntity is not ISqlQueryFragment && !context.Dialect.SupportedFeatures.Contains(SqlFeature.DeleteAs)) 
                         throw new SqlDialectException(context.Dialect.Kind.ToString(), "DELETE AS");
 
@@ -200,6 +203,7 @@ public class SqlCoreSyntaxRewriter : ISqlSegmentRewriter
 
                     rewritten.RemoveRange(delIdx, rewritten.Count - delIdx);
                     if (!string.IsNullOrEmpty(prefix)) rewritten.Add(new SqlSegment(SqlSegmentType.Literal, prefix));
+
                     rewritten.Add(new SqlSegment(SqlSegmentType.Raw, new SqlDeleteAsFragment(targetEntity)));
                     
                     int lookahead = i + 1;
@@ -226,7 +230,6 @@ public class SqlCoreSyntaxRewriter : ISqlSegmentRewriter
                 if (localUpdateIdx > -1 && targetIdx > localUpdateIdx)
                 {
                     var targetEntity = (ISqlEntityBase)rewritten[targetIdx].Value!;
-
                     if (targetEntity is not ISqlQueryFragment && !context.Dialect.SupportedFeatures.Contains(SqlFeature.UpdateAs)) 
                         throw new SqlDialectException(context.Dialect.Kind.ToString(), "UPDATE AS");
 
@@ -236,6 +239,7 @@ public class SqlCoreSyntaxRewriter : ISqlSegmentRewriter
 
                     rewritten.RemoveRange(localUpdateIdx, rewritten.Count - localUpdateIdx);
                     if (!string.IsNullOrEmpty(prefix)) rewritten.Add(new SqlSegment(SqlSegmentType.Literal, prefix));
+
                     rewritten.Add(new SqlSegment(SqlSegmentType.Raw, new SqlUpdateAsFragment(targetEntity)));
                     
                     int lookahead = i + 1;
@@ -263,6 +267,7 @@ public class SqlCoreSyntaxRewriter : ISqlSegmentRewriter
             }
             
             if (rewrittenKeyword) continue;
+
             rewritten.Add(segment);
         }
 

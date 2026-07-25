@@ -28,7 +28,7 @@ public class SqlTable<T> : SqlEntityBase<T>
         Reference = new SqlEntityReference(this) 
         { 
             Alias = alias, 
-            FallbackAlias = name, 
+            FallbackAlias = typeof(T).Name, // FIX: Use the C# Type Name!
             IsAliasQuoted = !string.IsNullOrWhiteSpace(alias) 
         };
         Declaration = new SqlDeclaration(this);
@@ -41,18 +41,22 @@ public class SqlTable<T> : SqlEntityBase<T>
         
         if (mode == SqlRenderMode.AliasOnly)
         {
-            return Reference.IsAliasQuoted && Reference.Alias != null 
-                ? dialect.QuoteIdentifier(Reference.Alias) 
-                : Reference.Alias ?? Name;
+            var aliasToUse = Reference.Alias ?? Reference.FallbackAlias;
+            return Reference.IsAliasQuoted && aliasToUse != null 
+                ? dialect.QuoteIdentifier(aliasToUse) 
+                : aliasToUse ?? Name;
         }
 
-        var quotedName = dialect.QuoteEntityName(Name, Schema);
+        var quotedName = Role == SqlEntityRole.Cte 
+            ? dialect.QuoteIdentifier(Name) 
+            : dialect.QuoteEntityName(Name, Schema);
         
         if (mode == SqlRenderMode.Declaration)
         {
-            return string.IsNullOrEmpty(Reference.Alias) 
+            var aliasToUse = Reference.Alias ?? Reference.FallbackAlias;
+            return string.IsNullOrEmpty(aliasToUse) 
                 ? quotedName 
-                : dialect.ApplyAlias(quotedName, Reference.IsAliasQuoted ? dialect.QuoteIdentifier(Reference.Alias) : Reference.Alias);
+                : dialect.ApplyAlias(quotedName, Reference.IsAliasQuoted ? dialect.QuoteIdentifier(aliasToUse) : aliasToUse);
         }
 
         return quotedName;

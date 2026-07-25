@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.Text;
 using SqlInterpol.Configuration;
 using SqlInterpol.Pipeline;
@@ -11,7 +9,7 @@ namespace SqlInterpol.Segments;
 /// A structural fragment that wraps recursively preprocessed segments of a nested subquery,
 /// preserving its foundational query interfaces and entity references for downstream compilers.
 /// </summary>
-public class SqlNestedQueryFragment : ISqlQueryFragment, ISqlEntityBase, ISqlSegmentContainer
+public class SqlNestedQueryFragment : ISqlQueryFragment, ISqlEntityBase, ISqlSegmentContainer, ISqlRoleable
 {
     /// <summary>
     /// Gets the open collection of executable segments belonging to the subquery.

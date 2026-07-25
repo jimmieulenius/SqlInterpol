@@ -1,7 +1,8 @@
 using SqlInterpol.Configuration;
+using SqlInterpol.Schema;
 using SqlInterpol.Segments;
 
-namespace SqlInterpol.Schema;
+namespace SqlInterpol;
 
 /// <summary>
 /// The reference fragment for a SQL entity, rendering as the alias (quoted or unquoted)
@@ -11,23 +12,36 @@ namespace SqlInterpol.Schema;
 public class SqlEntityReference(ISqlFragment parent) : ISqlReference, ISqlAliasable
 {
     private readonly ISqlFragment _parent = parent;
-
-    /// <summary>Gets or sets the alias to use when this reference appears in query clauses.</summary>
+    
+    /// <summary>Gets or sets the alias to use when this reference appears in query clauses (e.g. <c>p</c> for <c>"Products" AS "p"</c>).</summary>
     public string? Alias { get; set; }
-
-    /// <summary>Gets or sets whether the alias should be wrapped in dialect-specific identifier quotes.</summary>
+    
+    /// <summary>Gets or sets whether <see cref="Alias"/> should be wrapped in dialect-specific identifier quotes.</summary>
     public bool IsAliasQuoted { get; set; }
-
-    /// <summary>Gets the alias to use when no explicit alias is set.</summary>
-    public required string FallbackAlias { get; init; }
-
+    
+    /// <summary>Gets or sets the alias to use when <see cref="Alias"/> is <see langword="null"/>.</summary>
+    public string FallbackAlias { get; set; } = string.Empty; // FIX: Opened setter for the rewriter
+    
     /// <summary>Gets the entity fragment this reference belongs to.</summary>
     public ISqlFragment Source => _parent;
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Renders the entity reference. When an alias is set, returns the alias (quoted or unquoted
+    /// based on <see cref="IsAliasQuoted"/>); otherwise delegates to the parent entity fragment.
+    /// </summary>
+    /// <param name="context">The active context providing dialect quoting.</param>
+    /// <param name="mode">The render mode forwarded to the parent fragment when no alias is set.</param>
+    /// <returns>The SQL string for this entity reference.</returns>
     public string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
     {
-        if (!string.IsNullOrEmpty(Alias))
+        var aliasToUse = Alias ?? FallbackAlias;
+        
+        if (!string.IsNullOrEmpty(aliasToUse) && mode == SqlRenderMode.AliasOnly)
+        {
+            return IsAliasQuoted ? context.Dialect.QuoteIdentifier(aliasToUse) : aliasToUse;
+        }
+        
+        if (!string.IsNullOrEmpty(Alias) && mode == SqlRenderMode.Default)
         {
             return IsAliasQuoted ? context.Dialect.QuoteIdentifier(Alias) : Alias;
         }

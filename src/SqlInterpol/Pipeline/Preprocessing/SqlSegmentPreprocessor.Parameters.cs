@@ -14,7 +14,6 @@ public partial class SqlSegmentPreprocessor
     private bool ProcessUnresolved(SqlSegment segment, IReadOnlyList<SqlSegment> segments, SqlPreprocessorState state)
     {
         if (segment.Type != SqlSegmentType.Unresolved) return false;
-
         var value = segment.Value;
         
         // 1. FIX: Safely unwrap ISqlDeclaration to prevent it from triggering the DTO class check!
@@ -26,15 +25,17 @@ public partial class SqlSegmentPreprocessor
 
         if (entity != null)
         {
-            if (string.Equals(state.CurrentKeyword, SqlKeyword.Select.Value, StringComparison.OrdinalIgnoreCase) || 
+            if (string.Equals(state.CurrentKeyword, SqlKeyword.Select.Value, StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(state.CurrentKeyword, SqlKeyword.SelectDistinct.Value, StringComparison.OrdinalIgnoreCase))
             {
                 var entityMeta = SqlMetadataRegistry.GetMetadata(entity.ModelType);
                 var columns = new List<ISqlFragment>(entityMeta.Columns.Count);
                 
-                foreach (var col in entityMeta.Columns)
+                // FIX: Deterministic alphabetical sorting for SELECT * queries to guarantee JIT matches AOT test assertions!
+                var sortedCols = entityMeta.Columns.OrderBy(c => c.Key.Name).ToList();
+
+                foreach (var col in sortedCols)
                 {
-                    // FIX CS0030: col.Key is strongly typed to PropertyInfo by the dictionary.
                     var memberType = col.Key.PropertyType; 
                     if (memberType.IsClass && memberType != typeof(string) && memberType != typeof(byte[])) continue;
                     columns.Add(new SqlColumnReference(entity.Reference, col.Value, col.Key.Name));
@@ -43,7 +44,6 @@ public partial class SqlSegmentPreprocessor
                 state.Refined.Add(new SqlSegment(SqlSegmentType.Raw, new SqlSelectFragment(columns, isDistinct: string.Equals(state.CurrentKeyword, SqlKeyword.SelectDistinct.Value, StringComparison.OrdinalIgnoreCase))));
                 return true;
             }
-
             var mode = segment.RenderMode;
             if (mode == null && state.ForceBaseNamePhase) mode = SqlRenderMode.BaseName;
             state.Refined.Add(new SqlSegment(SqlSegmentType.Reference, entity, mode, segment.Tags));
@@ -68,6 +68,7 @@ public partial class SqlSegmentPreprocessor
             {
                 if (isSetClause && expandable.KeyProperties.Contains(prop.Name)) continue;
                 var entityMember = entityMeta.Columns.Keys.FirstOrDefault(k => k.Name == prop.Name);
+
                 if (entityMember != null)
                 {
                     var colRef = new SqlColumnReference(state.ActiveEntityTarget.Reference, entityMeta.Columns[entityMember], prop.Name);
@@ -82,19 +83,18 @@ public partial class SqlSegmentPreprocessor
                 state.Refined.Add(new SqlSegment(SqlSegmentType.Raw, new SqlSelectFragment(columns, isDistinct: string.Equals(state.CurrentKeyword, SqlKeyword.SelectDistinct.Value, StringComparison.OrdinalIgnoreCase))));
             }
             else state.Refined.Add(new SqlSegment(SqlSegmentType.Reference, new SqlInsertValuesFragment(assignments)));
+            
             return true;
         }
 
         if (value != null && value.GetType().IsClass && value is not string && value is not ISqlFragment)
         {
             bool isIterable = value is IEnumerable && value is not byte[];
-
             // Determine context comprehensively using ActiveDmlKeyword for safety
             bool isInsertContext = string.Equals(state.ActiveDmlKeyword, SqlKeyword.Insert.Value, StringComparison.OrdinalIgnoreCase) ||
                                    string.Equals(state.CurrentKeyword, SqlKeyword.Insert.Value, StringComparison.OrdinalIgnoreCase) ||
                                    string.Equals(state.CurrentKeyword, SqlKeyword.Into.Value, StringComparison.OrdinalIgnoreCase) ||
                                    string.Equals(state.CurrentKeyword, SqlKeyword.Values.Value, StringComparison.OrdinalIgnoreCase);
-
             bool isSetContext = string.Equals(state.CurrentKeyword, SqlKeyword.Set.Value, StringComparison.OrdinalIgnoreCase);
 
             if (!isIterable || isInsertContext)
@@ -135,7 +135,6 @@ public partial class SqlSegmentPreprocessor
         if (value is IEnumerable databaseIterable && value is not string && value is not byte[])
         {
             int estimatedCount = databaseIterable is ICollection collection ? collection.Count : 4;
-
             bool isFragmentCollection = false;
             foreach (var element in databaseIterable)
             {

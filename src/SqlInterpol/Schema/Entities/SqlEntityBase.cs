@@ -6,7 +6,7 @@ namespace SqlInterpol.Schema;
 /// <summary>
 /// Provides a base implementation for SQL entities, managing reference mapping and declarations.
 /// </summary>
-public abstract class SqlEntityBase : ISqlEntityBase
+public abstract class SqlEntityBase : ISqlEntityBase, ISqlRoleable
 {
     /// <inheritdoc />
     public SqlEntityRole Role { get; set; } = SqlEntityRole.Table;
