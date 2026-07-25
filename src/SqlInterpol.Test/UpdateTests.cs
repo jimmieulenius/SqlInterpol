@@ -403,7 +403,7 @@ public class UpdateTests
         get
         {
             var expectedExceptionType = typeof(ArgumentException);
-            var expectedExceptionMessage = "Entity must implement ISqlEntityBase<T>";
+            var expectedExceptionMessage = "Entity must implement ISqlEntityBase<T>.";
 
             return [
                 new SqlTestCase(

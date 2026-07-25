@@ -87,21 +87,26 @@ public static class Sql
     {
         var properties = SqlMetadataRegistry.GetDtoProperties(dto.GetType());
         var assignments = new List<ISqlAssignmentFragment>(properties.Length);
-        
-        Type? modelType = null;
+
+        // Guard: only ISqlEntityBase<T> implementations carry a concrete CLR type binding.
+        // Walk interfaces once — validate and confirm in a single pass, then use the
+        // purpose-built ModelType property (typeof(T)) to avoid a second GetGenericArguments() call.
+        bool hasGenericBinding = false;
         foreach (var i in entity.GetType().GetInterfaces())
         {
-            if (i.IsGenericType && (i.GetGenericTypeDefinition() == typeof(ISqlEntityBase<>) || i.Name.StartsWith("ISqlEntity")))
+            if (i.IsGenericType && i.GetGenericTypeDefinition() == typeof(ISqlEntityBase<>))
             {
-                modelType = i.GetGenericArguments()[0];
+                hasGenericBinding = true;
                 break;
             }
         }
-        
-        if (modelType == null) 
-            throw new ArgumentException("Entity must implement ISqlEntityBase<T>");
-            
-        var meta = SqlMetadataRegistry.GetMetadata(modelType);
+
+        if (!hasGenericBinding)
+        {
+            throw new ArgumentException("Entity must implement ISqlEntityBase<T>.");
+        }
+
+        var meta = SqlMetadataRegistry.GetMetadata(entity.ModelType);
         var globalEnumFormat = context.Options.EnumFormat;
         
         foreach (var prop in properties)
