@@ -43,7 +43,7 @@ public static class Sql
     /// <typeparam name="T">The model type containing the target property.</typeparam>
     /// <param name="selector">A lambda expression targeting the property to use as the argument name.</param>
     /// <returns>A fragment representing the typed argument.</returns>
-    public static SqlArgumentFragment Arg<T>(Expression<Func<T, object>> selector) => 
+    public static SqlArgumentFragment Arg<T>(Expression<Func<T, object?>> selector) => 
         new(SqlExpressionHelper.GetPropertyName(selector));
 
     /// <summary>
@@ -114,7 +114,8 @@ public static class Sql
             }
             
             string columnName = meta.Columns[entityMember];
-            var reference = new SqlColumnReference(entity.Reference, columnName, prop.Name); 
+            var reference = new SqlColumnReference(entity.Reference, columnName, prop.Name);
+
             var value = prop.GetValue(dto);
             
             if (value != null)

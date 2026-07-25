@@ -20,11 +20,11 @@ public partial class SqlAotInterceptorGenerator : IIncrementalGenerator
                     isDisabled = disableAot;
                 }
 
-                ImmutableArray<string> dialects = ImmutableArray.Create("PostgreSql");
+                ImmutableArray<string> dialects = ["PostgreSql"];
                 if (options.GlobalOptions.TryGetValue("build_property.sqlinterpoldialects", out var dialectsString)
                      && !string.IsNullOrWhiteSpace(dialectsString))
                 {
-                    dialects = dialectsString.Split(',', ';').Select(d => d.Trim()).Where(d => !string.IsNullOrEmpty(d)).ToImmutableArray();
+                    dialects = [.. dialectsString.Split(',', ';').Select(d => d.Trim()).Where(d => !string.IsNullOrEmpty(d))];
                 }
 
                 return (Dialects: dialects, IsDisabled: isDisabled);

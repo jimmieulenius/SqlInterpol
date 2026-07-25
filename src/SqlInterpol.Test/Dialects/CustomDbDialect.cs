@@ -4,7 +4,7 @@ using SqlInterpol.Dialects;
 namespace SqlInterpol.Test.Dialects;
 
 // 1. SqlDialectKind
-public static partial class SqlDialectKindExtensions
+public static class SqlDialectKindExtensions
 {
     extension (SqlDialectKind)
     {

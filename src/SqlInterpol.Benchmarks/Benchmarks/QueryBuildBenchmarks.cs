@@ -1,7 +1,6 @@
 using System.Runtime.CompilerServices;
 using BenchmarkDotNet.Attributes;
 using SqlInterpol.Benchmarks.Models;
-using SqlInterpol.Parsing;
 
 namespace SqlInterpol.Benchmarks;
 

@@ -8,4 +8,5 @@
   <Project Path="SqlInterpol.EntityFrameworkCore.Test/SqlInterpol.EntityFrameworkCore.Test.csproj" />
   <Project Path="SqlInterpol.Generators/SqlInterpol.Generators.csproj" />
   <Project Path="SqlInterpol.Test/SqlInterpol.Test.csproj" />
+  <Project Path="SqlInterpol.Test/SqlInterpol.Test.Aot.csproj" />
 </Solution>

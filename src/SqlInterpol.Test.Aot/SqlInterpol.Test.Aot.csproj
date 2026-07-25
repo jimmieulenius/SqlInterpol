@@ -5,10 +5,18 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
-      
+    
+    <!-- A compiler constant just in case you ever need to use #if AOT in your shared test files -->
+    <!-- <DefineConstants>$(DefineConstants);AOT_ENABLED</DefineConstants> -->
     <SqlInterpolDialects>PostgreSql,SqlServer</SqlInterpolDialects>
-    <SqlInterpolDisableAot>true</SqlInterpolDisableAot>
+    <SqlInterpolDisableAot>false</SqlInterpolDisableAot>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\SqlInterpol.Test\**\*.cs" 
+             Exclude="..\SqlInterpol.Test\obj\**;..\SqlInterpol.Test\bin\**" 
+             LinkBase="SharedTests" />
+  </ItemGroup>
 
   <ItemGroup>
     <CompilerVisibleProperty Include="SqlInterpolDialects" />
@@ -16,14 +24,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\SqlInterpol\SqlInterpol.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\SqlInterpol\SqlInterpol.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -43,6 +51,9 @@
   <PropertyGroup>
     <Features>InterceptorsPreview</Features>
     <InterceptorsNamespaces>$(InterceptorsNamespaces);SqlInterpol.Generators.Generated</InterceptorsNamespaces>
+    
+    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+    <CompilerGeneratedFilesOutputPath>obj/Generated</CompilerGeneratedFilesOutputPath>
   </PropertyGroup>
 
   <ItemGroup>

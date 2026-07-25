@@ -1,3 +1,4 @@
+using SqlInterpol.Schema;
 
 namespace SqlInterpol.Benchmarks.Models;
 
