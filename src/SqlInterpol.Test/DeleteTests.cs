@@ -6,7 +6,6 @@ namespace SqlInterpol.Test;
 
 public class DeleteTests
 {
-    // Shared test data at the class level ensures zero drift between execution and assertions!
     private const int TargetId = 42;
     private static readonly TestUser TemplateUser = new() { Id = 1, Name = "Bob", Age = 31 };
 
@@ -18,16 +17,18 @@ public class DeleteTests
         var db = testCase.CreateBuilder();
 
         // Act
-        testCase.Action(() => db.Entity<OrderModel>(out var o)
-            .Append($$"""
+        testCase.Action(() => 
+        {
+            db.Entity<OrderModel>(out var o);
+            return db.Append($$"""
                 DELETE FROM {{o}}
                 WHERE {{o.Id}} = {{TargetId}}
-                """)
-            .Build()
-        );
+                """).Build();
+        });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -37,47 +38,27 @@ public class DeleteTests
         // Arrange
         var db = testCase.CreateBuilder();
 
-        // Act - Pure dialect-agnostic WYSIWYG!
-        testCase.Action(() => db
-            .Entity<Product>(out var p)
-            .Entity<Category>(out var c)
-            .Append($$"""
+        // Act
+        testCase.Action(() => 
+        {
+            db.Entity<Product>(out var p).Entity<Category>(out var c);
+            return db.Append($$"""
                 DELETE FROM {{p}}
                 FROM {{c}} AS c1
                 WHERE {{p.CategoryId}} = c1.Id
-                """)
-            .Build()
-        );
+                """).Build();
+        });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
-
-    // TODO: Update template
-    // [Theory]
-    // [MemberData(nameof(DeleteTemplateData))]
-    // public void AppendDelete_Template(SqlTestCase testCase)
-    // {
-    //     // Arrange
-    //     var db = testCase.CreateBuilder();
-    //     var user = new TestUser { Id = 1, Name = "Bob", Age = 31 };
-
-    //     // Act
-    //     testCase.Action(() => db.Query<TestUser>(u => 
-    //         db.AppendDelete(u, user, x => x.Id)
-    //     ).Build()
-    //     );
-
-    //     // Assert
-    //     testCase.Assert();
-    // }
 
     public static TheoryData<SqlTestCase> DeletePureManualData
     {
         get
         {
             object?[] expectedParams = [TargetId];
-
             return
             [
                 new SqlTestCase(
@@ -149,7 +130,6 @@ public class DeleteTests
         get
         {
             object?[] expectedParams = [];
-
             return
             [
                 new SqlTestCase(
@@ -232,7 +212,6 @@ public class DeleteTests
         get
         {
             object?[] expectedParams = [TemplateUser.Id];
-
             return
             [
                 new SqlTestCase(

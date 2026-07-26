@@ -6,8 +6,7 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     
-    <!-- A compiler constant just in case you ever need to use #if AOT in your shared test files -->
-    <!-- <DefineConstants>$(DefineConstants);AOT_ENABLED</DefineConstants> -->
+    <DefineConstants>$(DefineConstants);AOT_ENABLED</DefineConstants>
     <SqlInterpolDialects>PostgreSql,SqlServer</SqlInterpolDialects>
     <SqlInterpolDisableAot>false</SqlInterpolDisableAot>
   </PropertyGroup>

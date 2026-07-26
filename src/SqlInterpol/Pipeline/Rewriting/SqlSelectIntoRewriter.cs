@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using SqlInterpol.Configuration;
 using SqlInterpol.Segments;
@@ -12,7 +11,7 @@ namespace SqlInterpol.Pipeline;
 public class SqlSelectIntoRewriter : ISqlSegmentRewriter
 {
     // Opt-out of transpilation if the user disables Meta-SQL!
-    public bool IsApplicable(ISqlPipelineState state) => state.Context.Options.CrossVendorSqlTranspilation;
+    public bool IsApplicable(ISqlPipelineState state) => state.Context.Options.CrossDialectSqlTranspilation;
 
     public IReadOnlyList<SqlSegment> Rewrite(IReadOnlyList<SqlSegment> segments, ISqlContext context)
     {

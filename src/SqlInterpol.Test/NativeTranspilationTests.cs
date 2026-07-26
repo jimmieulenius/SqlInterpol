@@ -14,13 +14,16 @@ public class NativeTranspilationTests
         var db = testCase.CreateBuilder();
 
         // Act
-        testCase.Action(() => db.Append($"""
-            SELECT * FROM Users WHERE IsActive = TRUE AND IsDeleted = FALSE
-            """).Build()
-        );
+        testCase.Action(() => 
+        {
+            return db.Append($"""
+                SELECT * FROM Users WHERE IsActive = TRUE AND IsDeleted = FALSE
+                """).Build();
+        });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -31,13 +34,16 @@ public class NativeTranspilationTests
         var db = testCase.CreateBuilder();
 
         // Act
-        testCase.Action(() => db.Append($"""
-            SELECT CONSTRUE, FALSEHOOD FROM TRUE_TABLE WHERE IsActive = TRUE
-            """).Build()
-        );
+        testCase.Action(() => 
+        {
+            return db.Append($"""
+                SELECT CONSTRUE, FALSEHOOD FROM TRUE_TABLE WHERE IsActive = TRUE
+                """).Build();
+        });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -48,13 +54,16 @@ public class NativeTranspilationTests
         var db = testCase.CreateBuilder();
 
         // Act
-        testCase.Action(() => db.Append($"""
-            SELECT FirstName || ' ' || LastName FROM Users
-            """).Build()
-        );
+        testCase.Action(() => 
+        {
+            return db.Append($"""
+                SELECT FirstName || ' ' || LastName FROM Users
+                """).Build();
+        });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -65,13 +74,16 @@ public class NativeTranspilationTests
         var db = testCase.CreateBuilder();
 
         // Act
-        testCase.Action(() => db.Append($"""
-            SELECT 'The statement is TRUE || FALSE' FROM Users WHERE IsActive = TRUE
-            """).Build()
-        );
+        testCase.Action(() => 
+        {
+            return db.Append($"""
+                SELECT 'The statement is TRUE || FALSE' FROM Users WHERE IsActive = TRUE
+                """).Build();
+        });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     public static TheoryData<SqlTestCase> BooleanTranspilationData

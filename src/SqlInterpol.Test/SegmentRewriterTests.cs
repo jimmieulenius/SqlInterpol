@@ -7,7 +7,7 @@ using SqlInterpol.Segments;
 
 namespace SqlInterpol.Test;
 
-public class CustomRewriterTests
+public class SegmentRewriterTests
 {
     [Theory]
     [MemberData(nameof(SoftDeleteData))]
@@ -22,16 +22,18 @@ public class CustomRewriterTests
         int targetId = 42;
 
         // Act: The user writes a standard DELETE statement
-        testCase.Action(() => db.Entity<OrderModel>(out var o)
-            .Append($$"""
+        testCase.Action(() => 
+        {
+            db.Entity<OrderModel>(out var o);
+            return db.Append($$"""
                 DELETE FROM {{o}}
                 WHERE {{o.Id}} = {{targetId}}
-                """)
-            .Build()
-        );
+                """).Build();
+        });
 
         // Assert: The engine automatically intercepted and rewrote it across ALL dialects!
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     public static TheoryData<SqlTestCase> SoftDeleteData

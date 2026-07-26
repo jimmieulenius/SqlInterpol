@@ -12,25 +12,21 @@ public class SelectIntoTests
     {
         // Arrange
         var db = testCase.CreateBuilder();
-        SqlQueryResult? result = null;
 
         // Act
         testCase.Action(() => 
         {
-            result = db
-                .Entity<Product>(out var p)
-                .Append($$"""
+            db.Entity<Product>(out var p);
+            return db.Append($$"""
                 SELECT {{p.Id}}, {{p.Name}}
                 INTO #TempProducts
                 FROM {{p}}
-                """)
-                .Build();
-
-            return [result];
+                """).Build();
         });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -40,21 +36,19 @@ public class SelectIntoTests
         // Arrange
         var db = testCase.CreateBuilder();
         var target = Sql.Raw("#TempProducts");
-        SqlQueryResult? result = null;
 
         // Act
         testCase.Action(() => 
         {
-            result = db
-                .Entity<Product>(out var p)
-                .Append($$"""
+            db.Entity<Product>(out var p);
+
+#pragma warning disable SQLIG10
+            return db.Append($$"""
                 SELECT {{p.Id}}, {{p.Name}}
                 INTO {{target}}
                 FROM {{p}}
-                """)
-                .Build();
-
-            return [result];
+                """).Build();
+#pragma warning restore SQLIG10
         });
 
         // Assert

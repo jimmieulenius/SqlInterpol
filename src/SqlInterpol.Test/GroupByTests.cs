@@ -15,17 +15,19 @@ public class GroupByTests
         var db = testCase.CreateBuilder();
         
         // Act - Uses zero-allocation POCO property routing
-        testCase.Action(() => db.Entity<OrderModel>(out var o)
-            .Append($$"""
+        testCase.Action(() =>
+        {
+            db.Entity<OrderModel>(out var o);
+            return db.Append($$"""
             SELECT CategoryId, order_status, COUNT(*)
             FROM {{o}}
             GROUP BY {{o.CategoryId}}, {{o.Status}}
-            """)
-            .Build()
-        );
+            """).Build();
+        });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -34,19 +36,22 @@ public class GroupByTests
     {
         // Arrange
         var db = testCase.CreateBuilder();
-
         // Simulate generating fragments dynamically from an API request using C# property names
         string[] apiRequestFields = ["CategoryId", "Status"];
 
         // Act - Testing dynamic API scenario using LINQ Select and the Column extension
-        testCase.Action(() => db.Entity<OrderModel>(out var o)
-            .Append($$"""
+        testCase.Action(() =>
+        {
+            db.Entity<OrderModel>(out var o);
+            
+#pragma warning disable SQLIG10 // Dynamic LINQ execution evaluated at runtime via JIT
+            return db.Append($$"""
             SELECT CategoryId, order_status, COUNT(*)
             FROM {{o}}
             GROUP BY {{apiRequestFields.Select(f => o.Column(f))}}
-            """)
-            .Build()
-        );
+            """).Build();
+#pragma warning restore SQLIG10
+        });
 
         // Assert
         testCase.Assert();
@@ -60,14 +65,18 @@ public class GroupByTests
         var db = testCase.CreateBuilder();
 
         // Act
-        testCase.Action(() => db.Entity<OrderModel>(out var o)
-            .Append($$"""
+        testCase.Action(() =>
+        {
+            db.Entity<OrderModel>(out var o);
+
+#pragma warning disable SQLIG10 // Sql.Raw dynamically evaluates SQL fragments via JIT
+            return db.Append($$"""
             SELECT YEAR(created_at), COUNT(*)
             FROM {{o}}
             GROUP BY {{Sql.Raw("YEAR(created_at)")}}
-            """)
-            .Build()
-        );
+            """).Build();
+#pragma warning restore SQLIG10
+        });
 
         // Assert
         testCase.Assert();
@@ -81,14 +90,18 @@ public class GroupByTests
         var db = testCase.CreateBuilder();
 
         // Act
-        testCase.Action(() => db.Entity<OrderModel>(out var o)
-            .Append($$"""
+        testCase.Action(() =>
+        {
+            db.Entity<OrderModel>(out var o);
+
+#pragma warning disable SQLIG10 // Sql.Raw dynamically evaluates SQL fragments via JIT
+            return db.Append($$"""
             SELECT order_status, YEAR(created_at), COUNT(*)
             FROM {{o}}
             GROUP BY {{o.Status}}, {{Sql.Raw("YEAR(created_at)")}}
-            """)
-            .Build()
-        );
+            """).Build();
+#pragma warning restore SQLIG10
+        });
 
         // Assert
         testCase.Assert();

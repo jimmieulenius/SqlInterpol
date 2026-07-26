@@ -27,7 +27,7 @@ public class MetadataTests
     [Fact]
     public void GetMetadata_OmitsIgnoredProperties()
     {
-        // Act
+        // Arrange & Act
         var meta = SqlMetadataRegistry.GetMetadata<MetadataErrorModel>();
 
         // Assert
@@ -38,7 +38,7 @@ public class MetadataTests
     [Fact]
     public void GetMetadata_ResolvesDefaultEntityName()
     {
-        // Act
+        // Arrange & Act
         var meta = SqlMetadataRegistry.GetMetadata<DefaultEntity>();
 
         // Assert
@@ -49,7 +49,7 @@ public class MetadataTests
     [Fact]
     public void GetMetadata_ResolvesDefaultColumnName()
     {
-        // Act
+        // Arrange & Act
         var meta = SqlMetadataRegistry.GetMetadata<DefaultEntity>();
 
         // Assert
@@ -61,7 +61,7 @@ public class MetadataTests
     [Fact]
     public void GetMetadata_ResolvesCustomEntityName()
     {
-        // Act
+        // Arrange & Act
         var meta = SqlMetadataRegistry.GetMetadata<CustomMappedEntity>();
 
         // Assert
@@ -72,7 +72,7 @@ public class MetadataTests
     [Fact]
     public void GetMetadata_ResolvesCustomColumnName()
     {
-        // Act
+        // Arrange & Act
         var meta = SqlMetadataRegistry.GetMetadata<CustomMappedEntity>();
 
         // Assert

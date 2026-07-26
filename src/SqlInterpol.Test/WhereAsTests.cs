@@ -16,15 +16,18 @@ public class WhereAsTests
         var categoryId = 5;
 
         // Act
-        testCase.Action(() => db.Entity<Product>(out var p)
-            .Append($$"""
-            SELECT
-                {{p.Id}} AS ProductId
-            FROM {{p}} AS p
-            WHERE {{p.Id}} = {{productId}} AND {{p.CategoryId}} = {{categoryId}}
-            """)
-            .Build()
-        );
+        testCase.Action(() => 
+        {
+            #pragma warning disable SQLIG10
+            db.Entity<Product>(out var p);
+            return db.Append($$"""
+                SELECT
+                    {{p.Id}} AS ProductId
+                FROM {{p}} AS p
+                WHERE {{p.Id}} = {{productId}} AND {{p.CategoryId}} = {{categoryId}}
+                """).Build();
+            #pragma warning restore SQLIG10
+        });
 
         // Assert
         testCase.Assert();

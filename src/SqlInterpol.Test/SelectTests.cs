@@ -14,17 +14,18 @@ public class SelectTests
         var db = testCase.CreateBuilder();
 
         // Act
-        testCase.Action(() => db
-            .Entity<ProductWithIgnoreModel>(out var p)
-            .Append($$"""
-            SELECT {{p}}
-            FROM {{p}} AS p1
-            """)
-            .Build()
-        );
+        testCase.Action(() => 
+        {
+            db.Entity<ProductWithIgnoreModel>(out var p);
+            return db.Append($$"""
+                SELECT {{p}}
+                FROM {{p}} AS p1
+                """).Build();
+        });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -35,18 +36,19 @@ public class SelectTests
         var db = testCase.CreateBuilder();
         
         // Act
-        testCase.Action(() => db
-            .Entity<Product>(out var p)
-            .Append($$"""
-            SELECT
-                {{p.Id}}
-            FROM {{p}}
-            """)
-            .Build()
-        );
+        testCase.Action(() => 
+        {
+            db.Entity<Product>(out var p);
+            return db.Append($$"""
+                SELECT
+                    {{p.Id}}
+                FROM {{p}}
+                """).Build();
+        });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -57,19 +59,20 @@ public class SelectTests
         var db = testCase.CreateBuilder();
         
         // Act
-        testCase.Action(() => db
-            .Entity<Product>(out var p)
-            .Append($$"""
-            SELECT
-                {{p.Id}},
-                {{p.CategoryId}}
-            FROM {{p}}
-            """)
-            .Build()
-        );
+        testCase.Action(() => 
+        {
+            db.Entity<Product>(out var p);
+            return db.Append($$"""
+                SELECT
+                    {{p.Id}},
+                    {{p.CategoryId}}
+                FROM {{p}}
+                """).Build();
+        });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -80,18 +83,19 @@ public class SelectTests
         var db = testCase.CreateBuilder();
         
         // Act
-        testCase.Action(() => db
-            .Entity<Product>(out var p)
-            .Append($$"""
-            SELECT
-                COUNT({{p.Id}})
-            FROM {{p}}
-            """)
-            .Build()
-        );
+        testCase.Action(() => 
+        {
+            db.Entity<Product>(out var p);
+            return db.Append($$"""
+                SELECT
+                    COUNT({{p.Id}})
+                FROM {{p}}
+                """).Build();
+        });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -104,18 +108,21 @@ public class SelectTests
         SqlQueryResult? result = null;
 
         // Act
-        testCase.Action(() => result = db
-            .Entity<Product>(out var p)
-            .Append($$"""
-            SELECT
-                {{activeStatus}}
-            FROM {{p}}
-            """)
-            .Build()
-        );
+        testCase.Action(() => 
+        {
+            db.Entity<Product>(out var p);
+            result = db.Append($$"""
+                SELECT
+                    {{activeStatus}}
+                FROM {{p}}
+                """).Build();
+            return result;
+        });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
+        
         Assert.NotNull(result);
         Assert.Single(result.Parameters);
         Assert.Equal(1, result.Parameters.Values.First());
@@ -129,18 +136,19 @@ public class SelectTests
         var db = testCase.CreateBuilder();
 
         // Act
-        testCase.Action(() => db
-            .Entity<Product>(out var p)
-            .Append($$"""
-            SELECT
-                {{p.Name}}
-            FROM {{p}}
-            """)
-            .Build()
-        );
+        testCase.Action(() => 
+        {
+            db.Entity<Product>(out var p);
+            return db.Append($$"""
+                SELECT
+                    {{p.Name}}
+                FROM {{p}}
+                """).Build();
+        });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -152,17 +160,18 @@ public class SelectTests
         db.Context.Options.CollectionLayout = SqlCollectionLayout.Vertical;
 
         // Act
-        testCase.Action(() => db
-            .Entity<ProductWithIgnoreModel>(out var p)
-            .Append($$"""
-            SELECT DISTINCT {{p}}
-            FROM {{p}} AS p1
-            """)
-            .Build()
-        );
+        testCase.Action(() => 
+        {
+            db.Entity<ProductWithIgnoreModel>(out var p);
+            return db.Append($$"""
+                SELECT DISTINCT {{p}}
+                FROM {{p}} AS p1
+                """).Build();
+        });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -173,17 +182,18 @@ public class SelectTests
         var db = testCase.CreateBuilder();
 
         // Act
-        testCase.Action(() => db
-            .Entity<Product>(out var p)
-            .Append($$"""
-            SELECT TOP 10 {{p.Id}}
-            FROM {{p}}
-            """)
-            .Build()
-        );
+        testCase.Action(() => 
+        {
+            db.Entity<Product>(out var p);
+            return db.Append($$"""
+                SELECT TOP 10 {{p.Id}}
+                FROM {{p}}
+                """).Build();
+        });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -195,17 +205,24 @@ public class SelectTests
         SqlQueryResult? result = null;
 
         // Act
-        testCase.Action(() => result = db
-            .Entity<ComplexProduct>(out var p)
-            .Append($$"""
-            SELECT {{p}}
-            FROM {{p}} AS {{Sql.Quote("p")}}
-            """)
-            .Build()
-        );
+        testCase.Action(() => 
+        {
+            db.Entity<ComplexProduct>(out var p);
+
+#pragma warning disable SQLIG10 // Sql.Quote dynamically evaluates SQL fragments via JIT
+            result = db.Append($$"""
+                SELECT {{p}}
+                FROM {{p}} AS {{Sql.Quote("p")}}
+                """).Build();
+#pragma warning restore SQLIG10
+
+            return result;
+        });
 
         // Assert
         testCase.Assert();
+        // Omitted db.AssertAotIntercepted() because Sql.Quote forces JIT execution
+        
         Assert.NotNull(result);
         Assert.DoesNotContain("Supplier", result.Sql);
     }

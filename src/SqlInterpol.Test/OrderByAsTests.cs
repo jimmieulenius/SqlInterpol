@@ -14,15 +14,18 @@ public class OrderByAsTests
         var db = testCase.CreateBuilder();
 
         // Act
-        testCase.Action(() => db.Entity<Product>(out var prod, "prod")
-            .Append($$"""
-            SELECT *
-            FROM {{prod}} AS {{prod:alias}}
-            ORDER BY
-                {{prod.Name}} ASC
-            """)
-            .Build()
-        );
+        testCase.Action(() => 
+        {
+            #pragma warning disable SQLIG10
+            db.Entity<Product>(out var prod, "prod");
+            return db.Append($$"""
+                SELECT *
+                FROM {{prod}} AS {{prod:alias}}
+                ORDER BY
+                    {{prod.Name}} ASC
+                """).Build();
+            #pragma warning restore SQLIG10
+        });
 
         // Assert
         testCase.Assert();

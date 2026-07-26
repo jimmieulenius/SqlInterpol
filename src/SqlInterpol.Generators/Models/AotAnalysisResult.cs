@@ -5,7 +5,7 @@ namespace SqlInterpol.Generators;
 /// Determines whether the string can be safely AOT-intercepted or must fall back
 /// to the JIT runtime engine.
 /// </summary>
-internal sealed class AotAnalysisResult
+internal sealed class SqlAotAnalysisResult
 {
     /// <summary>
     /// Gets inline alias overrides keyed by entity variable name (e.g., <c>"p" → "prod"</c>).

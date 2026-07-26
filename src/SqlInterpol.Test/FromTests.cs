@@ -10,60 +10,66 @@ public class FromTests
     [MemberData(nameof(From_SingleEntityData))]
     public void From_SingleEntity(SqlTestCase testCase)
     {
+        // Arrange
+        var db = testCase.CreateBuilder();
+
+        // Act
         testCase.Action(() =>
         {
-            var db = testCase.CreateBuilder();
-            
-            return db
-                .Entity<OrderLine>(out var ol)
-                .Append($$"""
+            db.Entity<OrderLine>(out var ol);
+            return db.Append($$"""
                 SELECT *
                 FROM {{ol}}
-                """)
-                .Build();
+                """).Build();
         });
 
+        // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
     [MemberData(nameof(From_EntityWithSqlTableNameOnlyData))]
     public void From_Entity_WithSqlTableNameOnly(SqlTestCase testCase)
     {
+        // Arrange
+        var db = testCase.CreateBuilder();
+
+        // Act
         testCase.Action(() =>
         {
-            var db = testCase.CreateBuilder();
-            
-            return db
-                .Entity<TableOnlyModel>(out var m)
-                .Append($$"""
+            db.Entity<TableOnlyModel>(out var m);
+            return db.Append($$"""
                 SELECT *
                 FROM {{m}}
-                """)
-                .Build();
+                """).Build();
         });
 
+        // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
     [MemberData(nameof(From_Entity_WithSqlTableNameAndSchemaData))]
     public void From_Entity_WithSqlTableNameAndSchema(SqlTestCase testCase)
     {
+        // Arrange
+        var db = testCase.CreateBuilder();
+
+        // Act
         testCase.Action(() =>
         {
-            var db = testCase.CreateBuilder();
-
-            return db
-                .Entity<TableAndSchemaModel>(out var m)
-                .Append($$"""
+            db.Entity<TableAndSchemaModel>(out var m);
+            return db.Append($$"""
                 SELECT *
                 FROM {{m}}
-                """)
-                .Build();
+                """).Build();
         });
 
+        // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     public static TheoryData<SqlTestCase> From_SingleEntityData =>

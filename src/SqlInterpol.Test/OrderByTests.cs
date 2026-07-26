@@ -16,14 +16,17 @@ public class OrderByTests
         var db = testCase.CreateBuilder();
         
         // Act
-        testCase.Action(() => db.Entity<OrderModel>(out var o)
-            .Append($$"""
+        testCase.Action(() => 
+        {
+            #pragma warning disable SQLIG10
+            db.Entity<OrderModel>(out var o);
+            return db.Append($$"""
             SELECT *
             FROM {{o}}
             ORDER BY {{o.OrderBy(x => x.CreatedAt, SqlOrderDirection.Desc)}}
-            """)
-            .Build()
-        );
+            """).Build();
+            #pragma warning restore SQLIG10
+        });
 
         // Assert
         testCase.Assert();
@@ -37,17 +40,19 @@ public class OrderByTests
         var db = testCase.CreateBuilder();
 
         // Act
-        testCase.Action(() => db.Entity<OrderModel>(out var o)
-            .Append($$"""
+        testCase.Action(() => 
+        {
+            db.Entity<OrderModel>(out var o);
+            return db.Append($$"""
             SELECT *
             FROM {{o}}
             ORDER BY {{o.Total}}, {{o.Id}} DESC
-            """)
-            .Build()
-        );
+            """).Build();
+        });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -75,16 +80,18 @@ public class OrderByTests
                 return o.OrderBy(propertyName, direction);
             });
 
+#pragma warning disable SQLIG10 // IEnumerable dynamically evaluates SQL fragments via JIT
             return db.Append($$"""
             SELECT *
             FROM {{o}}
             ORDER BY {{sorts}}
-            """)
-            .Build();
+            """).Build();
+#pragma warning restore SQLIG10
         });
 
         // Assert
         testCase.Assert();
+        // Omitted db.AssertAotIntercepted() because IEnumerable forces JIT fallback
     }
 
     [Theory]
@@ -95,17 +102,22 @@ public class OrderByTests
         var db = testCase.CreateBuilder();
 
         // Act
-        testCase.Action(() => db.Entity<OrderModel>(out var o)
-            .Append($$"""
+        testCase.Action(() => 
+        {
+            db.Entity<OrderModel>(out var o);
+
+#pragma warning disable SQLIG10 // Sql.Raw dynamically evaluates SQL fragments via JIT
+            return db.Append($$"""
             SELECT *
             FROM {{o}}
             ORDER BY {{Sql.Raw("Total DESC")}}
-            """)
-            .Build()
-        );
+            """).Build();
+#pragma warning restore SQLIG10
+        });
 
         // Assert
         testCase.Assert();
+        // Omitted db.AssertAotIntercepted() because Sql.Raw forces JIT execution
     }
 
     [Theory]
@@ -116,17 +128,22 @@ public class OrderByTests
         var db = testCase.CreateBuilder();
 
         // Act
-        testCase.Action(() => db.Entity<OrderModel>(out var o)
-            .Append($$"""
+        testCase.Action(() => 
+        {
+            db.Entity<OrderModel>(out var o);
+
+#pragma warning disable SQLIG10 // Sql.Raw dynamically evaluates SQL fragments via JIT
+            return db.Append($$"""
             SELECT *
             FROM {{o}}
             ORDER BY {{o.OrderBy(x => x.CreatedAt, SqlOrderDirection.Asc)}}, {{Sql.Raw("(Total * 0.9) DESC")}}
-            """)
-            .Build()
-        );
+            """).Build();
+#pragma warning restore SQLIG10
+        });
 
         // Assert
         testCase.Assert();
+        // Omitted db.AssertAotIntercepted() because Sql.Raw forces JIT execution
     }
 
     [Theory]
@@ -136,6 +153,7 @@ public class OrderByTests
         // Act & Assert
         testCase.Action(() => 
         {
+            #pragma warning disable SQLIG10
             var db = testCase.CreateBuilder();
 
             // By providing a valid "SELECT * FROM {entity}" baseline, the engine registers 
@@ -143,16 +161,15 @@ public class OrderByTests
             // column validation phase where it cleanly throws our expected ArgumentException!
             if (testCase.ExpectedExceptionMessage?.Contains("FakeColumn") == true)
             {
-                return db.Entity<Product>(out var p)
-                         .Append($"SELECT * FROM {p} ORDER BY {p.OrderBy("FakeColumn", SqlOrderDirection.Asc)}")
-                         .Build();
+                db.Entity<Product>(out var p);
+                return db.Append($"SELECT * FROM {p} ORDER BY {p.OrderBy("FakeColumn", SqlOrderDirection.Asc)}").Build();
             }
             else
             {
-                return db.Entity<OrderTestModel>(out var o)
-                         .Append($"SELECT * FROM {o} ORDER BY {o.OrderBy(x => x.UnmappedProperty, SqlOrderDirection.Asc)}")
-                         .Build();
+                db.Entity<OrderTestModel>(out var o);
+                return db.Append($"SELECT * FROM {o} ORDER BY {o.OrderBy(x => x.UnmappedProperty, SqlOrderDirection.Asc)}").Build();
             }
+            #pragma warning restore SQLIG10
         });
 
         testCase.Assert();

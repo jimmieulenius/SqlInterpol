@@ -15,18 +15,19 @@ public class SelectAsTests
         var db = testCase.CreateBuilder();
         
         // Act
-        testCase.Action(() => db
-            .Entity<Product>(out var p)
-            .Append($$"""
-            SELECT
-                {{p.Id}} AS ProductId
-            FROM {{p}}
-            """)
-            .Build()
-        );
+        testCase.Action(() => 
+        {
+            db.Entity<Product>(out var p);
+            return db.Append($$"""
+                SELECT
+                    {{p.Id}} AS ProductId
+                FROM {{p}}
+                """).Build();
+        });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -37,15 +38,18 @@ public class SelectAsTests
         var db = testCase.CreateBuilder();
         
         // Act
-        testCase.Action(() => db
-            .Entity<Product>(out var p)
-            .Append($$"""
-            SELECT
-                {{p.Column("Id")}} AS {{"ProductId"}}
-            FROM {{p}}
-            """)
-            .Build()
-        );
+        testCase.Action(() => 
+        {
+            db.Entity<Product>(out var p);
+
+#pragma warning disable SQLIG10 // p.Column() is evaluated dynamically via JIT
+            return db.Append($$"""
+                SELECT
+                    {{p.Column("Id")}} AS {{"ProductId"}}
+                FROM {{p}}
+                """).Build();
+#pragma warning restore SQLIG10
+        });
 
         // Assert
         testCase.Assert();
@@ -59,15 +63,17 @@ public class SelectAsTests
         var db = testCase.CreateBuilder();
         
         // Act
-        testCase.Action(() => db
-            .Entity<Product>(out var p)
-            .Append($$"""
-            SELECT
-                {{p.Name}} AS {{p.Name}}
-            FROM {{p}}
-            """)
-            .Build()
-        );
+        #pragma warning disable SQLIG10
+        testCase.Action(() => 
+        {
+            db.Entity<Product>(out var p);
+            return db.Append($$"""
+                SELECT
+                    {{p.Name}} AS {{p.Name}}
+                FROM {{p}}
+                """).Build();
+        });
+        #pragma warning restore SQLIG10
 
         // Assert
         testCase.Assert();

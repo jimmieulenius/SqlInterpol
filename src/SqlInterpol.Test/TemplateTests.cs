@@ -38,11 +38,13 @@ public class TemplateTests
         var db = new SqlBuilder(dialect);
         db.Entity<OrderModel>(out var o);
         
+#pragma warning disable SQLIG10
         db.Template(out var template, $$"""
             SELECT {{o.Id}}, {{o.CustomerId}}
             FROM {{o}} AS o1
             WHERE {{o.CustomerId}} = {{Sql.Arg("CustId")}}
             """);
+#pragma warning restore SQLIG10
             
         return template;
     }
@@ -52,11 +54,13 @@ public class TemplateTests
         var db = new SqlBuilder(dialect);
         db.Entity<OrderModel>(out var o);
 
+#pragma warning disable SQLIG10
         // The macro dynamically expands into (Col1, Col2) VALUES ({0}, {1}) and maps the args natively!
         db.Template(out var template, $$"""
             INSERT INTO {{o}}
             VALUES {{Sql.Expand<OrderInsertPayload>()}}
             """);
+#pragma warning restore SQLIG10
 
         return template;
     }
@@ -66,12 +70,14 @@ public class TemplateTests
         var db = new SqlBuilder(dialect);
         db.Entity<OrderModel>(out var o);
 
+#pragma warning disable SQLIG10
         // Passing "Id" excludes it from the SET list, allowing us to map it safely in the WHERE clause!
         db.Template(out var template, $$"""
             UPDATE {{o}}
             SET {{Sql.Expand<OrderUpdatePayload>("Id")}}
             WHERE {{o.Id:col}} = {{Sql.Arg("Id")}}
             """);
+#pragma warning restore SQLIG10
 
         return template;
     }
@@ -80,6 +86,7 @@ public class TemplateTests
     [MemberData(nameof(TemplateSelectData))]
     public void Template_Select(SqlTestCase testCase)
     {
+        // Act
         testCase.Action(() =>
         {
             var db = testCase.CreateBuilder();
@@ -90,12 +97,15 @@ public class TemplateTests
                 db.Context.Dialect.Kind, 
                 kind => CompileOrderTemplate(db.Context.Dialect));
 
+#pragma warning disable SQLIG10
             return db.Append(activeOrderTemplate, new { CustId = 5 })
                      .AppendLine()
                      .Append($"ORDER BY {o.Id} DESC") 
                      .Build();
+#pragma warning restore SQLIG10
         });
 
+        // Assert
         testCase.Assert();
     }
 
@@ -103,6 +113,7 @@ public class TemplateTests
     [MemberData(nameof(TemplateBulkInsertData))]
     public void Template_BulkInsert(SqlTestCase testCase)
     {
+        // Act
         testCase.Action(() =>
         {
             var db = testCase.CreateBuilder();
@@ -118,6 +129,7 @@ public class TemplateTests
             return db.AppendInsert(o, payloads).Build();
         });
 
+        // Assert
         testCase.Assert();
     }
 
@@ -125,6 +137,7 @@ public class TemplateTests
     [MemberData(nameof(TemplateUpdateData))]
     public void Template_Update(SqlTestCase testCase)
     {
+        // Act
         testCase.Action(() =>
         {
             var db = testCase.CreateBuilder();
@@ -140,6 +153,7 @@ public class TemplateTests
             return db.AppendUpdate(o, o.Id, payloads).Build();
         });
 
+        // Assert
         testCase.Assert();
     }
 
@@ -147,6 +161,7 @@ public class TemplateTests
     [MemberData(nameof(TemplateDeleteData))]
     public void Template_Delete(SqlTestCase testCase)
     {
+        // Act
         testCase.Action(() =>
         {
             var db = testCase.CreateBuilder();
@@ -162,6 +177,7 @@ public class TemplateTests
             return db.AppendDelete(o, o.Id, payloads).Build();
         });
 
+        // Assert
         testCase.Assert();
     }
 
@@ -169,6 +185,7 @@ public class TemplateTests
     [MemberData(nameof(TemplateManualInsertData))]
     public void Template_ManualInsert(SqlTestCase testCase)
     {
+        // Act
         testCase.Action(() =>
         {
             var db = testCase.CreateBuilder();
@@ -180,6 +197,7 @@ public class TemplateTests
             return db.Append(template, new OrderInsertPayload { Id = 101, CustomerId = 5 }).Build();
         });
 
+        // Assert
         testCase.Assert();
     }
 
@@ -187,6 +205,7 @@ public class TemplateTests
     [MemberData(nameof(TemplateManualUpdateData))]
     public void Template_ManualUpdate(SqlTestCase testCase)
     {
+        // Act
         testCase.Action(() =>
         {
             var db = testCase.CreateBuilder();
@@ -198,6 +217,7 @@ public class TemplateTests
             return db.Append(template, new OrderUpdatePayload { Id = 101, CustomerId = 500 }).Build();
         });
 
+        // Assert
         testCase.Assert();
     }
 

@@ -14,18 +14,21 @@ public class WindowFunctionTests
         var db = testCase.CreateBuilder();
 
         // Act
-        testCase.Action(() => db.Entity<Product>(out var p)
-            .Append($$"""
-            SELECT
-                {{p.Name}},
-                SUM({{p.Price}}) OVER (
-                    PARTITION BY {{p.CategoryId}}
-                    ORDER BY {{p.Id}} DESC
-                ) AS CategoryTotal
-            FROM {{p}}
-            """)
-            .Build()
-        );
+        testCase.Action(() => 
+        {
+            #pragma warning disable SQLIG10
+            db.Entity<Product>(out var p);
+            return db.Append($$"""
+                SELECT
+                    {{p.Name}},
+                    SUM({{p.Price}}) OVER (
+                        PARTITION BY {{p.CategoryId}}
+                        ORDER BY {{p.Id}} DESC
+                    ) AS CategoryTotal
+                FROM {{p}}
+                """).Build();
+            #pragma warning restore SQLIG10
+        });
 
         // Assert
         testCase.Assert();
@@ -39,16 +42,19 @@ public class WindowFunctionTests
         var db = testCase.CreateBuilder();
 
         // Act
-        testCase.Action(() => db.Entity<Product>(out var p)
-            .Append($$"""
-            SELECT 
-                {{p.Name}},
-                {{p.Price}},
-                AVG({{p.Price}}) OVER (PARTITION BY {{p.CategoryId}}) AS AvgCategoryPrice
-            FROM {{p}}
-            """)
-            .Build()
-        );
+        testCase.Action(() => 
+        {
+            #pragma warning disable SQLIG10
+            db.Entity<Product>(out var p);
+            return db.Append($$"""
+                SELECT 
+                    {{p.Name}},
+                    {{p.Price}},
+                    AVG({{p.Price}}) OVER (PARTITION BY {{p.CategoryId}}) AS AvgCategoryPrice
+                FROM {{p}}
+                """).Build();
+            #pragma warning restore SQLIG10
+        });
 
         // Assert
         testCase.Assert();

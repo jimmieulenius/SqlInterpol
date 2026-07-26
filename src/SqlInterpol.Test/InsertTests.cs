@@ -15,16 +15,18 @@ public class InsertTests
         var newProduct = new { Name = "Test Product", CategoryId = 5, Price = 19.99m };
 
         // Act
-        testCase.Action(() => db.Entity<Product>(out var p)
-            .Append($$"""
+        testCase.Action(() => 
+        {
+            db.Entity<Product>(out var p);
+            return db.Append($$"""
             INSERT INTO {{p}}
             {{newProduct}}
-            """)
-            .Build()
-        );
+            """).Build();
+        });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -36,16 +38,18 @@ public class InsertTests
         var newProduct = new { Name = "Test Product", CategoryId = 5, Price = 19.99m };
 
         // Act
-        testCase.Action(() => db.Entity<Product>(out var p)
-            .Append($$"""
+        testCase.Action(() => 
+        {
+            db.Entity<Product>(out var p);
+            return db.Append($$"""
             INSERT INTO {{p}}
             VALUES {{newProduct}}
-            """)
-            .Build()
-        );
+            """).Build();
+        });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -58,17 +62,19 @@ public class InsertTests
         var total = 100.00m;
         
         // Act
-        testCase.Action(() => db.Entity<OrderModel>(out var o)
-            .Append($$"""
+        testCase.Action(() => 
+        {
+            db.Entity<OrderModel>(out var o);
+            return db.Append($$"""
             INSERT INTO {{o}}
             ({{o.Status}}, {{o.Total}})
             VALUES ({{status}}, {{total}})
-            """)
-            .Build()
-        );
+            """).Build();
+        });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -84,15 +90,17 @@ public class InsertTests
         };
 
         // Act
-        testCase.Action(() => db.Entity<Product>(out var p)
-            .Append($$"""
+        testCase.Action(() => 
+        {
+            db.Entity<Product>(out var p);
+            return db.Append($$"""
             INSERT INTO {{p}} VALUES {{products}}
-            """)
-            .Build()
-        );
+            """).Build();
+        });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -104,16 +112,21 @@ public class InsertTests
         var newProduct = new { Name = "Test Product", CategoryId = 5, Price = 19.99m };
 
         // Act
-        testCase.Action(() => db.Entity<Product>(out var p)
-            .Append($$"""
+        testCase.Action(() => 
+        {
+            db.Entity<Product>(out var p);
+
+#pragma warning disable SQLIG10 // RETURNING clause forces JIT fallback
+            return db.Append($$"""
             INSERT INTO {{p}} {{newProduct}}
             RETURNING {{p.Id}}
-            """)
-            .Build()
-        );
+            """).Build();
+#pragma warning restore SQLIG10
+        });
 
         // Assert
         testCase.Assert();
+        // Omitted db.AssertAotIntercepted() because RETURNING forces JIT execution
     }
 
     [Theory]
@@ -125,16 +138,21 @@ public class InsertTests
         var newProduct = new { Name = "Test Product", CategoryId = 5, Price = 19.99m };
 
         // Act
-        testCase.Action(() => db.Entity<Product>(out var p)
-            .Append($$"""
+        testCase.Action(() => 
+        {
+            db.Entity<Product>(out var p);
+
+#pragma warning disable SQLIG10 // RETURNING clause forces JIT fallback
+            return db.Append($$"""
             INSERT INTO {{p}} {{newProduct}}
             RETURNING {{p.Id}}, {{p.Name}}
-            """)
-            .Build()
-        );
+            """).Build();
+#pragma warning restore SQLIG10
+        });
 
         // Assert
         testCase.Assert();
+        // Omitted db.AssertAotIntercepted() because RETURNING forces JIT execution
     }
 
     [Theory]
@@ -146,15 +164,17 @@ public class InsertTests
         var product = new ProductWithIgnoreModel { Id = 1, Name = "Gadget", RuntimeCacheToken = "OmitThisColumn" };
 
         // Act
-        testCase.Action(() => db.Entity<ProductWithIgnoreModel>(out var p)
-            .Append($$"""
+        testCase.Action(() => 
+        {
+            db.Entity<ProductWithIgnoreModel>(out var p);
+            return db.Append($$"""
             INSERT INTO {{p}} {{product}}
-            """)
-            .Build()
-        );
+            """).Build();
+        });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -177,36 +197,19 @@ public class InsertTests
         };
 
         // Act
-        testCase.Action(() => db.Entity<ComplexProduct>(out var p)
-            .Append($$"""
+        testCase.Action(() => 
+        {
+            db.Entity<ComplexProduct>(out var p);
+            return db.Append($$"""
             INSERT INTO {{p}}
             VALUES {{product}};
-            """)
-            .Build()
-        );
+            """).Build();
+        });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
-
-    // TODO: Add tests using templates for Insert statements, including scenarios with ignored properties and complex types.
-    // [Theory]
-    // [MemberData(nameof(InsertTemplateData))]
-    // public void AppendInsert_Template(SqlTestCase testCase)
-    // {
-    //     // Arrange
-    //     var db = testCase.CreateBuilder();
-    //     var user = new TestUser { Id = 1, Name = "Alice", Age = 30 };
-        
-    //     // Act
-    //     testCase.Action(() => db.Entity<TestUser>(out var u)
-    //         .AppendInsert(u, user)
-    //         .Build()
-    //     );
-        
-    //     // Assert
-    //     testCase.Assert();
-    // }
 
     public static TheoryData<SqlTestCase> InsertData
     {
@@ -799,12 +802,6 @@ public class InsertTests
             ];
         }
     }
-
-    // TODO: Add tests using templates for Insert statements, including scenarios with ignored properties and complex types.
-    // [Theory]
-    // [MemberData(nameof(InsertTemplateData))]
-    // public void AppendInsert_Template(SqlTestCase testCase)
-    // { ... }
 
     public static TheoryData<SqlTestCase> InsertTemplateData
     {

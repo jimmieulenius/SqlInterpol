@@ -17,9 +17,12 @@ public class UpdateSubqueryTests
         var updateDto = new { MaxPrice = TargetMaxPrice };
         
         // Act
-        testCase.Action(() => db
-            .Entity<OrderStatsModel>(out var stats)
-            .Append($$"""
+        testCase.Action(() => 
+        {
+            db.Entity<OrderStatsModel>(out var stats);
+
+#pragma warning disable SQLIG10
+            return db.Append($$"""
                 UPDATE (
                     {{db.Query(stats, () => db.Append($$"""
                         SELECT CategoryId, MAX(Price) AS max_price FROM Products GROUP BY CategoryId
@@ -27,9 +30,9 @@ public class UpdateSubqueryTests
                 ) AS {{"stats"}}
                 SET {{updateDto}}
                 WHERE {{stats.CategoryId}} = 5
-                """)
-            .Build()
-        );
+                """).Build();
+#pragma warning restore SQLIG10
+        });
 
         // Assert
         testCase.Assert();
@@ -44,10 +47,13 @@ public class UpdateSubqueryTests
         var updateDto = new { MaxPrice = TargetMaxPrice };
 
         // Act
-        testCase.Action(() => db
-            .Entity<OrderStatsModel>(out var stats)
-            .Entity<Product>(out var p)
-            .Append($$"""
+        testCase.Action(() => 
+        {
+            db.Entity<OrderStatsModel>(out var stats)
+              .Entity<Product>(out var p);
+
+#pragma warning disable SQLIG10
+            return db.Append($$"""
                 UPDATE (
                     {{db.Query(stats, () => db.Append($$"""
                         SELECT
@@ -59,9 +65,9 @@ public class UpdateSubqueryTests
                 ) AS {{"stats"}}
                 SET {{updateDto}}
                 WHERE {{stats.CategoryId}} = 5
-                """)
-            .Build()
-        );
+                """).Build();
+#pragma warning restore SQLIG10
+        });
 
         // Assert
         testCase.Assert();

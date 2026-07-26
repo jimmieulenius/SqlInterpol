@@ -26,6 +26,7 @@ public partial class SqlAotInterceptorGenerator
         sb.AppendLine("using System;");
         sb.AppendLine("using System.Runtime.CompilerServices;");
         sb.AppendLine("using SqlInterpol;");
+        
         // FIX: Add missing namespaces to the generated file to resolve ISqlGeneratorBuilder and other moved types!
         sb.AppendLine("using SqlInterpol.Configuration;");
         sb.AppendLine("using SqlInterpol.Execution;");
@@ -60,12 +61,12 @@ public partial class SqlAotInterceptorGenerator
                     continue;
 
                 uniqueAppendsFound++;
-
                 var syntaxTree = appendCall.InvocationNode.SyntaxTree;
                 var semanticModel = compilation.GetSemanticModel(syntaxTree);
-                string interceptorMethodName = $"Intercepted_{appendCall.MethodName}_{interceptorCount++}";
 
+                string interceptorMethodName = $"Intercepted_{appendCall.MethodName}_{interceptorCount++}";
                 var interceptableLocation = semanticModel.GetInterceptableLocation(appendCall.InvocationNode);
+
                 if (interceptableLocation != null)
                 {
                     var attrSyntax = interceptableLocation.GetInterceptsLocationAttributeSyntax();
@@ -79,7 +80,6 @@ public partial class SqlAotInterceptorGenerator
                     var line = lineSpan.StartLinePosition.Line + 1;
                     var character = lineSpan.StartLinePosition.Character + 1;
                     var normalizedPath = filePath.Replace("\\", "\\\\");
-
                     sb.AppendLine($"        [InterceptsLocation(@\"{normalizedPath}\", {line}, {character})]");
                 }
 
@@ -102,10 +102,27 @@ public partial class SqlAotInterceptorGenerator
                 if (firstArg is InterpolatedStringExpressionSyntax interpolatedString)
                 {
                     var analysis = AnalyzeContents(interpolatedString, queryContext);
-
+                    
                     if (analysis.RequiresJitFallback)
                     {
+                        // Emit Roslyn Diagnostic so the developer knows the query is falling back to JIT
+                        string reason = analysis switch
+                        {
+                            { HasWindowFunction: true } => "a window function (OVER)",
+                            { HasSetOperation: true } => "a set operation (UNION/INTERSECT/EXCEPT)",
+                            { HasUpsert: true } => "an UPSERT/MERGE operation",
+                            { HasComplexDynamicHoles: true } => "a dynamically evaluated SQL fragment",
+                            { HasReturning: true } => "a RETURNING clause",
+                            _ => "unsupported dynamic parameters or complex aliases"
+                        };
+
+                        spc.ReportDiagnostic(Diagnostic.Create(
+                            SqlAotDiagnostics.JitFallbackDiagnostic,
+                            interpolatedString.GetLocation(),
+                            reason));
+
                         sb.AppendLine("            builder.Append(ref handler); // JIT Dynamic Fallback");
+                        
                         if (appendCall.MethodName == "AppendLine")
                             sb.AppendLine("            genDb.AppendSegment(new SqlInterpol.Segments.SqlSegment(SqlInterpol.Segments.SqlSegmentType.Literal, \"\\n\"));");
                         
@@ -115,6 +132,8 @@ public partial class SqlAotInterceptorGenerator
                         continue;
                     }
 
+                    sb.AppendLine("            genDb.IsAotIntercepted = true;");
+
                     sb.AppendLine("            var ctx = genDb.Context;");
                     sb.AppendLine("            var options = ctx.Options;");
                     sb.AppendLine("            var dialect = ctx.Dialect;");
@@ -123,18 +142,18 @@ public partial class SqlAotInterceptorGenerator
                     sb.AppendLine("            int indentSize = options.IndentSize;");
                     sb.AppendLine("            bool autoAliasing = options.EntityAutoAliasing;");
                     sb.AppendLine();
-
                     sb.AppendLine($"            switch (dialectKind)");
                     sb.AppendLine("            {");
                     
                     var targetDialects = dialects.ToList();
                     targetDialects.Add("RUNTIME");
-
+                    
                     foreach (var targetDialect in targetDialects)
                     {
                         var quotes = dialectQuotes.TryGetValue(targetDialect, out var q) ? q : ("\"", "\"");
                         EmitDialectSwitchCase(sb, targetDialect, interpolatedString, queryContext, analysis, quotes);
                     }
+                    
                     sb.AppendLine("            }");
                 }
                 else if (firstArg is LiteralExpressionSyntax literal)
@@ -163,17 +182,15 @@ public partial class SqlAotInterceptorGenerator
         sb.AppendLine("    }");
         sb.AppendLine("}");
 
-        spc.AddSource("AotDiagnostics.g.cs", $@"
-// <auto-generated/>
+        spc.AddSource("AotDiagnostics.g.cs", $@"// <auto-generated/>
 // Active AOT Target Dialects: {string.Join(", ", dialects)}
 // Found {uniqueEntitiesFound} tracked db.Entity() declarations.
-// Found {uniqueAppendsFound} unique Append/AppendLine calls to intercept.
-");
-
+// Found {uniqueAppendsFound} unique Append/AppendLine calls to intercept.");
+        
         spc.AddSource("AotInterceptors.g.cs", sb.ToString());
     }
 
-    private static void EmitDialectSwitchCase(StringBuilder sb, string targetDialect, InterpolatedStringExpressionSyntax interpolatedString, CompileTimeQueryContext queryContext, AotAnalysisResult analysis, (string Open, string Close) quotes)
+    private static void EmitDialectSwitchCase(StringBuilder sb, string targetDialect, InterpolatedStringExpressionSyntax interpolatedString, CompileTimeQueryContext queryContext, SqlAotAnalysisResult analysis, (string Open, string Close) quotes)
     {
         bool isRuntime = targetDialect == "RUNTIME";
 
@@ -206,7 +223,7 @@ public partial class SqlAotInterceptorGenerator
         string QuoteEnt(string tbl, string? sch) => isRuntime 
             ? $"dialect.QuoteEntityName(\"{Escape(tbl)}\", {(sch == null ? "null" : $"\"{Escape(sch)}\"")})" 
             : $"\"{Escape(QuoteEntRaw(tbl, sch))}\"";
-
+            
         string QuoteVar(string varName) => isRuntime 
             ? $"dialect.QuoteIdentifier({varName})" 
             : $"(\"{Escape(quotes.Open)}\" + {varName} + \"{Escape(quotes.Close)}\")";
@@ -235,6 +252,7 @@ public partial class SqlAotInterceptorGenerator
         for (int i = 0; i < contents.Count; i++)
         {
             var content = contents[i];
+
             if (content is InterpolatedStringTextSyntax textContent2)
             {
                 var rawText = textContent2.TextToken.ValueText;
@@ -261,7 +279,6 @@ public partial class SqlAotInterceptorGenerator
                 foreach (var kw in SqlKeyword.AllOrdered)
                 {
                     if (!kw.IsClause) continue;
-
                     int idx = upperText.LastIndexOf(kw.Value);
                     if (idx > maxIdx)
                     {
@@ -280,7 +297,6 @@ public partial class SqlAotInterceptorGenerator
                 {
                     string? nextFormat = nextHole.FormatClause?.FormatStringToken.ValueText;
                     bool isEntityHole = false;
-
                     if (nextHole.Expression is IdentifierNameSyntax nId && queryContext.Entities.ContainsKey(nId.Identifier.Text))
                     {
                         isEntityHole = true;
@@ -443,8 +459,8 @@ public partial class SqlAotInterceptorGenerator
                     
                     string wasAuto = tableDecl.WasAutoAliased.ToString().ToLower();
 
-                    if (string.Equals(format, "columns", StringComparison.OrdinalIgnoreCase) ||
-                              (string.IsNullOrEmpty(format) && (currentSqlClause == SqlKeyword.Select.Value || currentSqlClause == SqlKeyword.Returning.Value)))
+                    if (string.Equals(format, "columns", StringComparison.OrdinalIgnoreCase) || 
+                             (string.IsNullOrEmpty(format) && (currentSqlClause == SqlKeyword.Select.Value || currentSqlClause == SqlKeyword.Returning.Value)))
                     {
                         flushLiteral();
                         sb.AppendLine($"                    // AOT Mapped Columns: {tableDecl.VariableName}");
@@ -475,6 +491,7 @@ public partial class SqlAotInterceptorGenerator
                         for (int k = 0; k < tableDecl.Columns.Count; k++)
                         {
                             var col = tableDecl.Columns[k];
+
                             if (k > 0)
                             {
                                 sb.AppendLine($"                    if (layout == SqlCollectionLayout.Vertical)");
@@ -515,7 +532,6 @@ public partial class SqlAotInterceptorGenerator
                         sb.AppendLine($"                        aliasable_{segmentIndex}.Alias = \"{Escape(inlineAlias)}\";");
                         sb.AppendLine($"                        aliasable_{segmentIndex}.IsAliasQuoted = false;");
                         sb.AppendLine($"                    }}");
-
                         sb.AppendLine($"                    genDb.AppendRaw(dialect.ApplyAlias({QuoteEnt(tableDecl.MappedTableName, tableDecl.MappedSchemaName)}, {QuoteId(inlineAlias)}));");
                     }
                     else if (isAliasHole)
@@ -564,8 +580,9 @@ public partial class SqlAotInterceptorGenerator
                         sb.AppendLine($"                        aliasable_{segmentIndex}.Alias = alias_{segmentIndex};");
                         sb.AppendLine($"                        aliasable_{segmentIndex}.IsAliasQuoted = false;");
                         sb.AppendLine($"                    }}");
-
+                        
                         sb.AppendLine($"                    string quotedAlias_{segmentIndex} = string.IsNullOrEmpty(alias_{segmentIndex}) ? \"\" : {QuoteVar($"alias_{segmentIndex}")};");
+
                         sb.AppendLine($"                    genDb.AppendRaw(dialect.ApplyAlias({QuoteEnt(tableDecl.MappedTableName, tableDecl.MappedSchemaName)}, quotedAlias_{segmentIndex}));");
                     }
 

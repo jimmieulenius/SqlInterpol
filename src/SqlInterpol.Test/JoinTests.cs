@@ -15,21 +15,24 @@ public class JoinTests
         var db = testCase.CreateBuilder();
         
         // Act - Uses fluent entity initialization and zero-allocation properties
-        testCase.Action(() => db.Entity<Product>(out var p)
-            .Entity<OrderLine>(out var o)
-            .Append($$"""
+        testCase.Action(() => 
+        {
+            db.Entity<Product>(out var p)
+              .Entity<OrderLine>(out var o);
+
+            return db.Append($$"""
             SELECT
                 {{p.Id}},
                 {{o.OrderId}}
             FROM {{p}}
             JOIN {{o}}
                 ON {{p.Id}} = {{o.ProductItemNumber}}
-            """)
-            .Build()
-        );
+            """).Build();
+        });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     public static TheoryData<SqlTestCase> JoinTwoEntitiesData =>

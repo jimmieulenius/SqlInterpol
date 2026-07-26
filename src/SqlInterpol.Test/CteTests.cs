@@ -14,17 +14,18 @@ public class CteTests
     {
         // Arrange
         var db = testCase.CreateBuilder();
-        db
-            .Entity<Product>(out var p)
-            .Query(p, out var innerQuery, () => db.Append($$"""
-                SELECT {{p.CategoryId}}, SUM({{p.Price}}) AS TotalPrice
-                FROM {{p}} AS {{"p"}}
-                GROUP BY {{p.CategoryId}}
-                """));
 
         // Act
         testCase.Action(() => 
         {
+#pragma warning disable SQLIG10
+            db.Entity<Product>(out var p)
+              .Query(p, out var innerQuery, () => db.Append($$"""
+                  SELECT {{p.CategoryId}}, SUM({{p.Price}}) AS TotalPrice
+                  FROM {{p}} AS {{"p"}}
+                  GROUP BY {{p.CategoryId}}
+                  """));
+
             db.Entity<Category>(out var c);
             db.Entity<CategoryStats>(out var cs);
 
@@ -37,6 +38,7 @@ public class CteTests
                 JOIN {{cs}} AS {{"cs"}}
                     ON {{c.Id}} = {{cs.CategoryId}}
                 """).Build();
+#pragma warning restore SQLIG10
         });
 
         // Assert
@@ -49,20 +51,22 @@ public class CteTests
     {
         // Arrange
         var db = testCase.CreateBuilder();
-        db.Context.Options.EntityAutoAliasing = true;
         
-        // Define the inner query for the CTE
-        var innerQuery = db
-            .Entity<Product>(out var p)
-            .Query(p, () => db.Append($$"""
-                SELECT {{p.CategoryId}}, SUM({{p.Price}}) AS TotalPrice
-                FROM {{p}}
-                GROUP BY {{p.CategoryId}}
-                """));
-
         // Act
         testCase.Action(() => 
         {
+#pragma warning disable SQLIG10
+            db.Context.Options.EntityAutoAliasing = true;
+
+            // Define the inner query for the CTE
+            var innerQuery = db
+                .Entity<Product>(out var p)
+                .Query(p, () => db.Append($$"""
+                    SELECT {{p.CategoryId}}, SUM({{p.Price}}) AS TotalPrice
+                    FROM {{p}}
+                    GROUP BY {{p.CategoryId}}
+                    """));
+
             db.Entity<Category>(out var c);
             db.Entity<CategoryStats>(out var cs);
 
@@ -76,6 +80,7 @@ public class CteTests
                 JOIN {{cs}}
                     ON {{c.Id}} = {{cs.CategoryId}}
                 """).Build();
+#pragma warning restore SQLIG10
         });
 
         // Assert
@@ -90,14 +95,18 @@ public class CteTests
         var db = testCase.CreateBuilder();
 
         // Act
-        testCase.Action(() => db.Append($"""
-            WITH RECURSIVE Numbers AS (
-                SELECT 1 AS n
-                UNION ALL
-                SELECT n + 1 FROM Numbers WHERE n < 10
-            )
-            SELECT n FROM Numbers
-            """).Build()
+        testCase.Action(() =>
+#pragma warning disable SQLIG10
+            db.Append($"""
+                WITH RECURSIVE Numbers AS (
+                    SELECT 1 AS n
+                    UNION ALL
+                    SELECT n + 1 FROM Numbers WHERE n < 10
+                )
+                SELECT n FROM Numbers
+                """)
+            .Build()
+#pragma warning restore SQLIG10
         );
 
         // Assert
@@ -114,6 +123,7 @@ public class CteTests
         // Act
         testCase.Action(() => 
         {
+            #pragma warning disable SQLIG10
             db.Entity<Product>(out var p);
 
             return db.Append($$"""
@@ -122,6 +132,7 @@ public class CteTests
                 )
                 SELECT * FROM ExpensiveProducts
                 """).Build();
+            #pragma warning restore SQLIG10
         });
 
         // Assert
@@ -356,7 +367,6 @@ public class CteTests
         get
         {
             object?[] expectedParams = [Threshold];
-
             return
             [
                 new SqlTestCase(

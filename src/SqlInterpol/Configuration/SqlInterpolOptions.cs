@@ -74,7 +74,7 @@ public record SqlInterpolOptions
     /// (like LIMIT / OFFSET) into the syntax required by the active database dialect.
     /// Default is true.
     /// </summary>
-    public bool CrossVendorSqlTranspilation { get; set; } = true;
+    public bool CrossDialectSqlTranspilation { get; set; } = true;
 
     /// <summary>
     /// Gets the active dialect kind. Set automatically by <see cref="SqlBuilder"/> when constructing the context.
@@ -115,6 +115,12 @@ public record SqlInterpolOptions
     /// Extension packages can add keywords here so the Lexer automatically identifies them!
     /// </summary>
     public Dictionary<string, string[]> KeywordTags { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// An optional hook to capture query build metrics. 
+    /// If null, telemetry allocation and timing are completely bypassed.
+    /// </summary>
+    public Action<SqlQueryTelemetry>? OnQueryBuilt { get; set; }
 
     /// <summary>
     /// Creates a new instance of options and automatically applies any globally registered extensions.

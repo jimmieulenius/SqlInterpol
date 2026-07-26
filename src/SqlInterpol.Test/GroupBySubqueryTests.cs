@@ -14,21 +14,23 @@ public class GroupBySubqueryTests
         var db = testCase.CreateBuilder();
         
         // Act
-        testCase.Action(() => db
-            .Entity<StatsModel>(out var stats, "stats")
-            .Query(stats, out var statsQuery, () => db.Append($$"""
+        testCase.Action(() =>
+        {
+            db.Entity<StatsModel>(out var stats, "stats");
+            db.Query(stats, out var statsQuery, () => db.Append($$"""
                 SELECT CategoryId, MAX(Price) AS MaxPrice FROM Products GROUP BY CategoryId
-                """))
-            .Append($$"""
+                """));
+
+            return db.Append($$"""
                 SELECT CategoryId, COUNT(*)
                 FROM {{stats:decl}}
                 GROUP BY {{stats.CategoryId}}
-                """)
-            .Build()
-        );
+                """).Build();
+        });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     public static TheoryData<SqlTestCase> GroupBySubqueryData =>

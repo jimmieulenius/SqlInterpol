@@ -20,6 +20,11 @@ public interface ISqlGeneratorBuilder
     ISqlContext Context { get; }
 
     /// <summary>
+    /// Indicates whether at least one Append call was successfully intercepted by the AOT source generator.
+    /// </summary>
+    bool IsAotIntercepted { get; set; }
+
+    /// <summary>
     /// Appends a raw string directly to the SQL stream.
     /// </summary>
     /// <param name="rawSql">The literal string to append.</param>

@@ -1,6 +1,5 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
+using System.ComponentModel;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using SqlInterpol.Configuration;
 using SqlInterpol.Execution;
@@ -27,6 +26,18 @@ public partial class SqlBuilder : ISqlEntityRegistry
     /// Gets the context holding the dialect, renderer, options, and parameters for this builder.
     /// </summary>
     public SqlContext Context { get; }
+    
+    /// <summary>
+    /// Indicates whether at least one Append call was successfully intercepted by the AOT source generator.
+    /// </summary>
+    public bool IsAotIntercepted { get; set; } = false;
+
+    /// <summary>
+    /// Remembers the AOT interception status of the most recently built query. 
+    /// Exposed publicly for testing frameworks and custom dialect authors.
+    /// </summary>
+    [EditorBrowsable(EditorBrowsableState.Advanced)]
+    public bool LastBuildWasAotIntercepted { get; private set; }
     
     private ISqlSegmentRenderer Renderer => Context.Options?.Renderer ?? SqlSegmentRenderer.Instance;
     
@@ -98,6 +109,7 @@ public partial class SqlBuilder : ISqlEntityRegistry
     {
         _segments.Clear();
         Context.Reset();
+        IsAotIntercepted = false; // Reset the telemetry tracking flag
         return this;
     }
 
@@ -238,17 +250,53 @@ public partial class SqlBuilder : ISqlEntityRegistry
     /// </summary>
     /// <param name="arguments">An optional anonymous object containing global template arguments.</param>
     /// <param name="clear">When <see langword="true"/> (default), <see cref="Clear"/> is called after building.</param>
+    /// <param name="callerMemberName">Automatically populated by the compiler for telemetry tracking.</param>
+    /// <param name="callerFilePath">Automatically populated by the compiler for telemetry tracking.</param>
+    /// <param name="callerLineNumber">Automatically populated by the compiler for telemetry tracking.</param>
     /// <returns>The query result ready for execution.</returns>
-    public SqlQueryResult Build(object? arguments = null, bool clear = true)
+    public SqlQueryResult Build(
+        object? arguments = null, 
+        bool clear = true,
+        [CallerMemberName] string callerMemberName = "",
+        [CallerFilePath] string callerFilePath = "",
+        [CallerLineNumber] int callerLineNumber = 0)
     {
-        var result = BuildSegments(_segments, arguments);
-
-        if (clear)
+        try
         {
-            Clear();
-        }
+            var options = Context.Options;
 
-        return result;
+            // Fast path: No telemetry requested
+            if (options.OnQueryBuilt == null)
+            {
+                return BuildSegments(_segments, arguments);
+            }
+
+            // Telemetry path
+            var sw = Stopwatch.StartNew();
+            var result = BuildSegments(_segments, arguments);
+            sw.Stop();
+
+            options.OnQueryBuilt.Invoke(new SqlQueryTelemetry(
+                CallerMemberName: callerMemberName,
+                FilePath: callerFilePath,
+                LineNumber: callerLineNumber,
+                WasAotIntercepted: IsAotIntercepted,
+                ParameterCount: result.Parameters.Count,
+                BuildDuration: sw.Elapsed
+            ));
+
+            return result;
+        }
+        finally
+        {
+            // ALWAYS capture the AOT state and clean up, even if dialect validation throws!
+            LastBuildWasAotIntercepted = IsAotIntercepted;
+            
+            if (clear)
+            {
+                Clear();
+            }
+        }
     }
 
     /// <summary>
@@ -256,9 +304,49 @@ public partial class SqlBuilder : ISqlEntityRegistry
     /// </summary>
     /// <param name="query">The isolated query to build.</param>
     /// <param name="arguments">An optional anonymous object containing global template arguments.</param>
+    /// <param name="callerMemberName">Automatically populated by the compiler for telemetry tracking.</param>
+    /// <param name="callerFilePath">Automatically populated by the compiler for telemetry tracking.</param>
+    /// <param name="callerLineNumber">Automatically populated by the compiler for telemetry tracking.</param>
     /// <returns>The query result ready for execution.</returns>
-    public SqlQueryResult Build(ISqlQuery query, object? arguments = null) 
-        => BuildSegments(query.Segments, arguments);
+    public SqlQueryResult Build(
+        ISqlQuery query, 
+        object? arguments = null,
+        [CallerMemberName] string callerMemberName = "",
+        [CallerFilePath] string callerFilePath = "",
+        [CallerLineNumber] int callerLineNumber = 0)
+    {
+        try
+        {
+            var options = Context.Options;
+
+            // Fast path: No telemetry requested
+            if (options.OnQueryBuilt == null)
+            {
+                return BuildSegments(query.Segments, arguments);
+            }
+
+            // Telemetry path
+            var sw = Stopwatch.StartNew();
+            var result = BuildSegments(query.Segments, arguments);
+            sw.Stop();
+
+            options.OnQueryBuilt.Invoke(new SqlQueryTelemetry(
+                CallerMemberName: callerMemberName,
+                FilePath: callerFilePath,
+                LineNumber: callerLineNumber,
+                WasAotIntercepted: IsAotIntercepted,
+                ParameterCount: result.Parameters.Count,
+                BuildDuration: sw.Elapsed
+            ));
+
+            return result;
+        }
+        finally
+        {
+            // ALWAYS capture the AOT state, even if dialect validation throws!
+            LastBuildWasAotIntercepted = IsAotIntercepted;
+        }
+    }
 
     private SqlQueryResult BuildSegments(IReadOnlyList<SqlSegment> segmentsToBuild, object? arguments)
     {

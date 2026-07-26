@@ -14,21 +14,24 @@ public class OrderBySubqueryTests
         var db = testCase.CreateBuilder();
         
         // Act
-        testCase.Action(() => db.Entity<StatsModel>(out var stats, "stats")
-            .Append($$"""
-            SELECT *
-            FROM
-            (
-                SELECT
-                    CategoryId,
-                    MAX(Price) AS MaxPrice
-                FROM Products
-                GROUP BY CategoryId
-            ) AS {{stats:alias}}
-            ORDER BY {{stats.MaxPrice}} DESC
-            """)
-            .Build()
-        );
+        testCase.Action(() => 
+        {
+            #pragma warning disable SQLIG10
+            db.Entity<StatsModel>(out var stats, "stats");
+            return db.Append($$"""
+                SELECT *
+                FROM
+                (
+                    SELECT
+                        CategoryId,
+                        MAX(Price) AS MaxPrice
+                    FROM Products
+                    GROUP BY CategoryId
+                ) AS {{stats:alias}}
+                ORDER BY {{stats.MaxPrice}} DESC
+                """).Build();
+            #pragma warning restore SQLIG10
+        });
 
         // Assert
         testCase.Assert();

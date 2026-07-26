@@ -14,21 +14,24 @@ public class JoinAsTests
         var db = testCase.CreateBuilder();
         
         // Act
-        testCase.Action(() => db.Entity<Product>(out var p)
-            .Entity<OrderLine>(out var ol)
-            .Append($$"""
-            SELECT
-                {{p.Id}},
-                {{ol.OrderId}}
-            FROM {{p}} AS p
-            JOIN {{ol}} AS ol
-                ON {{p.Id}} = {{ol.ProductItemNumber}}
-            """)
-            .Build()
-        );
+        testCase.Action(() => 
+        {
+            db.Entity<Product>(out var p)
+              .Entity<OrderLine>(out var ol);
+
+            return db.Append($$"""
+                SELECT
+                    {{p.Id}},
+                    {{ol.OrderId}}
+                FROM {{p}} AS p
+                JOIN {{ol}} AS ol
+                    ON {{p.Id}} = {{ol.ProductItemNumber}}
+                """).Build();
+        });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -41,18 +44,22 @@ public class JoinAsTests
         // Act
         // We pass the explicit alias into the Entity declaration, and then use the 
         // :alias format specifier to render only the quoted alias in the FROM clause!
-        testCase.Action(() => db.Entity<Product>(out var prod, "prod")
-            .Entity<OrderLine>(out var OrderLine, "OrderLine")
-            .Append($$"""
-            SELECT
-                {{prod.Id}},
-                {{OrderLine.OrderId}}
-            FROM dbo.Products AS {{prod:alias}}
-            JOIN order_lines AS {{OrderLine:alias}}
-                ON {{prod.Id}} = {{OrderLine.ProductItemNumber}}
-            """)
-            .Build()
-        );
+        testCase.Action(() => 
+        {
+            #pragma warning disable SQLIG10
+            db.Entity<Product>(out var prod, "prod")
+              .Entity<OrderLine>(out var OrderLine, "OrderLine");
+
+            return db.Append($$"""
+                SELECT
+                    {{prod.Id}},
+                    {{OrderLine.OrderId}}
+                FROM dbo.Products AS {{prod:alias}}
+                JOIN order_lines AS {{OrderLine:alias}}
+                    ON {{prod.Id}} = {{OrderLine.ProductItemNumber}}
+                """).Build();
+            #pragma warning restore SQLIG10
+        });
 
         // Assert
         testCase.Assert();
@@ -68,21 +75,24 @@ public class JoinAsTests
         // Act
         // The preprocessor naturally detects "AS original" and "AS related" 
         // and wires them automatically to the p1 and p2 scopes!
-        testCase.Action(() => db.Entity<Product>(out var p1)
-            .Entity<Product>(out var p2)
-            .Append($$"""
-            SELECT
-                {{p1.Id}},
-                {{p2.Id}}
-            FROM {{p1}} AS original
-            JOIN {{p2}} AS related
-                ON {{p1.CategoryId}} = {{p2.CategoryId}}
-            """)
-            .Build()
-        );
+        testCase.Action(() => 
+        {
+            db.Entity<Product>(out var p1)
+              .Entity<Product>(out var p2);
+
+            return db.Append($$"""
+                SELECT
+                    {{p1.Id}},
+                    {{p2.Id}}
+                FROM {{p1}} AS original
+                JOIN {{p2}} AS related
+                    ON {{p1.CategoryId}} = {{p2.CategoryId}}
+                """).Build();
+        });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -94,21 +104,24 @@ public class JoinAsTests
         
         // Act
         // Brilliant API experience! The metadata overrides happen securely at declaration time!
-        testCase.Action(() => db.Entity<Product>(out var p, name: "Archive_Products", schema: "history")
-            .Entity<OrderLine>(out var ol)
-            .Append($$"""
-            SELECT
-                {{p.Id}},
-                {{ol.OrderId}}
-            FROM {{p}}
-            JOIN {{ol}}
-                ON {{p.Id}} = {{ol.ProductItemNumber}}
-            """)
-            .Build()
-        );
+        testCase.Action(() => 
+        {
+            db.Entity<Product>(out var p, name: "Archive_Products", schema: "history")
+              .Entity<OrderLine>(out var ol);
+
+            return db.Append($$"""
+                SELECT
+                    {{p.Id}},
+                    {{ol.OrderId}}
+                FROM {{p}}
+                JOIN {{ol}}
+                    ON {{p.Id}} = {{ol.ProductItemNumber}}
+                """).Build();
+        });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     public static TheoryData<SqlTestCase> JoinWithLiteralAliasesData =>

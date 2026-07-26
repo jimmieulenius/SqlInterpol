@@ -15,15 +15,18 @@ public class UpdateAsTests
         var updateDto = new { Status = "Shipped", Total = 99.99m };
         
         // Act
-        testCase.Action(() => db
-            .Entity<OrderModel>(out var o)
-            .Append($$"""
+        testCase.Action(() => 
+        {
+            db.Entity<OrderModel>(out var o);
+
+#pragma warning disable SQLIG10
+            return db.Append($$"""
                 UPDATE {{o}} AS {{"ord"}}
                 SET {{updateDto}}
                 WHERE {{o.Id}} = 1
-                """)
-            .Build()
-        );
+                """).Build();
+#pragma warning restore SQLIG10
+        });
 
         // Assert
         testCase.Assert();

@@ -15,17 +15,19 @@ public class LockTests
         int id = 5;
 
         // Act - Zero-allocation properties and fluent target tracking
-        testCase.Action(() => db.Entity<Product>(out var p)
-            .Append($$"""
-            SELECT {{p.Id}}, {{p.Name}}
-            FROM {{p}} FOR UPDATE
-            WHERE {{p.Id}} = {{id}}
-            """)
-            .Build()
-        );
+        testCase.Action(() => 
+        {
+            db.Entity<Product>(out var p);
+            return db.Append($$"""
+                SELECT {{p.Id}}, {{p.Name}}
+                FROM {{p}} FOR UPDATE
+                WHERE {{p.Id}} = {{id}}
+                """).Build();
+        });
 
         // Assert - Handles both string verification and exception assertions natively
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -37,17 +39,19 @@ public class LockTests
         int id = 5;
 
         // Act
-        testCase.Action(() => db.Entity<Product>(out var p)
-            .Append($$"""
-            SELECT {{p.Id}}, {{p.Name}}
-            FROM {{p}} FOR SHARE
-            WHERE {{p.Id}} = {{id}}
-            """)
-            .Build()
-        );
+        testCase.Action(() => 
+        {
+            db.Entity<Product>(out var p);
+            return db.Append($$"""
+                SELECT {{p.Id}}, {{p.Name}}
+                FROM {{p}} FOR SHARE
+                WHERE {{p.Id}} = {{id}}
+                """).Build();
+        });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     public static TheoryData<SqlTestCase> SelectWithForUpdateData

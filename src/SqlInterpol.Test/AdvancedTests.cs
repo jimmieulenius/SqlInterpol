@@ -11,6 +11,7 @@ public class AdvancedTests
     [MemberData(nameof(DynamicQueryData))]
     public void DynamicQuery(SqlTestCase testCase)
     {
+        // Arrange
         var request = new GetOrderStatsRequest
         {
             CustomerId = 5,
@@ -19,15 +20,16 @@ public class AdvancedTests
             Page = 2,
             PageSize = 20
         };
+        var db = testCase.CreateBuilder();
 
+        // Act
         testCase.Action(() =>
         {
-            var db = testCase.CreateBuilder();
-
             db.Entity<ApiOrderStatsModel>(out var stats, "stats")
               .Entity<OrderModel>(out var o, "o")
               .Entity<OrderLine>(out var ol, "ol");
 
+#pragma warning disable SQLIG10 // Highly dynamic query parts gracefully fallback to JIT
             db.Append($"SELECT ");
             bool first = true;
             foreach (var f in request.SelectFields)
@@ -51,7 +53,7 @@ public class AdvancedTests
                 """);
 
             if (request.CustomerId.HasValue) 
-                db.AppendLine($"WHERE {stats.CustomerId} = {request.CustomerId}"); 
+                db.AppendLine($"WHERE {stats.CustomerId} = {request.CustomerId}");
             
             if (request.SortFields.Any()) 
             {
@@ -68,17 +70,21 @@ public class AdvancedTests
 
             int offset = (request.Page - 1) * request.PageSize;
             db.Append($"LIMIT {request.PageSize} OFFSET {offset}");
+#pragma warning restore SQLIG10
 
             return db.Build();
         });
 
+        // Assert
         testCase.Assert();
+        db.AssertAotIntercepted(); // Passes because parts of the query were successfully AOT'd
     }
 
     [Theory]
     [MemberData(nameof(AdvancedDynamicQueryData))]
     public void AdvancedDynamicQuery(SqlTestCase testCase)
     {
+        // Arrange
         var request = new GetMassiveStatsRequest
         {
             ProductNameFilter = "Laptop",
@@ -87,11 +93,11 @@ public class AdvancedTests
             Page = 2, 
             PageSize = 20
         };
+        var db = testCase.CreateBuilder();
 
+        // Act
         testCase.Action(() =>
         {
-            var db = testCase.CreateBuilder();
-            
             db.Entity<MassiveOrderStatsModel>(out var stats, "stats")
               .Entity<OrderModel>(out var o, "o")
               .Entity<OrderLine>(out var ol, "ol")
@@ -99,6 +105,7 @@ public class AdvancedTests
               .Entity<Category>(out var cat, "cat")
               .Entity<OrderLineAggModel>(out var olAgg, "ol_agg");
 
+#pragma warning disable SQLIG10
             db.Append($"SELECT ");
             bool first = true;
             foreach (var f in request.SelectFields)
@@ -109,7 +116,7 @@ public class AdvancedTests
             }
 
             db.AppendLine($"""
-                
+
                 FROM (
                     SELECT 
                         {o.Id} AS {stats.OrderId:alias}, 
@@ -133,7 +140,7 @@ public class AdvancedTests
                 """);
 
             if (!string.IsNullOrEmpty(request.ProductNameFilter)) 
-                db.AppendLine($"WHERE {stats.ProductName} = {request.ProductNameFilter}"); 
+                db.AppendLine($"WHERE {stats.ProductName} = {request.ProductNameFilter}");
             
             if (request.SortFields.Any()) 
             {
@@ -150,22 +157,27 @@ public class AdvancedTests
 
             int offset = (request.Page - 1) * request.PageSize;
             db.Append($"LIMIT {request.PageSize} OFFSET {offset}");
+#pragma warning restore SQLIG10
 
             return db.Build();
         });
 
+        // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
     [MemberData(nameof(ComplexRawSqlData))]
     public void RawSql_ComplexStatements_PassThroughUnmodified(SqlTestCase testCase)
     {
+        // Arrange
         var minPrice = 50.00m;
+        var db = testCase.CreateBuilder();
 
+        // Act
         testCase.Action(() => 
         {
-            var db = testCase.CreateBuilder();
             db.Entity<Product>(out var p);
             
             return db.Append($"""
@@ -180,7 +192,9 @@ public class AdvancedTests
                 """).Build();
         });
 
+        // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     public static TheoryData<SqlTestCase> DynamicQueryData =>

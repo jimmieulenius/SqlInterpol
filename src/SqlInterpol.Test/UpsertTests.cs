@@ -15,14 +15,18 @@ public class UpsertTests
         var updateProduct = new { Name = "Apple", Price = 10m };
 
         // Act
-        testCase.Action(() => db.Entity<Product>(out var p)
-            .Append($$"""
-            INSERT INTO {{p}} {{newProduct}}
-            ON CONFLICT {{p.Id}}
-            DO UPDATE SET {{updateProduct}}
-            """)
-            .Build()
-        );
+        testCase.Action(() => 
+        {
+            db.Entity<Product>(out var p);
+
+            #pragma warning disable SQLIG10
+            return db.Append($$"""
+                INSERT INTO {{p}} {{newProduct}}
+                ON CONFLICT {{p.Id}}
+                DO UPDATE SET {{updateProduct}}
+                """).Build();
+            #pragma warning restore SQLIG10
+        });
 
         // Assert
         testCase.Assert();
@@ -38,14 +42,17 @@ public class UpsertTests
         var newPrice = 99.99m;
 
         // Act
-        testCase.Action(() => db.Entity<Product>(out var p)
-            .Append($$"""
-            INSERT INTO {{p}} (Id, Price) 
-            VALUES ({{id}}, {{newPrice}}) 
-            ON DUPLICATE KEY UPDATE Price = {{newPrice}}
-            """)
-            .Build()
-        );
+        testCase.Action(() => 
+        {
+            #pragma warning disable SQLIG10
+            db.Entity<Product>(out var p);
+            return db.Append($$"""
+                INSERT INTO {{p}} (Id, Price) 
+                VALUES ({{id}}, {{newPrice}}) 
+                ON DUPLICATE KEY UPDATE Price = {{newPrice}}
+                """).Build();
+            #pragma warning restore SQLIG10
+        });
 
         // Assert
         testCase.Assert();
@@ -60,41 +67,21 @@ public class UpsertTests
         var id = 1;
 
         // Act
-        testCase.Action(() => db.Entity<Product>(out var p)
-            .Append($$"""
-            INSERT INTO {{p}} (Id) 
-            VALUES ({{id}}) 
-            ON CONFLICT DO NOTHING
-            """)
-            .Build()
-        );
+        testCase.Action(() => 
+        {
+            #pragma warning disable SQLIG10
+            db.Entity<Product>(out var p);
+            return db.Append($$"""
+                INSERT INTO {{p}} (Id) 
+                VALUES ({{id}}) 
+                ON CONFLICT DO NOTHING
+                """).Build();
+            #pragma warning restore SQLIG10
+        });
 
         // Assert
         testCase.Assert();
     }
-
-    // TODO: Add a test for the Upsert template method once we have a working implementation
-    // [Theory]
-    // [MemberData(nameof(UpsertTemplateData))]
-    // public void AppendUpsert_Template(SqlTestCase testCase)
-    // {
-    //     // Arrange
-    //     var db = testCase.CreateBuilder();
-    //     var user = new TestUser { Id = 1, Name = "Charlie", Age = 32 };
-
-    //     // Act
-    //     testCase.Action(() => 
-    //     {
-    //         // First we register the entity so the builder context is aware of it
-    //         db.Entity<TestUser>(out var u);
-            
-    //         // Then we use the pre-built Upsert template logic
-    //         return db.AppendUpsert(u, user, x => x.Id).Build();
-    //     });
-
-    //     // Assert
-    //     testCase.Assert();
-    // }
 
     public static TheoryData<SqlTestCase> UpsertData
     {

@@ -14,9 +14,11 @@ public class RawSqlTests
         var db = testCase.CreateBuilder();
         var minPrice = 50.00m;
 
+        #pragma warning disable SQLIG10
         // Act
         // We are mixing AST nodes {{p}}, parameters {{minPrice}}, and RAW SQL here!
-        testCase.Action(() => db.Entity<Product>(out var p)
+        testCase.Action(() =>
+        db.Entity<Product>(out var p)
             .Append($$"""
             SELECT {{p.Id}}, {{p.Name}}
             FROM {{p}}
@@ -29,6 +31,7 @@ public class RawSqlTests
             """)
             .Build()
         );
+        #pragma warning restore SQLIG10
 
         // Assert - Natively verifies the SQL string AND the expected parameters array!
         testCase.Assert();
@@ -43,6 +46,7 @@ public class RawSqlTests
 
         // Act
         // Proving that window functions and raw SQL keywords flow perfectly around our AST tags
+        #pragma warning disable SQLIG10
         testCase.Action(() => db.Entity<Product>(out var p)
             .Append($$"""
             SELECT 
@@ -53,6 +57,7 @@ public class RawSqlTests
             """)
             .Build()
         );
+        #pragma warning restore SQLIG10
 
         // Assert
         testCase.Assert();

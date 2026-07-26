@@ -16,22 +16,22 @@ public class DeleteSubqueryTests
         var db = testCase.CreateBuilder();
 
         // Act
-        testCase.Action(() => db
-            .Entity<OrderLine>(out var l)
-            .Entity<OrderModel>(out var o)
-            .Append($$"""
+        testCase.Action(() => 
+        {
+            db.Entity<OrderLine>(out var l).Entity<OrderModel>(out var o);
+            return db.Append($$"""
                 DELETE FROM {{l}}
                 WHERE {{l.OrderId}} IN (
                     SELECT {{o.Id}}
                     FROM {{o}}
                     WHERE {{o.Status}} = {{Status}}
                 )
-                """)
-            .Build()
-        );
+                """).Build();
+        });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     public static TheoryData<SqlTestCase> Delete_WithSubqueryData
@@ -39,7 +39,6 @@ public class DeleteSubqueryTests
         get
         {
             object?[] expectedParams = [Status];
-
             return
             [
                 new SqlTestCase(

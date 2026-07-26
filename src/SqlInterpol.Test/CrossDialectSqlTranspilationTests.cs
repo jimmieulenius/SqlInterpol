@@ -8,53 +8,55 @@ public class CrossDialectSqlTranspilationTests
 {
     [Theory]
     [MemberData(nameof(PagingToggleData))]
-    public void Paging_Toggle(bool xvSql, SqlTestCase testCase)
+    public void Paging_Toggle(bool crossDialectSqlTranspilation, SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
+        db.Context.Options.CrossDialectSqlTranspilation = crossDialectSqlTranspilation;
         int limit = 10;
         int offset = 20;
         
         // Act
         testCase.Action(() => 
         {
-            db.Context.Options.CrossVendorSqlTranspilation = xvSql;
             return [db.Append($"SELECT * FROM Products LIMIT {limit} OFFSET {offset}").Build()];
         });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
     [MemberData(nameof(PagingHardcodedToggleData))]
-    public void Paging_Hardcoded_Toggle(bool xvSql, SqlTestCase testCase)
+    public void Paging_Hardcoded_Toggle(bool crossDialectSqlTranspilation, SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
-        
+        db.Context.Options.CrossDialectSqlTranspilation = crossDialectSqlTranspilation;
+
         // Act
         testCase.Action(() => 
         {
-            db.Context.Options.CrossVendorSqlTranspilation = xvSql;
             return [db.Append($"SELECT * FROM Products LIMIT 10 OFFSET 20").Build()];
         });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
     [MemberData(nameof(RowLockingToggleData))]
-    public void RowLocking_Toggle(bool xvSql, SqlTestCase testCase)
+    public void RowLocking_Toggle(bool crossDialectSqlTranspilation, SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
+        db.Context.Options.CrossDialectSqlTranspilation = crossDialectSqlTranspilation;
 
         // Act
         testCase.Action(() => 
         {
-            db.Context.Options.CrossVendorSqlTranspilation = xvSql;
             return [db.Append($"SELECT * FROM Products FOR UPDATE").Build()];
         });
 
@@ -64,15 +66,15 @@ public class CrossDialectSqlTranspilationTests
 
     [Theory]
     [MemberData(nameof(SelectIntoToggleData))]
-    public void SelectInto_Toggle(bool xvSql, SqlTestCase testCase)
+    public void SelectInto_Toggle(bool crossDialectSqlTranspilation, SqlTestCase testCase)
     {
         // Arrange
         var db = testCase.CreateBuilder();
+        db.Context.Options.CrossDialectSqlTranspilation = crossDialectSqlTranspilation;
 
         // Act
         testCase.Action(() => 
         {
-            db.Context.Options.CrossVendorSqlTranspilation = xvSql;
             return [db.Append($"SELECT Id INTO #Temp FROM Products").Build()];
         });
 
@@ -85,12 +87,9 @@ public class CrossDialectSqlTranspilationTests
         get
         {
             object?[] expectedParams = [10, 20];
-
             return new TheoryData<bool, SqlTestCase>
             {
-                // ====================================================================
-                // 1. META-SQL ENABLED (Transpilation ON)
-                // ====================================================================
+                // CrossDialectSqlTranspilation enabled
                 {
                     true, 
                     new SqlTestCase(
@@ -163,10 +162,7 @@ public class CrossDialectSqlTranspilationTests
                         expectedParameters: expectedParams
                     )
                 },
-
-                // ====================================================================
-                // 2. META-SQL DISABLED (Raw Pass-Through)
-                // ====================================================================
+                // CrossDialectSqlTranspilation disabled
                 {
                     false, 
                     new SqlTestCase(
@@ -248,12 +244,9 @@ public class CrossDialectSqlTranspilationTests
         get
         {
             string rawSql = "SELECT * FROM Products LIMIT 10 OFFSET 20";
-
             return new TheoryData<bool, SqlTestCase>
             {
-                // ====================================================================
-                // 1. META-SQL ENABLED (Transpilation ON)
-                // ====================================================================
+                // CrossDialectSqlTranspilation enabled
                 {
                     true, 
                     new SqlTestCase(
@@ -304,10 +297,7 @@ public class CrossDialectSqlTranspilationTests
                         ]
                     )
                 },
-
-                // ====================================================================
-                // 2. META-SQL DISABLED (Raw Pass-Through)
-                // ====================================================================
+                // CrossDialectSqlTranspilation disabled
                 {
                     false, 
                     new SqlTestCase(
@@ -363,7 +353,7 @@ public class CrossDialectSqlTranspilationTests
 
             return new TheoryData<bool, SqlTestCase>
             {
-                // --- META-SQL ENABLED (Transpilation ON) ---
+                // CrossDialectSqlTranspilation enabled
                 {
                     true, 
                     new SqlTestCase(
@@ -413,7 +403,7 @@ public class CrossDialectSqlTranspilationTests
                     )
                 },
 
-                // --- META-SQL DISABLED (Raw Pass-Through) ---
+                // CrossDialectSqlTranspilation disabled
                 {
                     false, 
                     new SqlTestCase(
@@ -469,7 +459,7 @@ public class CrossDialectSqlTranspilationTests
 
             return new TheoryData<bool, SqlTestCase>
             {
-                // --- META-SQL ENABLED (Transpilation ON) ---
+                // CrossDialectSqlTranspilation enabled
                 {
                     true, 
                     new SqlTestCase(
@@ -528,7 +518,7 @@ public class CrossDialectSqlTranspilationTests
                     )
                 },
 
-                // --- META-SQL DISABLED (Raw Pass-Through) ---
+                // CrossDialectSqlTranspilation disabled
                 {
                     false, 
                     new SqlTestCase(

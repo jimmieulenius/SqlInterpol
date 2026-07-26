@@ -16,15 +16,18 @@ public class PagingTests
         int pageOffset = 20;
 
         // Act - Using standard PostgreSQL/MySQL syntax. The engine transpiles it for others!
-        testCase.Action(() => db.Entity<Product>(out var p)
-            .Append($$"""
-            SELECT {{p.Id}}, {{p.Name}}
-            FROM {{p}}
-            ORDER BY {{p.Id}}
-            LIMIT {{pageSize}} OFFSET {{pageOffset}}
-            """)
-            .Build()
-        );
+        testCase.Action(() => 
+        {
+            #pragma warning disable SQLIG10
+            db.Entity<Product>(out var p);
+            return db.Append($$"""
+                SELECT {{p.Id}}, {{p.Name}}
+                FROM {{p}}
+                ORDER BY {{p.Id}}
+                LIMIT {{pageSize}} OFFSET {{pageOffset}}
+                """).Build();
+            #pragma warning restore SQLIG10
+        });
 
         // Assert - Natively verifies the SQL string AND the expected parameters array!
         testCase.Assert();

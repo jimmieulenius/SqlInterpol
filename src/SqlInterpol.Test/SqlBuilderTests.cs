@@ -14,13 +14,15 @@ public class SqlBuilderTests
         var db = testCase.CreateBuilder();
         
         // Act
-        testCase.Action(() => db.Entity<Product>(out var p)
-            .Append($"SELECT {p.Id}").Append($" FROM {p}")
-            .Build()
-        );
+        testCase.Action(() => 
+        {
+            db.Entity<Product>(out var p);
+            return db.Append($"SELECT {p.Id}").Append($" FROM {p}").Build();
+        });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -31,14 +33,17 @@ public class SqlBuilderTests
         var db = testCase.CreateBuilder();
         
         // Act
-        testCase.Action(() => db.Entity<Product>(out var p)
-            .AppendLine($"SELECT {p.Id}")
-            .Append($"FROM {p}")
-            .Build()
-        );
+        testCase.Action(() => 
+        {
+            db.Entity<Product>(out var p);
+            return db.AppendLine($"SELECT {p.Id}")
+                     .Append($"FROM {p}")
+                     .Build();
+        });
     
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -49,20 +54,20 @@ public class SqlBuilderTests
         var db = testCase.CreateBuilder();
         
         // Act
-        testCase.Action(() => db.Entity<Product>(out var p)
-            .Append($$"""
-            SELECT
-                {{p.Id}}
-            FROM {{p}}
-            """)
-            .Build()
-        );
+        testCase.Action(() => 
+        {
+            db.Entity<Product>(out var p);
+            return db.Append($$"""
+                SELECT
+                    {{p.Id}}
+                FROM {{p}}
+                """).Build();
+        });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
-
-    // --- TEST DATA ---
 
     public static TheoryData<SqlTestCase> AppendData =>
     [

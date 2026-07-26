@@ -28,6 +28,7 @@ public class CustomParserTests
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     public static TheoryData<SqlTestCase> CustomParserData
@@ -35,7 +36,6 @@ public class CustomParserTests
         get
         {
             object?[] expectedParams = [ActiveIds[0], ActiveIds[1], ActiveIds[2]];
-
             return
             [
                 new SqlTestCase(

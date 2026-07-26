@@ -16,17 +16,19 @@ public class ParserTests
 
         // Act - Testing the parser's ability to read a raw SQL string containing '' 
         // without prematurely ending the string token.
-        testCase.Action(() => db.Entity<Product>(out var p)
-            .Append($$"""
-            SELECT {{p.Id}}
-            FROM {{p}}
-            WHERE {{p.Name}} = 'O''Connor' AND {{p.CategoryId}} = 1
-            """)
-            .Build()
-        );
+        testCase.Action(() => 
+        {
+            db.Entity<Product>(out var p);
+            return db.Append($$"""
+                SELECT {{p.Id}}
+                FROM {{p}}
+                WHERE {{p.Name}} = 'O''Connor' AND {{p.CategoryId}} = 1
+                """).Build();
+        });
 
         // Assert - testCase.Assert() automatically validates SQL and 0 parameters
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -38,17 +40,19 @@ public class ParserTests
         var searchName = "O'Connor"; // A malicious or complex string
 
         // Act - Testing that variables are parameterized, naturally escaping the risk of injection
-        testCase.Action(() => db.Entity<Product>(out var p)
-            .Append($$"""
-            SELECT {{p.Id}}
-            FROM {{p}}
-            WHERE {{p.Name}} = {{searchName}}
-            """)
-            .Build()
-        );
+        testCase.Action(() => 
+        {
+            db.Entity<Product>(out var p);
+            return db.Append($$"""
+                SELECT {{p.Id}}
+                FROM {{p}}
+                WHERE {{p.Name}} = {{searchName}}
+                """).Build();
+        });
 
         // Assert - testCase.Assert() automatically validates SQL and the expected parameter value
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -59,20 +63,22 @@ public class ParserTests
         var db = testCase.CreateBuilder();
 
         // Act - Testing that quotes inside a multi-line comment do not start a string state
-        testCase.Action(() => db.Entity<Product>(out var p)
-            .Append($$"""
-            SELECT {{p.Id}}
-            /* This is a multi-line comment.
-               It has 'single quotes' and "double quotes".
-               The parser should completely ignore them.
-            */
-            FROM {{p}}
-            """)
-            .Build()
-        );
+        testCase.Action(() => 
+        {
+            db.Entity<Product>(out var p);
+            return db.Append($$"""
+                SELECT {{p.Id}}
+                /* This is a multi-line comment.
+                   It has 'single quotes' and "double quotes".
+                   The parser should completely ignore them.
+                */
+                FROM {{p}}
+                """).Build();
+        });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -83,17 +89,19 @@ public class ParserTests
         var db = testCase.CreateBuilder();
 
         // Act - Testing that quotes inside a single-line comment do not start a string state
-        testCase.Action(() => db.Entity<Product>(out var p)
-            .Append($$"""
-            SELECT {{p.Id}}
-            -- This is a single-line comment with 'quotes' and "more quotes"
-            FROM {{p}}
-            """)
-            .Build()
-        );
+        testCase.Action(() => 
+        {
+            db.Entity<Product>(out var p);
+            return db.Append($$"""
+                SELECT {{p.Id}}
+                -- This is a single-line comment with 'quotes' and "more quotes"
+                FROM {{p}}
+                """).Build();
+        });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -104,17 +112,19 @@ public class ParserTests
         var db = testCase.CreateBuilder();
 
         // Act - Testing that comment tokens inside a string literal do not start a comment state
-        testCase.Action(() => db.Entity<Product>(out var p)
-            .Append($$"""
-            SELECT {{p.Id}}
-            FROM {{p}}
-            WHERE {{p.Name}} = 'Item /* Note */ -- 1'
-            """)
-            .Build()
-        );
+        testCase.Action(() => 
+        {
+            db.Entity<Product>(out var p);
+            return db.Append($$"""
+                SELECT {{p.Id}}
+                FROM {{p}}
+                WHERE {{p.Name}} = 'Item /* Note */ -- 1'
+                """).Build();
+        });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -125,14 +135,17 @@ public class ParserTests
         var db = testCase.CreateBuilder();
 
         // Act - Proof that AST keyword interceptors (like FOR UPDATE or RETURNING) ignore strings
-        testCase.Action(() => db.Entity<Product>(out var p)
-            .Append($$"""
-            SELECT {{p.Id}}
-            FROM {{p}}
-            WHERE {{p.Name}} = 'INSERT VALUES RETURNING FOR UPDATE'
-            """)
-            .Build()
-        );
+        testCase.Action(() => 
+        {
+            #pragma warning disable SQLIG10
+            db.Entity<Product>(out var p);
+            return db.Append($$"""
+                SELECT {{p.Id}}
+                FROM {{p}}
+                WHERE {{p.Name}} = 'INSERT VALUES RETURNING FOR UPDATE'
+                """).Build();
+            #pragma warning restore SQLIG10
+        });
 
         // Assert
         testCase.Assert();
@@ -146,14 +159,17 @@ public class ParserTests
         var db = testCase.CreateBuilder();
 
         // Act - Proof that AST keyword interceptors ignore comments
-        testCase.Action(() => db.Entity<Product>(out var p)
-            .Append($$"""
-            SELECT {{p.Id}}
-            FROM {{p}}
-            /* We don't want to INSERT VALUES RETURNING FOR UPDATE here */
-            """)
-            .Build()
-        );
+        testCase.Action(() => 
+        {
+            #pragma warning disable SQLIG10
+            db.Entity<Product>(out var p);
+            return db.Append($$"""
+                SELECT {{p.Id}}
+                FROM {{p}}
+                /* We don't want to INSERT VALUES RETURNING FOR UPDATE here */
+                """).Build();
+            #pragma warning restore SQLIG10
+        });
 
         // Assert
         testCase.Assert();

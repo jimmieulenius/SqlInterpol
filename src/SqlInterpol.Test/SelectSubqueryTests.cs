@@ -23,14 +23,14 @@ public class SelectSubqueryTests
             // Scenario 1: 'prod' table alias
             db1.Entity<Product>(out var p1)
                .Entity<Category>(out var c1)
-               // FIX: Use the 'out var' parameter to capture the actual ISqlQuery AST node!
                .Query(c1, out var categorySubquery1, () => db1.Append($$"""
-                    SELECT
-                        {{c1.Name}}
-                    FROM {{c1}}
-                    WHERE {{c1.Id}} = {{p1.CategoryId}} AND {{c1.IsActive}} = {{activeStatus}}
-                    """));
+                   SELECT
+                       {{c1.Name}}
+                   FROM {{c1}}
+                   WHERE {{c1.Id}} = {{p1.CategoryId}} AND {{c1.IsActive}} = {{activeStatus}}
+                   """));
 
+#pragma warning disable SQLIG10
             var result1 = db1.Append($$"""
                 SELECT 
                     {{p1.Id}},
@@ -40,18 +40,19 @@ public class SelectSubqueryTests
                 FROM {{p1}} AS prod
                 WHERE {{p1.Price}} > {{minPrice}}
                 """).Build();
+#pragma warning restore SQLIG10
 
             // Scenario 2: 'second_prod' table alias (Guarantees no cross-statement alias leakage)
             db2.Entity<Product>(out var p2)
                .Entity<Category>(out var c2)
-               // FIX: Same here, capture the query explicitly
                .Query(c2, out var categorySubquery2, () => db2.Append($$"""
-                    SELECT
-                        {{c2.Name}}
-                    FROM {{c2}}
-                    WHERE {{c2.Id}} = {{p2.CategoryId}} AND {{c2.IsActive}} = {{activeStatus}}
-                    """));
+                   SELECT
+                       {{c2.Name}}
+                   FROM {{c2}}
+                   WHERE {{c2.Id}} = {{p2.CategoryId}} AND {{c2.IsActive}} = {{activeStatus}}
+                   """));
 
+#pragma warning disable SQLIG10
             var result2 = db2.Append($$"""
                 SELECT 
                     {{p2.Id}},
@@ -61,6 +62,7 @@ public class SelectSubqueryTests
                 FROM {{p2}} AS second_prod
                 WHERE {{p2.Price}} > {{minPrice}}
                 """).Build();
+#pragma warning restore SQLIG10
 
             return [result1, result2];
         });
@@ -86,6 +88,7 @@ public class SelectSubqueryTests
         // Act
         testCase.Action(() =>
         {
+#pragma warning disable SQLIG10
             return [
                 db1.Append($$"""
                     SELECT 
@@ -107,6 +110,7 @@ public class SelectSubqueryTests
                     WHERE {{p2.Price}} > {{minPrice}}
                     """).Build()
             ];
+#pragma warning restore SQLIG10
         });
 
         // Assert

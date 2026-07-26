@@ -10,16 +10,19 @@ public class FromSubqueryTests
     [MemberData(nameof(From_SubqueryData))]
     public void From_Subquery(SqlTestCase testCase)
     {
+        // Arrange
+        var db = testCase.CreateBuilder();
+
         // Act
         testCase.Action(() =>
         {
-            var db = testCase.CreateBuilder();
-
+            #pragma warning disable SQLIG10
             db.Entity<CategoryStats>(out var stats)
-                .Entity<Product>(out var p, "p")
-                .Query(
-                    stats,
-                    () => db.Append($"""
+              .Entity<Product>(out var p, "p");
+
+            db.Query(
+                stats,
+                () => db.Append($"""
                     SELECT
                         {p.CategoryId} AS {stats.CategoryId:alias},
                         SUM({p.Price}) AS {stats.TotalPrice:alias}
@@ -28,7 +31,7 @@ public class FromSubqueryTests
                     """));
 
             db.Entity<Category>(out var c, "c");
-
+            
             return db.Append($"""
                 SELECT
                     {c.Name},
@@ -38,8 +41,8 @@ public class FromSubqueryTests
                     {stats}
                 ) AS stats
                 JOIN {c} ON {stats.CategoryId} = {c.Id}
-                """)
-                .Build();
+                """).Build();
+            #pragma warning restore SQLIG10
         });
 
         // Assert
@@ -50,26 +53,30 @@ public class FromSubqueryTests
     [MemberData(nameof(From_SubqueryData))]
     public void From_Subquery_AutoAliasing(SqlTestCase testCase)
     {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        db.Context.Options.EntityAutoAliasing = true;
+
         // Act
         testCase.Action(() =>
         {
-            var db = testCase.CreateBuilder();
-            db.Context.Options.EntityAutoAliasing = true;
-
             db.Entity<CategoryStats>(out var stats)
-              .Entity<Product>(out var p)
-              .Query(
-                  stats,
-                  () => db.Append($"""
-                      SELECT
-                          {p.CategoryId} AS {stats.CategoryId:alias},
-                          SUM({p.Price}) AS {stats.TotalPrice:alias}
-                      FROM {p}
-                      GROUP BY {p.CategoryId}
-                  """));
+              .Entity<Product>(out var p);
+
+#pragma warning disable SQLIG10
+            db.Query(
+                stats,
+                () => db.Append($"""
+                    SELECT
+                        {p.CategoryId} AS {stats.CategoryId:alias},
+                        SUM({p.Price}) AS {stats.TotalPrice:alias}
+                    FROM {p}
+                    GROUP BY {p.CategoryId}
+                """));
+#pragma warning restore SQLIG10
 
             db.Entity<Category>(out var c);
-
+            
             return db.Append($"""
                 SELECT
                     {c.Name},
@@ -82,6 +89,7 @@ public class FromSubqueryTests
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     public static TheoryData<SqlTestCase> From_SubqueryData =>

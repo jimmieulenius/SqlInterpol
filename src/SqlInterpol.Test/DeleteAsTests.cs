@@ -16,13 +16,17 @@ public class DeleteAsTests
         var db = testCase.CreateBuilder();
 
         // Act
-        testCase.Action(() => db.Entity<OrderModel>(out var o)
-            .Append($$""" 
+        testCase.Action(() => 
+        {
+            #pragma warning disable SQLIG10
+            db.Entity<OrderModel>(out var o);
+            
+            return db.Append($$"""
                 DELETE FROM {{o}} AS {{"o"}}
                 WHERE {{o.Id}} = {{TargetId}}
-                """)
-            .Build()
-        );
+                """).Build();
+            #pragma warning restore SQLIG10
+        });
 
         // Assert
         testCase.Assert();
@@ -37,16 +41,18 @@ public class DeleteAsTests
         db.Context.Options.EntityAutoAliasing = true; // Even with auto-aliasing enabled, it strips safely!
 
         // Act
-        testCase.Action(() => db.Entity<OrderModel>(out var o)
-            .Append($$""" 
+        testCase.Action(() => 
+        {
+            db.Entity<OrderModel>(out var o);
+            return db.Append($$"""
                 DELETE FROM {{o}}
                 WHERE {{o.Id}} = {{TargetId}}
-                """)
-            .Build()
-        );
+                """).Build();
+        });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     public static TheoryData<SqlTestCase> DeleteWithExplicitAliasData
@@ -106,7 +112,6 @@ public class DeleteAsTests
                     DELETE FROM <<dbo>>.<<Orders>>
                     WHERE <<dbo>>.<<Orders>>.<<Id>> = !!100
                     """], expectedParameters: parameters),
-
                 new SqlTestCase(SqlDialectKind.Firebird, [
                     """
                     DELETE FROM "dbo"."Orders"
@@ -118,25 +123,21 @@ public class DeleteAsTests
                     DELETE FROM `dbo`.`Orders`
                     WHERE `dbo`.`Orders`.`Id` = @p0
                     """], expectedParameters: parameters),
-
                 new SqlTestCase(SqlDialectKind.Oracle, [
                     """
                     DELETE FROM "dbo"."Orders"
                     WHERE "dbo"."Orders"."Id" = :0
                     """], expectedParameters: parameters),
-
                 new SqlTestCase(SqlDialectKind.PostgreSql, [
                     """
                     DELETE FROM "dbo"."Orders"
                     WHERE "dbo"."Orders"."Id" = $1
                     """], expectedParameters: parameters),
-
                 new SqlTestCase(SqlDialectKind.SqLite, [
                     """
                     DELETE FROM "dbo"."Orders"
                     WHERE "dbo"."Orders"."Id" = @p1
                     """], expectedParameters: parameters),
-
                 new SqlTestCase(SqlDialectKind.SqlServer, [
                     """
                     DELETE FROM [dbo].[Orders]

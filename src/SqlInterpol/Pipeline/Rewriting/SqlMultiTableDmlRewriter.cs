@@ -11,7 +11,7 @@ public class SqlMultiTableDmlRewriter : ISqlSegmentRewriter
 {
     /// <inheritdoc />
     // FIX: Cleanly opt-out of DML transpilation if the user disables Meta-SQL!
-    public bool IsApplicable(ISqlPipelineState state) => state.Context.Options.CrossVendorSqlTranspilation;
+    public bool IsApplicable(ISqlPipelineState state) => state.Context.Options.CrossDialectSqlTranspilation;
 
     /// <inheritdoc />
     public IReadOnlyList<SqlSegment> Rewrite(IReadOnlyList<SqlSegment> segments, ISqlContext context)

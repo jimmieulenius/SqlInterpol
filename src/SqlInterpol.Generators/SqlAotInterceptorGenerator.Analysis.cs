@@ -31,9 +31,9 @@ public partial class SqlAotInterceptorGenerator
         $@"\b(ON\s+CONFLICT|ON\s+DUPLICATE|{SqlKeyword.Merge.Value})\b", 
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    private static AotAnalysisResult AnalyzeContents(InterpolatedStringExpressionSyntax interpolatedString, CompileTimeQueryContext queryContext)
+    private static SqlAotAnalysisResult AnalyzeContents(InterpolatedStringExpressionSyntax interpolatedString, CompileTimeQueryContext queryContext)
     {
-        var result = new AotAnalysisResult();
+        var result = new SqlAotAnalysisResult();
         var contents = interpolatedString.Contents;
 
         for (int i = 0; i < contents.Count; i++)

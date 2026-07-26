@@ -27,6 +27,8 @@ public class WhereSubqueryTests
 
             // 2. Declare Category and build the main query, injecting the fragment natively
             db.Entity<Category>(out var c);
+
+#pragma warning disable SQLIG10
             return db.Append($$"""
                 SELECT 
                     {{c.Name}}
@@ -36,6 +38,7 @@ public class WhereSubqueryTests
                     {{activeCategoriesQuery}}
                 )
                 """).Build();
+#pragma warning restore SQLIG10
         });
 
         // Assert

@@ -21,14 +21,18 @@ public class UpdateTests
         var updateDto = new { Status = TargetStatus, Total = TargetTotal };
 
         // Act
-        testCase.Action(() => db.Entity<OrderModel>(out var o)
-            .Append($$"""
+        testCase.Action(() => 
+        {
+            db.Entity<OrderModel>(out var o);
+
+#pragma warning disable SQLIG10
+            return db.Append($$"""
                 UPDATE {{o}}
                 SET {{updateDto}}
                 WHERE {{o.Id}} = {{TargetOrderId}}
-                """)
-            .Build()
-        );
+                """).Build();
+#pragma warning restore SQLIG10
+        });
 
         // Assert
         testCase.Assert();
@@ -42,17 +46,19 @@ public class UpdateTests
         var db = testCase.CreateBuilder();
         
         // Act
-        testCase.Action(() => db.Entity<OrderModel>(out var o)
-            .Append($$"""
+        testCase.Action(() => 
+        {
+            db.Entity<OrderModel>(out var o);
+            return db.Append($$"""
                 UPDATE {{o}}
                 SET {{o.Status}} = {{TargetStatus}}, {{o.Total}} = {{TargetTotal}}
                 WHERE {{o.Id}} = {{TargetOrderId}}
-                """)
-            .Build()
-        );
+                """).Build();
+        });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -70,14 +76,18 @@ public class UpdateTests
         };
 
         // Act
-        testCase.Action(() => db.Entity<OrderWithIgnoreModel>(out var o)
-            .Append($$"""
+        testCase.Action(() => 
+        {
+            db.Entity<OrderWithIgnoreModel>(out var o);
+
+#pragma warning disable SQLIG10
+            return db.Append($$"""
                 UPDATE {{o}}
                 SET {{order}}
                 WHERE {{o.Id}} = {{order.Id}}
-                """)
-            .Build()
-        );
+                """).Build();
+#pragma warning restore SQLIG10
+        });
 
         // Assert
         testCase.Assert();
@@ -94,33 +104,12 @@ public class UpdateTests
         testCase.Action(() =>
         {
             Sql.BuildAssignments(new InvalidDummyEntity(), new { Name = "Test" }, db.Context);
-
             return new SqlQueryResult(string.Empty, new Dictionary<string, object?>());
         });
 
         // Assert
         testCase.Assert();
     }
-
-    // [Theory]
-    // [MemberData(nameof(UpdateInvalidEntityPropertyData))]
-    // public void Update_InvalidEntityProperty(SqlTestCase testCase)
-    // {
-    //     // Arrange
-    //     var db = testCase.CreateBuilder();
-
-    //     // Act
-    //     testCase.Action(() =>
-    //     {
-    //         var entity = db.AddEntity<Product>();
-    //         Sql.BuildAssignments(entity, new { Id = 1, NonExistentProperty = "Should Fail" }, db.Context);
-
-    //         return new SqlQueryResult(string.Empty, new Dictionary<string, object?>());
-    //     });
-
-    //     // Assert
-    //     testCase.Assert();
-    // }
 
     [Theory]
     [MemberData(nameof(MultiTableUpdateData))]
@@ -130,39 +119,24 @@ public class UpdateTests
         var db = testCase.CreateBuilder();
 
         // Act - Implicit Join WYSIWYG!
-        testCase.Action(() => db
-            .Entity<Product>(out var p)
-            .Entity<Category>(out var c)
-            .Append($$"""
+        testCase.Action(() => 
+        {
+            #pragma warning disable SQLIG10
+            db.Entity<Product>(out var p)
+              .Entity<Category>(out var c);
+
+            return db.Append($$"""
                 UPDATE {{p}}
                 SET {{p.Price}} = {{10}}
                 FROM {{c}} AS c1
                 WHERE {{p.CategoryId}} = c1.Id
-                """)
-            .Build()
-        );
+                """).Build();
+            #pragma warning restore SQLIG10
+        });
 
         // Assert
         testCase.Assert();
     }
-
-    // TODO: Update template
-    // [Theory]
-    // [MemberData(nameof(UpdateTemplateData))]
-    // public void AppendUpdate_Template(SqlTestCase testCase)
-    // {
-    //     // Arrange
-    //     var db = testCase.CreateBuilder();
-    //     var user = new TestUser { Id = 1, Name = "Bob", Age = 31 };
-
-    //     // Act
-    //     testCase.Action(() => db.Query<TestUser>(u => 
-    //          db.AppendUpdate(u, user, x => x.Id)
-    //     ).Build());
-
-    //     // Assert
-    //     testCase.Assert();
-    // }
 
     public static TheoryData<SqlTestCase> UpdateData
     {

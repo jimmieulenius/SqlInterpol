@@ -14,18 +14,19 @@ public class GroupByAsTests
         var db = testCase.CreateBuilder();
 
         // Act
-        testCase.Action(() => db
-            .Entity<Product>(out var p)
-            .Append($$"""
+        testCase.Action(() =>
+        {
+            db.Entity<Product>(out var p);
+            return db.Append($$"""
                 SELECT {{p.Name}}, {{p.IsActive}}, COUNT(*)
                 FROM {{p}} AS prod
                 GROUP BY {{p.Name}}, {{p.IsActive}}
-                """)
-            .Build()
-        );
+                """).Build();
+        });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     public static TheoryData<SqlTestCase> GroupByWithExplicitAliasData =>

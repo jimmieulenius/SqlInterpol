@@ -14,17 +14,20 @@ public class HavingTests
         var db = testCase.CreateBuilder();
 
         // Act
-        testCase.Action(() => db.Entity<Product>(out var p)
-            .Append($$"""
+        testCase.Action(() =>
+        {
+            #pragma warning disable SQLIG10
+            db.Entity<Product>(out var p);
+            return db.Append($$"""
                 SELECT 
                     {{p.CategoryId}},
                     COUNT({{p.Id}}) AS ProductCount
                 FROM {{p}}
                 GROUP BY {{p.CategoryId}}
                 HAVING COUNT({{p.Id}}) > {{5}}
-                """)
-            .Build()
-        );
+                """).Build();
+            #pragma warning restore SQLIG10
+        });
 
         // Assert
         testCase.Assert();

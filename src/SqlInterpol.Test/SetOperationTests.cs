@@ -14,14 +14,17 @@ public class SetOperationTests
         var db = testCase.CreateBuilder();
 
         // Act
-        testCase.Action(() => db.Entity<Product>(out var p)
-            .Append($$"""
+        testCase.Action(() => 
+        {
+            #pragma warning disable SQLIG10
+            db.Entity<Product>(out var p);
+            return db.Append($$"""
                 SELECT {{p.Id}} FROM {{p}}
                 INTERSECT
                 SELECT {{p.Id}} FROM {{p}} WHERE {{p.CategoryId}} = {{1}}
-                """)
-            .Build()
-        );
+                """).Build();
+            #pragma warning restore SQLIG10
+        });
 
         // Assert - Natively verifies the SQL string AND the hoisted parameter!
         testCase.Assert();
@@ -42,12 +45,16 @@ public class SetOperationTests
         var q2 = db.Fragment($"SELECT {p.Id} FROM {p} WHERE {p.CategoryId} = {1}");
 
         // Act
-        testCase.Action(() => db.Append($$"""
-            {{q1}}
-            INTERSECT
-            {{q2}}
-            """).Build()
-        );
+        testCase.Action(() => 
+        {
+            #pragma warning disable SQLIG10
+            return db.Append($$"""
+                {{q1}}
+                INTERSECT
+                {{q2}}
+                """).Build();
+            #pragma warning restore SQLIG10
+        });
 
         // Assert
         testCase.Assert();
@@ -61,14 +68,17 @@ public class SetOperationTests
         var db = testCase.CreateBuilder();
 
         // Act
-        testCase.Action(() => db.Entity<Product>(out var p)
-            .Append($$"""
+        testCase.Action(() => 
+        {
+            #pragma warning disable SQLIG10
+            db.Entity<Product>(out var p);
+            return db.Append($$"""
                 SELECT {{p.Id}} FROM {{p}}
                 EXCEPT
                 SELECT {{p.Id}} FROM {{p}} WHERE {{p.CategoryId}} = {{2}}
-                """)
-            .Build()
-        );
+                """).Build();
+            #pragma warning restore SQLIG10
+        });
 
         // Assert
         testCase.Assert();
@@ -87,12 +97,16 @@ public class SetOperationTests
         var q2 = db.Fragment($"SELECT {p.Id} FROM {p} WHERE {p.CategoryId} = {2}");
 
         // Act
-        testCase.Action(() => db.Append($$"""
-            {{q1}}
-            EXCEPT
-            {{q2}}
-            """).Build()
-        );
+        testCase.Action(() => 
+        {
+#pragma warning disable SQLIG10
+            return db.Append($$"""
+                {{q1}}
+                EXCEPT
+                {{q2}}
+                """).Build();
+#pragma warning restore SQLIG10
+        });
 
         // Assert
         testCase.Assert();
@@ -125,12 +139,16 @@ public class SetOperationTests
             """);
 
         // Act - Pure WYSIWYG Union!
-        testCase.Action(() => db.Append($$"""
-            {{query1}}
-            UNION ALL
-            {{query2}}
-            """).Build()
-        );
+        testCase.Action(() => 
+        {
+#pragma warning disable SQLIG10
+            return db.Append($$"""
+                {{query1}}
+                UNION ALL
+                {{query2}}
+                """).Build();
+#pragma warning restore SQLIG10
+        });
 
         // Assert - Proof that the context successfully shared the parameter counter across nested builders!
         testCase.Assert();

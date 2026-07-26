@@ -16,20 +16,23 @@ public class InsertSubqueryTests
         
         // Act
         // Insert into OrderModel (Total) using OrderLine (Quantity)
-        testCase.Action(() => db.Entity<OrderModel>(out var o)
-            .Entity<OrderLine>(out var l)
-            .Append($$"""
+        testCase.Action(() => 
+        {
+            db.Entity<OrderModel>(out var o)
+              .Entity<OrderLine>(out var l);
+
+            return db.Append($$"""
                 INSERT INTO {{o}} 
                 ({{o.Id}}, {{o.Total}})
                 SELECT {{l.OrderId}}, {{l.Quantity}}
                 FROM {{l}}
                 WHERE {{l.OrderId}} = {{targetId}}
-                """)
-            .Build()
-        );
+                """).Build();
+        });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     public static TheoryData<SqlTestCase> InsertSelectData

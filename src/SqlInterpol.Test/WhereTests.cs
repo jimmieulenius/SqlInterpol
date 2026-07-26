@@ -15,18 +15,20 @@ public class WhereTests
         int targetId = 42;
 
         // Act
-        testCase.Action(() => db.Entity<Product>(out var p)
-            .Append($$"""
-            SELECT
-                {{p.Id}}
-            FROM {{p}}
-            WHERE {{p.Id}} = {{targetId}}
-            """)
-            .Build()
-        );
+        testCase.Action(() => 
+        {
+            db.Entity<Product>(out var p);
+            return db.Append($$"""
+                SELECT
+                    {{p.Id}}
+                FROM {{p}}
+                WHERE {{p.Id}} = {{targetId}}
+                """).Build();
+        });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -38,15 +40,19 @@ public class WhereTests
         int[] categoryIds = [10, 20, 30];
 
         // Act
-        testCase.Action(() => db.Entity<Product>(out var p)
-            .Append($$"""
-            SELECT
-                {{p.Id}}
-            FROM {{p}}
-            WHERE {{p.CategoryId}} IN ({{categoryIds}})
-            """)
-            .Build()
-        );
+        testCase.Action(() => 
+        {
+            db.Entity<Product>(out var p);
+
+#pragma warning disable SQLIG10
+            return db.Append($$"""
+                SELECT
+                    {{p.Id}}
+                FROM {{p}}
+                WHERE {{p.CategoryId}} IN ({{categoryIds}})
+                """).Build();
+#pragma warning restore SQLIG10
+        });
 
         // Assert
         testCase.Assert();

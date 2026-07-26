@@ -12,11 +12,13 @@ public class FormattingTests
     [MemberData(nameof(Select_WithNewLinesData))]
     public void Select_WithNewLines(SqlTestCase testCase)
     {
+        // Arrange
+        var db = testCase.CreateBuilder();
+
+        // Act
         testCase.Action(() =>
         {
-            var db = testCase.CreateBuilder();
             db.Entity<Product>(out var p);
-
             return db.Append($"""
                 SELECT 
                     {p.Id}, 
@@ -26,36 +28,44 @@ public class FormattingTests
                 """).Build();
         });
 
+        // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
     [MemberData(nameof(Select_WithTabsData))]
     public void Select_WithTabs(SqlTestCase testCase)
     {
+        // Arrange
+        var db = testCase.CreateBuilder();
+
+        // Act
         testCase.Action(() =>
         {
-            var db = testCase.CreateBuilder();
             db.Entity<Product>(out var p);
-
             return db.Append($"""
-                SELECT 	{p.Id}, 	{p.Name}
-                FROM 	{p}
+                SELECT  {p.Id},  {p.Name}
+                FROM  {p}
                 """).Build();
         });
 
+        // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
     [MemberData(nameof(Select_WithExtraSpacesData))]
     public void Select_WithExtraSpaces(SqlTestCase testCase)
     {
+        // Arrange
+        var db = testCase.CreateBuilder();
+
+        // Act
         testCase.Action(() =>
         {
-            var db = testCase.CreateBuilder();
             db.Entity<Product>(out var p);
-
             // Testing right-aligned keywords (common in some style guides)
             return db.Append($"""
                 SELECT {p.Id}
@@ -64,83 +74,97 @@ public class FormattingTests
                 """).Build();
         });
 
+        // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
     [MemberData(nameof(Select_WithMixedWhitespaceData))]
     public void Select_WithMixedWhitespace(SqlTestCase testCase)
     {
+        // Arrange
+        var db = testCase.CreateBuilder();
+
+        // Act
         testCase.Action(() =>
         {
-            var db = testCase.CreateBuilder();
             db.Entity<Product>(out var p);
-
             // Testing a mix of leading/trailing blank lines and indentation
             return db.Append($"""
 
-                SELECT {p.Id}
-                FROM {p}
+                    SELECT {p.Id}
+                    FROM {p}
 
                 """).Build();
         });
 
+        // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
     [MemberData(nameof(Select_WithCommentsData))]
     public void Select_WithComments(SqlTestCase testCase)
     {
+        // Arrange
+        var db = testCase.CreateBuilder();
+
+        // Act
         testCase.Action(() =>
         {
-            var db = testCase.CreateBuilder();
             db.Entity<Product>(out var p);
-
             return db.Append($"""
                 SELECT {p.Id} -- This is the primary key
                 FROM {p} /* This is the table */
                 """).Build();
         });
 
+        // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
     [MemberData(nameof(InsertVerticalLayoutData))]
     public void Insert_VerticalLayout(SqlTestCase testCase)
     {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        db.Context.Options.CollectionLayout = SqlCollectionLayout.Vertical;
+        db.Context.Options.IndentSize = 4;
+
+        // Act
         testCase.Action(() =>
         {
-            var db = testCase.CreateBuilder();
-            db.Context.Options.CollectionLayout = SqlCollectionLayout.Vertical;
-            db.Context.Options.IndentSize = 4;
-            
             db.Entity<OrderModel>(out var o);
             var dto = new { Status = "New", Total = 10m };
-
             return db.Append($"""
                 INSERT INTO {o}
                 VALUES {dto}
                 """).Build();
         });
 
+        // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
     [MemberData(nameof(UpdateVerticalLayoutData))]
     public void Update_VerticalLayout(SqlTestCase testCase)
     {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        db.Context.Options.CollectionLayout = SqlCollectionLayout.Vertical;
+        db.Context.Options.IndentSize = 4;
+
+        // Act
         testCase.Action(() =>
         {
-            var db = testCase.CreateBuilder();
-            db.Context.Options.CollectionLayout = SqlCollectionLayout.Vertical;
-            db.Context.Options.IndentSize = 4;
-            
             db.Entity<OrderModel>(out var o);
             var dto = new { Status = "Processing", Total = 50.00m };
-
             // Note: No trailing space after SET because the vertical collection prepends its own newline!
             return db.Append($"""
                 UPDATE {o}
@@ -148,26 +172,29 @@ public class FormattingTests
                 """).Build();
         });
 
+        // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
     [MemberData(nameof(BulkInsertVerticalLayoutData))]
     public void BulkInsert_VerticalLayout(SqlTestCase testCase)
     {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        db.Context.Options.CollectionLayout = SqlCollectionLayout.Vertical;
+        db.Context.Options.IndentSize = 4;
+
+        // Act
         testCase.Action(() =>
         {
-            var db = testCase.CreateBuilder();
-            db.Context.Options.CollectionLayout = SqlCollectionLayout.Vertical;
-            db.Context.Options.IndentSize = 4;
-            
             db.Entity<Product>(out var p);
             var products = new[]
             {
                 new { Name = "Prod1", CategoryId = 1, Price = 10m },
                 new { Name = "Prod2", CategoryId = 2, Price = 20m }
             };
-
             return db.Append($"""
                 INSERT INTO {p}
                 VALUES
@@ -175,22 +202,25 @@ public class FormattingTests
                 """).Build();
         });
 
+        // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
     [MemberData(nameof(WhereInVerticalLayoutData))]
     public void WhereIn_VerticalLayout(SqlTestCase testCase)
     {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        db.Context.Options.CollectionLayout = SqlCollectionLayout.Vertical;
+        db.Context.Options.IndentSize = 4;
+
+        // Act
         testCase.Action(() =>
         {
-            var db = testCase.CreateBuilder();
-            db.Context.Options.CollectionLayout = SqlCollectionLayout.Vertical;
-            db.Context.Options.IndentSize = 4;
-            
             db.Entity<OrderModel>(out var o);
             var ids = new[] { 1, 2, 3 };
-
             return db.Append($"""
                 SELECT *
                 FROM {o}
@@ -200,36 +230,40 @@ public class FormattingTests
                 """).Build();
         });
 
+        // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
     [MemberData(nameof(OrderByEnumerableVerticalLayoutData))]
     public void OrderBy_EnumerableCombiner_VerticalLayout(SqlTestCase testCase)
     {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        db.Context.Options.CollectionLayout = SqlCollectionLayout.Vertical;
+        db.Context.Options.IndentSize = 4;
+
+        // Act
         testCase.Action(() =>
         {
-            var db = testCase.CreateBuilder();
-            
-            // Force Vertical Layout for this specific test
-            db.Context.Options.CollectionLayout = SqlCollectionLayout.Vertical;
-            db.Context.Options.IndentSize = 4;
-            
             db.Entity<OrderModel>(out var o);
-            
             IEnumerable<ISqlOrderFragment> sorts = 
             [
                 o.OrderBy("Total"),
                 o.OrderBy(x => x.Id, SqlOrderDirection.Desc)
             ];
 
+#pragma warning disable SQLIG10 // IEnumerable<ISqlOrderFragment> falls back to JIT evaluation
             return db.Append($"""
                 SELECT *
                 FROM {o}
                 ORDER BY {sorts}
                 """).Build();
+#pragma warning restore SQLIG10
         });
 
+        // Assert
         testCase.Assert();
     }
 
@@ -237,20 +271,23 @@ public class FormattingTests
     [MemberData(nameof(SelectEntityExpansionVerticalLayoutData))]
     public void Select_EntityExpansion_VerticalLayout(SqlTestCase testCase)
     {
+        // Arrange
+        var db = testCase.CreateBuilder();
+        db.Context.Options.CollectionLayout = SqlCollectionLayout.Vertical;
+
+        // Act
         testCase.Action(() =>
         {
-            var db = testCase.CreateBuilder();
-            db.Context.Options.CollectionLayout = SqlCollectionLayout.Vertical;
-            
             db.Entity<ProductWithIgnoreModel>(out var p);
-
             return db.Append($"""
                 SELECT {p}
                 FROM {p} AS p1
                 """).Build();
         });
 
+        // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     public static TheoryData<SqlTestCase> Select_WithNewLinesData =>
@@ -335,8 +372,8 @@ public class FormattingTests
             SqlDialectKind.CustomDb,
             [
                 """
-                SELECT 	<<dbo>>.<<Products>>.<<Id>>, 	<<dbo>>.<<Products>>.<<PROD_NAME>>
-                FROM 	<<dbo>>.<<Products>>
+                SELECT  <<dbo>>.<<Products>>.<<Id>>,  <<dbo>>.<<Products>>.<<PROD_NAME>>
+                FROM  <<dbo>>.<<Products>>
                 """
             ]
         ),
@@ -344,8 +381,8 @@ public class FormattingTests
             SqlDialectKind.MySql,
             [
                 """
-                SELECT 	`dbo`.`Products`.`Id`, 	`dbo`.`Products`.`PROD_NAME`
-                FROM 	`dbo`.`Products`
+                SELECT  `dbo`.`Products`.`Id`,  `dbo`.`Products`.`PROD_NAME`
+                FROM  `dbo`.`Products`
                 """
             ]
         ),
@@ -353,8 +390,8 @@ public class FormattingTests
             SqlDialectKind.Oracle,
             [
                 """
-                SELECT 	"dbo"."Products"."Id", 	"dbo"."Products"."PROD_NAME"
-                FROM 	"dbo"."Products"
+                SELECT  "dbo"."Products"."Id",  "dbo"."Products"."PROD_NAME"
+                FROM  "dbo"."Products"
                 """
             ]
         ),
@@ -362,8 +399,8 @@ public class FormattingTests
             SqlDialectKind.PostgreSql,
             [
                 """
-                SELECT 	"dbo"."Products"."Id", 	"dbo"."Products"."PROD_NAME"
-                FROM 	"dbo"."Products"
+                SELECT  "dbo"."Products"."Id",  "dbo"."Products"."PROD_NAME"
+                FROM  "dbo"."Products"
                 """
             ]
         ),
@@ -371,8 +408,8 @@ public class FormattingTests
             SqlDialectKind.SqLite,
             [
                 """
-                SELECT 	"dbo"."Products"."Id", 	"dbo"."Products"."PROD_NAME"
-                FROM 	"dbo"."Products"
+                SELECT  "dbo"."Products"."Id",  "dbo"."Products"."PROD_NAME"
+                FROM  "dbo"."Products"
                 """
             ]
         ),
@@ -380,8 +417,8 @@ public class FormattingTests
             SqlDialectKind.SqlServer,
             [
                 """
-                SELECT 	[dbo].[Products].[Id], 	[dbo].[Products].[PROD_NAME]
-                FROM 	[dbo].[Products]
+                SELECT  [dbo].[Products].[Id],  [dbo].[Products].[PROD_NAME]
+                FROM  [dbo].[Products]
                 """
             ]
         )
@@ -458,8 +495,8 @@ public class FormattingTests
             [
                 """
 
-                SELECT <<dbo>>.<<Products>>.<<Id>>
-                FROM <<dbo>>.<<Products>>
+                    SELECT <<dbo>>.<<Products>>.<<Id>>
+                    FROM <<dbo>>.<<Products>>
 
                 """
             ]
@@ -469,8 +506,8 @@ public class FormattingTests
             [
                 """
 
-                SELECT `dbo`.`Products`.`Id`
-                FROM `dbo`.`Products`
+                    SELECT `dbo`.`Products`.`Id`
+                    FROM `dbo`.`Products`
 
                 """
             ]
@@ -480,8 +517,8 @@ public class FormattingTests
             [
                 """
 
-                SELECT "dbo"."Products"."Id"
-                FROM "dbo"."Products"
+                    SELECT "dbo"."Products"."Id"
+                    FROM "dbo"."Products"
 
                 """
             ]
@@ -491,8 +528,8 @@ public class FormattingTests
             [
                 """
 
-                SELECT "dbo"."Products"."Id"
-                FROM "dbo"."Products"
+                    SELECT "dbo"."Products"."Id"
+                    FROM "dbo"."Products"
 
                 """
             ]
@@ -502,8 +539,8 @@ public class FormattingTests
             [
                 """
 
-                SELECT "dbo"."Products"."Id"
-                FROM "dbo"."Products"
+                    SELECT "dbo"."Products"."Id"
+                    FROM "dbo"."Products"
 
                 """
             ]
@@ -513,8 +550,8 @@ public class FormattingTests
             [
                 """
 
-                SELECT [dbo].[Products].[Id]
-                FROM [dbo].[Products]
+                    SELECT [dbo].[Products].[Id]
+                    FROM [dbo].[Products]
 
                 """
             ]
