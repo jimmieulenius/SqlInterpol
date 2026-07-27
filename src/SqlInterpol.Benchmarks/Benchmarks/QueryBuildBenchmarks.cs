@@ -158,6 +158,7 @@ public class QueryBuildBenchmarks
         var db = SqlBuilder.PostgreSql();
         db.Entity<Order>(out var o);
         db.Entity<OrderLine>(out var ol);
+        #pragma warning disable SQLIG10
         db.Append($"""
             SELECT {o.Id}, {o.Total}, {ol.Price}, {ol.Quantity}
             FROM {o} AS o
@@ -165,6 +166,7 @@ public class QueryBuildBenchmarks
             WHERE {o.CustomerId} = {_customerId}
             """);
         return db.Build().Sql;
+        #pragma warning restore SQLIG10
     }
 
     [Benchmark]

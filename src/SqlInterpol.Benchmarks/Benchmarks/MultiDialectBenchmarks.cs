@@ -56,6 +56,7 @@ public class MultiDialectBenchmarks
         db.Entity<OrderLine>(out var ol);
 
         // The lexer dynamically detects 'AS p' and 'AS ol' now natively!
+        #pragma warning disable SQLIG10
         db.Append($"""
             SELECT {p.Id}, {p.Name}, SUM({ol.Price}) AS total
             FROM {p} AS p
@@ -64,5 +65,6 @@ public class MultiDialectBenchmarks
               AND {p.Price} >= {minPrice}
             GROUP BY {p.Id}, {p.Name}
             """);
+        #pragma warning restore SQLIG10
     }
 }
