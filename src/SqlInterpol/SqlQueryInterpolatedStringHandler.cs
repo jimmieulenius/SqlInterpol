@@ -110,6 +110,12 @@ public ref struct SqlQueryInterpolatedStringHandler
     /// Evaluates a specific formatted hole on demand. Used exclusively by the AOT interceptor
     /// to access individual holes by index without iterating the full buffer.
     /// </summary>
+    /// <param name="formattedHoleIndex">The zero-based index into the formatted (non-literal) holes only.</param>
+    /// <returns>The evaluated <see cref="SqlSegment"/> for the requested hole.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when <paramref name="formattedHoleIndex"/> exceeds the number of formatted holes
+    /// captured by this handler.
+    /// </exception>
     public SqlSegment GetSegment(int formattedHoleIndex)
     {
         int holeCount = 0;
