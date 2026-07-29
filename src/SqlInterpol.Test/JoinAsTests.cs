@@ -42,11 +42,8 @@ public class JoinAsTests
         var db = testCase.CreateBuilder();
         
         // Act
-        // We pass the explicit alias into the Entity declaration, and then use the 
-        // :alias format specifier to render only the quoted alias in the FROM clause!
         testCase.Action(() => 
         {
-            #pragma warning disable SQLIG10
             db.Entity<Product>(out var prod, "prod")
               .Entity<OrderLine>(out var OrderLine, "OrderLine");
 
@@ -58,11 +55,11 @@ public class JoinAsTests
                 JOIN order_lines AS {{OrderLine:alias}}
                     ON {{prod.Id}} = {{OrderLine.ProductItemNumber}}
                 """).Build();
-            #pragma warning restore SQLIG10
         });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]

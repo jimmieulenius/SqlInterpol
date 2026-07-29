@@ -42,17 +42,16 @@ public class SelectAsTests
         {
             db.Entity<Product>(out var p);
 
-#pragma warning disable SQLIG10 // p.Column() is evaluated dynamically via JIT
             return db.Append($$"""
                 SELECT
                     {{p.Column("Id")}} AS {{"ProductId"}}
                 FROM {{p}}
                 """).Build();
-#pragma warning restore SQLIG10
         });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -63,7 +62,6 @@ public class SelectAsTests
         var db = testCase.CreateBuilder();
         
         // Act
-        #pragma warning disable SQLIG10
         testCase.Action(() => 
         {
             db.Entity<Product>(out var p);
@@ -73,10 +71,10 @@ public class SelectAsTests
                 FROM {{p}}
                 """).Build();
         });
-        #pragma warning restore SQLIG10
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     public static TheoryData<SqlTestCase> ProjectionAsLiteralData =>

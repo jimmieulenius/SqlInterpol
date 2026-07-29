@@ -18,18 +18,17 @@ public class DeleteAsTests
         // Act
         testCase.Action(() => 
         {
-            #pragma warning disable SQLIG10
             db.Entity<OrderModel>(out var o);
             
             return db.Append($$"""
                 DELETE FROM {{o}} AS {{"o"}}
                 WHERE {{o.Id}} = {{TargetId}}
                 """).Build();
-            #pragma warning restore SQLIG10
         });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]

@@ -9,9 +9,16 @@ internal sealed class SqlAotAnalysisResult
 {
     /// <summary>
     /// Gets inline alias overrides keyed by entity variable name (e.g., <c>"p" → "prod"</c>).
-    /// Populated when a <c>{p} AS prod</c> alias pattern is detected.
+    /// Populated when a <c>{p} AS prod</c> alias pattern is detected in literal SQL text.
     /// </summary>
     public Dictionary<string, string> InlineAliases { get; } = new();
+
+    /// <summary>
+    /// Gets inline aliases discovered via string-literal holes (e.g., <c>{entity} AS {"alias"}</c>).
+    /// Unlike <see cref="InlineAliases"/> these do not require the emitter to strip the AS clause
+    /// from the surrounding text, and they do not indicate a complex multi-entity DML scenario.
+    /// </summary>
+    public Dictionary<string, string> InlineAliasesFromHoles { get; } = new();
 
     /// <summary>
     /// Gets inline aliases for property holes, keyed by interpolation hole index.
@@ -65,12 +72,13 @@ internal sealed class SqlAotAnalysisResult
     /// A fallback is triggered by any construct the AOT emitter cannot safely unroll at compile time.
     /// </summary>
     public bool RequiresJitFallback =>
-        (HasAsKeywordOrAlias && HasParameterHoles)
-        || HasHoleAfterAs
+        HasHoleAfterAs
         || HasReturning
         || HasComplexDynamicHoles
-        || HasSetOperation
         || HasUnconsumableAlias
-        || HasWindowFunction
-        || HasUpsert;
+        || HasUpsert
+        // DML queries with text-based inline aliases (FROM {{entity}} AS alias) plus parameter holes
+        // can involve complex dialect rewrites (multi-table UPDATE → MERGE, etc.) that the AOT
+        // emitter cannot safely unroll using literal strings.
+        || (IsDmlQuery && HasParameterHoles && InlineAliases.Count > 0);
 }

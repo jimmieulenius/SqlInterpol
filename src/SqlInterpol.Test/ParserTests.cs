@@ -137,18 +137,17 @@ public class ParserTests
         // Act - Proof that AST keyword interceptors (like FOR UPDATE or RETURNING) ignore strings
         testCase.Action(() => 
         {
-            #pragma warning disable SQLIG10
             db.Entity<Product>(out var p);
             return db.Append($$"""
                 SELECT {{p.Id}}
                 FROM {{p}}
                 WHERE {{p.Name}} = 'INSERT VALUES RETURNING FOR UPDATE'
                 """).Build();
-            #pragma warning restore SQLIG10
         });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -161,18 +160,17 @@ public class ParserTests
         // Act - Proof that AST keyword interceptors ignore comments
         testCase.Action(() => 
         {
-            #pragma warning disable SQLIG10
             db.Entity<Product>(out var p);
             return db.Append($$"""
                 SELECT {{p.Id}}
                 FROM {{p}}
                 /* We don't want to INSERT VALUES RETURNING FOR UPDATE here */
                 """).Build();
-            #pragma warning restore SQLIG10
         });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]

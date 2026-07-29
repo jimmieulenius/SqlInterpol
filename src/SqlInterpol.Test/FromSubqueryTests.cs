@@ -16,7 +16,6 @@ public class FromSubqueryTests
         // Act
         testCase.Action(() =>
         {
-            #pragma warning disable SQLIG10
             db.Entity<CategoryStats>(out var stats)
               .Entity<Product>(out var p, "p");
 
@@ -42,11 +41,11 @@ public class FromSubqueryTests
                 ) AS stats
                 JOIN {c} ON {stats.CategoryId} = {c.Id}
                 """).Build();
-            #pragma warning restore SQLIG10
         });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -63,7 +62,6 @@ public class FromSubqueryTests
             db.Entity<CategoryStats>(out var stats)
               .Entity<Product>(out var p);
 
-#pragma warning disable SQLIG10
             db.Query(
                 stats,
                 () => db.Append($"""
@@ -73,7 +71,6 @@ public class FromSubqueryTests
                     FROM {p}
                     GROUP BY {p.CategoryId}
                 """));
-#pragma warning restore SQLIG10
 
             db.Entity<Category>(out var c);
             

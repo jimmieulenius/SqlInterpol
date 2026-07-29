@@ -18,7 +18,7 @@ public class CteTests
         // Act
         testCase.Action(() => 
         {
-#pragma warning disable SQLIG10
+            #pragma warning disable SQLIG10
             db.Entity<Product>(out var p)
               .Query(p, out var innerQuery, () => db.Append($$"""
                   SELECT {{p.CategoryId}}, SUM({{p.Price}}) AS TotalPrice
@@ -38,7 +38,7 @@ public class CteTests
                 JOIN {{cs}} AS {{"cs"}}
                     ON {{c.Id}} = {{cs.CategoryId}}
                 """).Build();
-#pragma warning restore SQLIG10
+            #pragma warning restore SQLIG10
         });
 
         // Assert
@@ -55,7 +55,7 @@ public class CteTests
         // Act
         testCase.Action(() => 
         {
-#pragma warning disable SQLIG10
+            #pragma warning disable SQLIG10
             db.Context.Options.EntityAutoAliasing = true;
 
             // Define the inner query for the CTE
@@ -80,7 +80,7 @@ public class CteTests
                 JOIN {{cs}}
                     ON {{c.Id}} = {{cs.CategoryId}}
                 """).Build();
-#pragma warning restore SQLIG10
+            #pragma warning restore SQLIG10
         });
 
         // Assert
@@ -96,7 +96,6 @@ public class CteTests
 
         // Act
         testCase.Action(() =>
-#pragma warning disable SQLIG10
             db.Append($"""
                 WITH RECURSIVE Numbers AS (
                     SELECT 1 AS n
@@ -106,11 +105,11 @@ public class CteTests
                 SELECT n FROM Numbers
                 """)
             .Build()
-#pragma warning restore SQLIG10
         );
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -123,7 +122,6 @@ public class CteTests
         // Act
         testCase.Action(() => 
         {
-            #pragma warning disable SQLIG10
             db.Entity<Product>(out var p);
 
             return db.Append($$"""
@@ -132,11 +130,11 @@ public class CteTests
                 )
                 SELECT * FROM ExpensiveProducts
                 """).Build();
-            #pragma warning restore SQLIG10
         });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     public static TheoryData<SqlTestCase> Select_WithCteData

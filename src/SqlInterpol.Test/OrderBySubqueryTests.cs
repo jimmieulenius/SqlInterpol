@@ -16,7 +16,6 @@ public class OrderBySubqueryTests
         // Act
         testCase.Action(() => 
         {
-            #pragma warning disable SQLIG10
             db.Entity<StatsModel>(out var stats, "stats");
             return db.Append($$"""
                 SELECT *
@@ -30,11 +29,11 @@ public class OrderBySubqueryTests
                 ) AS {{stats:alias}}
                 ORDER BY {{stats.MaxPrice}} DESC
                 """).Build();
-            #pragma warning restore SQLIG10
         });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     public static TheoryData<SqlTestCase> OrderBySubqueryData =>

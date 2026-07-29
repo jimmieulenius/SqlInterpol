@@ -18,7 +18,6 @@ public class WhereAsTests
         // Act
         testCase.Action(() => 
         {
-            #pragma warning disable SQLIG10
             db.Entity<Product>(out var p);
             return db.Append($$"""
                 SELECT
@@ -26,11 +25,11 @@ public class WhereAsTests
                 FROM {{p}} AS p
                 WHERE {{p.Id}} = {{productId}} AND {{p.CategoryId}} = {{categoryId}}
                 """).Build();
-            #pragma warning restore SQLIG10
         });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     public static TheoryData<SqlTestCase> WhereWithAliasedEntityData

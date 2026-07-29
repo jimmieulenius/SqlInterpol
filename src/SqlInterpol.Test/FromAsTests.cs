@@ -62,18 +62,17 @@ public class FromAsTests
         // Act
         testCase.Action(() =>
         {
-            #pragma warning disable SQLIG10
             db.Entity<OrderLine>(out var ol);
             return db.Append($$"""
                 SELECT
                     {{ol.OrderId}}
                 FROM ORDER_LINES AS {{ol:alias}}
                 """).Build();
-            #pragma warning restore SQLIG10
         });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -86,18 +85,17 @@ public class FromAsTests
         // Act
         testCase.Action(() =>
         {
-            #pragma warning disable SQLIG10
             db.Entity<Product>(out var p, "prod");
             return db.Append($$"""
                 SELECT
                     {{p.Id}}
                 FROM products AS {{p:alias}}
                 """).Build();
-            #pragma warning restore SQLIG10
         });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -110,18 +108,17 @@ public class FromAsTests
         // Act
         testCase.Action(() =>
         {
-            #pragma warning disable SQLIG10
             db.Entity<Product>(out var p, "Product");
             return db.Append($$"""
                 SELECT
                     {{p.Id}}
                 FROM {{p:base}} AS {{p:alias}}
                 """).Build();
-            #pragma warning restore SQLIG10
         });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -134,17 +131,16 @@ public class FromAsTests
         // Act
         testCase.Action(() =>
         {
-            #pragma warning disable SQLIG10
             db.Entity<Product>(out var p);
             return db.Append($$"""
                 SELECT {{p}}
                 FROM {{p:base}} AS {{p:alias}}
                 """).Build();
-            #pragma warning restore SQLIG10
         });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]

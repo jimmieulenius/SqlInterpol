@@ -23,4 +23,11 @@ public class CompileTimeQueryContext
     /// therefore rendered as subqueries rather than direct table references.
     /// </summary>
     public HashSet<string> SubqueryEntities { get; } = new();
+
+    /// <summary>
+    /// Gets the set of variable names that hold the result of a <c>.Query(...)</c> call
+    /// (either via <c>out var</c> parameter or direct assignment). When these appear as
+    /// interpolation holes they require runtime rendering and force a JIT fallback.
+    /// </summary>
+    public HashSet<string> QueryFragmentVariables { get; } = new();
 }

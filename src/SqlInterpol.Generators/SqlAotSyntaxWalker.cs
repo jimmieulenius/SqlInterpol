@@ -49,9 +49,36 @@ public class SqlAotSyntaxWalker : CSharpSyntaxWalker
                         CurrentContext.SubqueryEntities.Add(ident.Identifier.Text);
                     }
                 }
+
+                // Track out-var result variables (e.g. .Query(p, out var innerQuery, ...))
+                foreach (var arg in node.ArgumentList.Arguments)
+                {
+                    if (!arg.RefOrOutKeyword.IsKind(SyntaxKind.OutKeyword)) continue;
+                    if (arg.Expression is DeclarationExpressionSyntax decl)
+                        CurrentContext.QueryFragmentVariables.Add(decl.Designation.ToString());
+                    else if (arg.Expression is IdentifierNameSyntax argIdent)
+                        CurrentContext.QueryFragmentVariables.Add(argIdent.Identifier.Text);
+                }
+
+                // Track return-value assignment variables (e.g. var q = db.Entity<T>().Query(e, ...))
+                TrackQueryReturnVariable(node);
             }
         }
         base.VisitInvocationExpression(node);
+    }
+
+    private void TrackQueryReturnVariable(InvocationExpressionSyntax queryInvocation)
+    {
+        // Walk up the chain to find the outermost invocation (handles fluent chaining).
+        SyntaxNode node = queryInvocation;
+        while (node.Parent is MemberAccessExpressionSyntax || node.Parent is InvocationExpressionSyntax)
+            node = node.Parent;
+
+        if (node.Parent is EqualsValueClauseSyntax equalsClause &&
+            equalsClause.Parent is VariableDeclaratorSyntax varDecl)
+        {
+            CurrentContext.QueryFragmentVariables.Add(varDecl.Identifier.Text);
+        }
     }
 
     private void TrackEntityDeclaration(InvocationExpressionSyntax node, GenericNameSyntax genericName)

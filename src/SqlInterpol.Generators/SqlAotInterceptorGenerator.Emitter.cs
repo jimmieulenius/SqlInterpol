@@ -5,7 +5,6 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 #pragma warning disable RSEXPERIMENTAL002
-
 namespace SqlInterpol.Generators;
 
 public partial class SqlAotInterceptorGenerator
@@ -27,7 +26,6 @@ public partial class SqlAotInterceptorGenerator
         sb.AppendLine("using System.Runtime.CompilerServices;");
         sb.AppendLine("using SqlInterpol;");
         
-        // FIX: Add missing namespaces to the generated file to resolve ISqlGeneratorBuilder and other moved types!
         sb.AppendLine("using SqlInterpol.Configuration;");
         sb.AppendLine("using SqlInterpol.Execution;");
         sb.AppendLine("using SqlInterpol.Infrastructure;");
@@ -61,12 +59,13 @@ public partial class SqlAotInterceptorGenerator
                     continue;
 
                 uniqueAppendsFound++;
+
                 var syntaxTree = appendCall.InvocationNode.SyntaxTree;
                 var semanticModel = compilation.GetSemanticModel(syntaxTree);
 
                 string interceptorMethodName = $"Intercepted_{appendCall.MethodName}_{interceptorCount++}";
-                var interceptableLocation = semanticModel.GetInterceptableLocation(appendCall.InvocationNode);
 
+                var interceptableLocation = semanticModel.GetInterceptableLocation(appendCall.InvocationNode);
                 if (interceptableLocation != null)
                 {
                     var attrSyntax = interceptableLocation.GetInterceptsLocationAttributeSyntax();
@@ -133,7 +132,6 @@ public partial class SqlAotInterceptorGenerator
                     }
 
                     sb.AppendLine("            genDb.IsAotIntercepted = true;");
-
                     sb.AppendLine("            var ctx = genDb.Context;");
                     sb.AppendLine("            var options = ctx.Options;");
                     sb.AppendLine("            var dialect = ctx.Dialect;");
@@ -219,7 +217,7 @@ public partial class SqlAotInterceptorGenerator
         string QuoteId(string id) => isRuntime 
             ? $"dialect.QuoteIdentifier(\"{Escape(id)}\")" 
             : $"\"{Escape(QuoteIdRaw(id))}\"";
-
+        
         string QuoteEnt(string tbl, string? sch) => isRuntime 
             ? $"dialect.QuoteEntityName(\"{Escape(tbl)}\", {(sch == null ? "null" : $"\"{Escape(sch)}\"")})" 
             : $"\"{Escape(QuoteEntRaw(tbl, sch))}\"";
@@ -241,6 +239,7 @@ public partial class SqlAotInterceptorGenerator
         };
         
         Action<string> appendLiteral = (text) => compileTimeBuffer.Append(text);
+
         Action<string> appendDynamic = (expr) =>
         {
             flushLiteral();
@@ -274,7 +273,7 @@ public partial class SqlAotInterceptorGenerator
 
                 var upperText = rawText.ToUpperInvariant();
                 int maxIdx = -1;
-                SqlKeyword? matchedKeyword = null; // FIX CS8600: Explicit nullable keyword tracking
+                SqlKeyword? matchedKeyword = null;
 
                 foreach (var kw in SqlKeyword.AllOrdered)
                 {
@@ -295,9 +294,15 @@ public partial class SqlAotInterceptorGenerator
                 bool nextIsColumns = false;
                 if (i + 1 < contents.Count && contents[i + 1] is InterpolationSyntax nextHole)
                 {
-                    string? nextFormat = nextHole.FormatClause?.FormatStringToken.ValueText;
+                    ExpressionSyntax nextExpr = nextHole.Expression;
+                    string? nextExplicitMode = null;
+                    
+                    UnwrapRenderExtension(ref nextExpr, ref nextExplicitMode);
+                    string? nextFormat = nextExplicitMode ?? nextHole.FormatClause?.FormatStringToken.ValueText;
+                    
                     bool isEntityHole = false;
-                    if (nextHole.Expression is IdentifierNameSyntax nId && queryContext.Entities.ContainsKey(nId.Identifier.Text))
+                    
+                    if (nextExpr is IdentifierNameSyntax nId && queryContext.Entities.ContainsKey(nId.Identifier.Text))
                     {
                         isEntityHole = true;
                     }
@@ -322,30 +327,36 @@ public partial class SqlAotInterceptorGenerator
             }
             else if (content is InterpolationSyntax interpolation)
             {
-                string? format = interpolation.FormatClause?.FormatStringToken.ValueText;
+                ExpressionSyntax baseExpr = interpolation.Expression;
+                string? explicitExtensionMode = null;
+
+                UnwrapRenderExtension(ref baseExpr, ref explicitExtensionMode);
+
+                string? format = explicitExtensionMode ?? interpolation.FormatClause?.FormatStringToken.ValueText;
                 
                 bool isAliasHole = expectsAlias || string.Equals(format, "alias", StringComparison.OrdinalIgnoreCase);
+                bool isBaseHole = string.Equals(format, "col", StringComparison.OrdinalIgnoreCase) || string.Equals(format, "base", StringComparison.OrdinalIgnoreCase);
                 expectsAlias = false;
 
-                string? propertyName = null; // FIX CS8600: Explicit nullable string conversion
-                string? entityIdentifier = null; // FIX CS8600: Explicit nullable string conversion
+                string? propertyName = null;
+                string? entityIdentifier = null;
 
-                if (interpolation.Expression is MemberAccessExpressionSyntax holeMemberAccess &&
+                if (baseExpr is MemberAccessExpressionSyntax holeMemberAccess &&
                     holeMemberAccess.Expression is IdentifierNameSyntax identifier &&
                     queryContext.Entities.ContainsKey(identifier.Identifier.Text))
                 {
                     propertyName = holeMemberAccess.Name.Identifier.Text;
                     entityIdentifier = identifier.Identifier.Text;
                 }
-                else if (interpolation.Expression is InvocationExpressionSyntax inv &&
-                         inv.Expression is MemberAccessExpressionSyntax invMa &&
-                         invMa.Name.Identifier.Text == "Column" &&
-                         invMa.Expression is IdentifierNameSyntax invIdent &&
+                else if (baseExpr is InvocationExpressionSyntax inv &&
+                         inv.Expression is MemberAccessExpressionSyntax innerInvMa &&
+                         innerInvMa.Name.Identifier.Text == "Column" &&
+                         innerInvMa.Expression is IdentifierNameSyntax invIdent &&
                          queryContext.Entities.ContainsKey(invIdent.Identifier.Text) &&
                          inv.ArgumentList.Arguments.Count == 1 &&
                          inv.ArgumentList.Arguments[0].Expression is LiteralExpressionSyntax lit)
                 {
-                    propertyName = ((LiteralExpressionSyntax)inv.ArgumentList.Arguments[0].Expression).Token.ValueText;
+                    propertyName = lit.Token.ValueText;
                     entityIdentifier = invIdent.Identifier.Text;
                 }
 
@@ -379,7 +390,7 @@ public partial class SqlAotInterceptorGenerator
                         if (isRuntime) appendDynamic(QuoteId(propertyName));
                         else appendLiteral(QuoteIdRaw(propertyName));
                     }
-                    else if (currentSqlClause == SqlKeyword.Insert.Value)
+                    else if (isBaseHole || currentSqlClause == SqlKeyword.Insert.Value)
                     {
                         sb.AppendLine($"                    // AOT Mapped Property (Unprefixed): {entityDecl.VariableName}.{propertyName} -> {columnName}");
                         if (isRuntime) appendDynamic(QuoteId(columnName));
@@ -389,7 +400,8 @@ public partial class SqlAotInterceptorGenerator
                     {
                         sb.AppendLine($"                    // AOT Mapped Property: {entityDecl.VariableName}.{propertyName} -> {columnName}");
                         
-                        if (analysis.InlineAliases.TryGetValue(entityDecl.VariableName, out var inlineAlias))
+                        if (analysis.InlineAliases.TryGetValue(entityDecl.VariableName, out var inlineAlias) ||
+                            analysis.InlineAliasesFromHoles.TryGetValue(entityDecl.VariableName, out inlineAlias))
                         {
                             if (isRuntime) appendDynamic($"{QuoteId(inlineAlias)} + \".\" + {QuoteId(columnName)}");
                             else appendLiteral($"{QuoteIdRaw(inlineAlias)}.{QuoteIdRaw(columnName)}");
@@ -400,10 +412,24 @@ public partial class SqlAotInterceptorGenerator
                             sb.AppendLine($"                    bool suppressAutoAlias_{segmentIndex} = {analysis.IsDmlQuery.ToString().ToLower()} && {wasAuto};");
                             sb.AppendLine($"                    string resolvedAlias_{segmentIndex} = suppressAutoAlias_{segmentIndex} ? \"\" : genDb.ResolveAlias(\"{Escape(entityDecl.VariableName)}\", \"\", {wasAuto});");
                             
-                            sb.AppendLine($"                    if (!string.IsNullOrEmpty(resolvedAlias_{segmentIndex}))");
+                            sb.AppendLine($"                    string finalPrefix_{segmentIndex} = \"\";");
+                            sb.AppendLine($"                    if (!suppressAutoAlias_{segmentIndex})");
                             sb.AppendLine($"                    {{");
-                            if (isRuntime) sb.AppendLine($"                        genDb.AppendRaw({QuoteVar($"resolvedAlias_{segmentIndex}")} + \".\");");
-                            else sb.AppendLine($"                        genDb.AppendRaw(\"{Escape(quotes.Open)}\" + resolvedAlias_{segmentIndex} + \"{Escape(quotes.Close)}.\");");
+                            sb.AppendLine($"                        if (!string.IsNullOrEmpty(resolvedAlias_{segmentIndex})) finalPrefix_{segmentIndex} = resolvedAlias_{segmentIndex};");
+                            sb.AppendLine($"                        else");
+                            sb.AppendLine($"                        {{");
+                            sb.AppendLine($"                            var rawObj_{segmentIndex} = handler.GetRawObject({segmentIndex});");
+                            sb.AppendLine($"                            SqlInterpol.Schema.ISqlEntityBase? entBase_{segmentIndex} = rawObj_{segmentIndex} as SqlInterpol.Schema.ISqlEntityBase;");
+                            sb.AppendLine($"                            if (rawObj_{segmentIndex} is SqlInterpol.Schema.ISqlDeclaration decl_{segmentIndex}) entBase_{segmentIndex} = decl_{segmentIndex}.Entity;");
+                            sb.AppendLine($"                            if (entBase_{segmentIndex} != null)");
+                            sb.AppendLine($"                                finalPrefix_{segmentIndex} = entBase_{segmentIndex}.Reference.FallbackAlias ?? \"\";");
+                            sb.AppendLine($"                        }}");
+                            sb.AppendLine($"                    }}");
+
+                            sb.AppendLine($"                    if (!string.IsNullOrEmpty(finalPrefix_{segmentIndex}))");
+                            sb.AppendLine($"                    {{");
+                            if (isRuntime) sb.AppendLine($"                        genDb.AppendRaw({QuoteVar($"finalPrefix_{segmentIndex}")} + \".\");");
+                            else sb.AppendLine($"                        genDb.AppendRaw(\"{Escape(quotes.Open)}\" + finalPrefix_{segmentIndex} + \"{Escape(quotes.Close)}.\");");
                             sb.AppendLine($"                    }}");
                             sb.AppendLine($"                    else");
                             sb.AppendLine($"                    {{");
@@ -424,7 +450,7 @@ public partial class SqlAotInterceptorGenerator
 
                     segmentIndex++;
                 }
-                else if (interpolation.Expression is IdentifierNameSyntax singleIdentifier &&
+                else if (baseExpr is IdentifierNameSyntax singleIdentifier &&
                          queryContext.Entities.TryGetValue(singleIdentifier.Identifier.Text, out var tableDecl))
                 {
                     if (queryContext.SubqueryEntities.Contains(tableDecl.VariableName))
@@ -451,7 +477,9 @@ public partial class SqlAotInterceptorGenerator
                         continue;
                     }
 
-                    if (analysis.InlineAliases.TryGetValue(tableDecl.VariableName, out var inlineAlias) && string.IsNullOrEmpty(format))
+                    if ((analysis.InlineAliases.TryGetValue(tableDecl.VariableName, out var inlineAlias) ||
+                         analysis.InlineAliasesFromHoles.TryGetValue(tableDecl.VariableName, out inlineAlias)) &&
+                        string.IsNullOrEmpty(format))
                     {
                         if (analysis.ReplacementForNextText.TryGetValue(i, out var rep))
                             activeTextReplacement = rep; 
@@ -459,8 +487,59 @@ public partial class SqlAotInterceptorGenerator
                     
                     string wasAuto = tableDecl.WasAutoAliased.ToString().ToLower();
 
-                    if (string.Equals(format, "columns", StringComparison.OrdinalIgnoreCase) || 
-                             (string.IsNullOrEmpty(format) && (currentSqlClause == SqlKeyword.Select.Value || currentSqlClause == SqlKeyword.Returning.Value)))
+                    // Detect {{entity}} AS {{entity:alias}} - the alias follows as literal "AS" + alias hole,
+                    // so we must emit only the base table name here (no ApplyAlias) to avoid a double alias.
+                    bool isFollowedByExplicitAliasHole = false;
+                    if (string.IsNullOrEmpty(format) && inlineAlias == null)
+                    {
+                        if (i + 1 < contents.Count && contents[i + 1] is InterpolatedStringTextSyntax nextTxtForAliasCheck)
+                        {
+                            var ntTrimmed = nextTxtForAliasCheck.TextToken.ValueText.TrimEnd();
+                            bool endsWithAs = ntTrimmed.EndsWith(SqlKeyword.As.Value, StringComparison.OrdinalIgnoreCase) &&
+                                (ntTrimmed.Length == SqlKeyword.As.Value.Length ||
+                                 !char.IsLetterOrDigit(ntTrimmed[ntTrimmed.Length - (SqlKeyword.As.Value.Length + 1)]));
+
+                            if (endsWithAs && i + 2 < contents.Count && contents[i + 2] is InterpolationSyntax nextAliasHole)
+                            {
+                                ExpressionSyntax nextAliasExpr = nextAliasHole.Expression;
+                                string? nextAliasExtMode = null;
+                                UnwrapRenderExtension(ref nextAliasExpr, ref nextAliasExtMode);
+                                string? nextAliasFmt = nextAliasExtMode ?? nextAliasHole.FormatClause?.FormatStringToken.ValueText;
+
+                                isFollowedByExplicitAliasHole =
+                                    nextAliasExpr is IdentifierNameSyntax nhAliasId &&
+                                    nhAliasId.Identifier.Text == tableDecl.VariableName &&
+                                    string.Equals(nextAliasFmt, "alias", StringComparison.OrdinalIgnoreCase);
+                            }
+                        }
+                    }
+
+                    // Detect if this entity later appears as an alias hole ({entity:alias}) anywhere in
+                    // the same interpolated string. In that case, keep full AOT and let column-prefix
+                    // inference use the entity fallback alias instead of forcing a JIT segment fallback.
+                    bool hasAliasHoleForEntityLater = false;
+                    if (string.IsNullOrEmpty(format))
+                    {
+                        for (int look = i + 1; look < contents.Count; look++)
+                        {
+                            if (contents[look] is not InterpolationSyntax laterHole) continue;
+                            ExpressionSyntax laterExpr = laterHole.Expression;
+                            string? laterExtMode = null;
+                            UnwrapRenderExtension(ref laterExpr, ref laterExtMode);
+                            string? laterFmt = laterExtMode ?? laterHole.FormatClause?.FormatStringToken.ValueText;
+
+                            if (string.Equals(laterFmt, "alias", StringComparison.OrdinalIgnoreCase) &&
+                                laterExpr is IdentifierNameSyntax laterId &&
+                                laterId.Identifier.Text == tableDecl.VariableName)
+                            {
+                                hasAliasHoleForEntityLater = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (string.Equals(format, "columns", StringComparison.OrdinalIgnoreCase) ||
+                              (string.IsNullOrEmpty(format) && (currentSqlClause == SqlKeyword.Select.Value || currentSqlClause == SqlKeyword.Returning.Value)))
                     {
                         flushLiteral();
                         sb.AppendLine($"                    // AOT Mapped Columns: {tableDecl.VariableName}");
@@ -468,18 +547,59 @@ public partial class SqlAotInterceptorGenerator
                         sb.AppendLine($"                    string indent_{segmentIndex} = new string(' ', indentSize);");
                         sb.AppendLine($"                    bool omitPrefix_{segmentIndex} = (\"{currentSqlClause}\" == \"{SqlKeyword.Insert.Value}\");");
                         
-                        sb.AppendLine($"                    string prefix_{segmentIndex} = \"\";");
+                        sb.AppendLine($"                    bool suppressAutoAlias_{segmentIndex} = {analysis.IsDmlQuery.ToString().ToLower()} && {wasAuto};");
+                        sb.AppendLine($"                    string resolvedAlias_{segmentIndex} = suppressAutoAlias_{segmentIndex} ? \"\" : genDb.ResolveAlias(\"{Escape(tableDecl.VariableName)}\", \"\", {wasAuto});");
+
                         if (inlineAlias != null)
                         {
-                            sb.AppendLine($"                    prefix_{segmentIndex} = {QuoteId(inlineAlias)} + \".\";");
+                            // Inline alias known at compile time — emit directly.
+                            sb.AppendLine($"                    string prefix_{segmentIndex} = {QuoteId(inlineAlias)} + \".\";");
+                        }
+                        else if (tableDecl.ExplicitAlias != null)
+                        {
+                            // Explicit alias known at compile time — emit directly.
+                            sb.AppendLine($"                    string prefix_{segmentIndex} = !string.IsNullOrEmpty(resolvedAlias_{segmentIndex}) ? ({QuoteVar($"resolvedAlias_{segmentIndex}")} + \".\") : ({QuoteId(tableDecl.ExplicitAlias)} + \".\");");
                         }
                         else
                         {
-                            sb.AppendLine($"                    bool suppressAutoAlias_{segmentIndex} = {analysis.IsDmlQuery.ToString().ToLower()} && {wasAuto};");
-                            sb.AppendLine($"                    string resolvedAlias_{segmentIndex} = suppressAutoAlias_{segmentIndex} ? \"\" : genDb.ResolveAlias(\"{Escape(tableDecl.VariableName)}\", \"\", {wasAuto});");
-                            sb.AppendLine($"                    if (!string.IsNullOrEmpty(resolvedAlias_{segmentIndex}))");
+                            // No compile-time alias. Use JIT fallback when no runtime alias is available (e.g. no
+                            // auto-aliasing and the alias will be set later by an {{entity:alias}} hole).
+                            string hasAliasHoleLiteral = hasAliasHoleForEntityLater ? "true" : "false";
+                            sb.AppendLine($"                    if (string.IsNullOrEmpty(resolvedAlias_{segmentIndex}) && !autoAliasing && !suppressAutoAlias_{segmentIndex} && !{hasAliasHoleLiteral})");
                             sb.AppendLine($"                    {{");
-                            sb.AppendLine($"                        prefix_{segmentIndex} = {QuoteVar($"resolvedAlias_{segmentIndex}")} + \".\";");
+                            sb.AppendLine($"                        // JIT fallback: alias not known at intercept time; preprocessor will expand with the correct alias.");
+                            sb.AppendLine($"                        genDb.AppendSegment(handler.GetSegment({segmentIndex}));");
+                            // We must skip the rest of the column expansion — jump to segmentIndex++ and continue.
+                            sb.AppendLine($"                    }}");
+                            sb.AppendLine($"                    else");
+                            sb.AppendLine($"                    {{");
+
+                            sb.AppendLine($"                    string prefix_{segmentIndex} = \"\";");
+                            sb.AppendLine($"                    string finalAlias_{segmentIndex} = \"\";");
+                            sb.AppendLine($"                    if (!suppressAutoAlias_{segmentIndex})");
+                            sb.AppendLine($"                    {{");
+                            sb.AppendLine($"                        if (!string.IsNullOrEmpty(resolvedAlias_{segmentIndex})) finalAlias_{segmentIndex} = resolvedAlias_{segmentIndex};");
+                            if (hasAliasHoleForEntityLater)
+                            {
+                                var fallbackTypeAlias = tableDecl.TypeName.Split('.').Last();
+                                sb.AppendLine($"                        else if (autoAliasing && {wasAuto}) finalAlias_{segmentIndex} = \"{Escape(tableDecl.VariableName)}\";");
+                                sb.AppendLine($"                        else finalAlias_{segmentIndex} = \"{Escape(fallbackTypeAlias)}\";");
+                            }
+                            else
+                            {
+                                sb.AppendLine($"                        else");
+                                sb.AppendLine($"                        {{");
+                                sb.AppendLine($"                            var rawObj_{segmentIndex} = handler.GetRawObject({segmentIndex});");
+                                sb.AppendLine($"                            SqlInterpol.Schema.ISqlEntityBase? entBase_{segmentIndex} = rawObj_{segmentIndex} as SqlInterpol.Schema.ISqlEntityBase;");
+                                sb.AppendLine($"                            if (rawObj_{segmentIndex} is SqlInterpol.Schema.ISqlDeclaration decl_{segmentIndex}) entBase_{segmentIndex} = decl_{segmentIndex}.Entity;");
+                                sb.AppendLine($"                            if (entBase_{segmentIndex} != null)");
+                                sb.AppendLine($"                                finalAlias_{segmentIndex} = entBase_{segmentIndex}.Reference.FallbackAlias ?? \"\";");
+                                sb.AppendLine($"                        }}");
+                            }
+                            sb.AppendLine($"                    }}");
+                            sb.AppendLine($"                    if (!string.IsNullOrEmpty(finalAlias_{segmentIndex}))");
+                            sb.AppendLine($"                    {{");
+                            sb.AppendLine($"                        prefix_{segmentIndex} = {QuoteVar($"finalAlias_{segmentIndex}")} + \".\";");
                             sb.AppendLine($"                    }}");
                             sb.AppendLine($"                    else");
                             sb.AppendLine($"                    {{");
@@ -487,6 +607,9 @@ public partial class SqlAotInterceptorGenerator
                             else sb.AppendLine($"                        prefix_{segmentIndex} = {QuoteEnt(tableDecl.MappedTableName, tableDecl.MappedSchemaName)} + \".\";");
                             sb.AppendLine($"                    }}");
                         }
+
+                        // Only emit column-by-column code when NOT in the JIT fallback branch.
+                        bool needsClosingBrace = inlineAlias == null && tableDecl.ExplicitAlias == null;
                         
                         for (int k = 0; k < tableDecl.Columns.Count; k++)
                         {
@@ -518,6 +641,11 @@ public partial class SqlAotInterceptorGenerator
                             sb.AppendLine($"                    if (!omitPrefix_{segmentIndex}) genDb.AppendRaw(prefix_{segmentIndex});");
                             sb.AppendLine($"                    genDb.AppendRaw({QuoteId(col.ColumnName)});");
                         }
+
+                        if (needsClosingBrace)
+                        {
+                            sb.AppendLine($"                    }}"); // closes the `else` of the JIT fallback check
+                        }
                         
                         nextRequiresHorizontalSpace = false;
                     }
@@ -532,11 +660,13 @@ public partial class SqlAotInterceptorGenerator
                         sb.AppendLine($"                        aliasable_{segmentIndex}.Alias = \"{Escape(inlineAlias)}\";");
                         sb.AppendLine($"                        aliasable_{segmentIndex}.IsAliasQuoted = false;");
                         sb.AppendLine($"                    }}");
+
                         sb.AppendLine($"                    genDb.AppendRaw(dialect.ApplyAlias({QuoteEnt(tableDecl.MappedTableName, tableDecl.MappedSchemaName)}, {QuoteId(inlineAlias)}));");
                     }
                     else if (isAliasHole)
                     {
                         sb.AppendLine($"                    // AOT Mapped Alias-Only: {tableDecl.VariableName}");
+
                         if (inlineAlias != null)
                         {
                             if (isRuntime) appendDynamic(QuoteId(inlineAlias));
@@ -548,20 +678,62 @@ public partial class SqlAotInterceptorGenerator
                             sb.AppendLine($"                    string alias_{segmentIndex} = \"\";");
                             sb.AppendLine($"                    if (autoAliasing && {wasAuto}) alias_{segmentIndex} = \"{Escape(tableDecl.VariableName)}\";");
 
-                            sb.AppendLine($"                    var segVal_{segmentIndex} = handler.GetSegment({segmentIndex}).Value;");
-                            sb.AppendLine($"                    if (segVal_{segmentIndex} is SqlInterpol.Schema.ISqlEntityBase entBase_{segmentIndex})");
+                            sb.AppendLine($"                    var rawObj_{segmentIndex} = handler.GetRawObject({segmentIndex});");
+                            sb.AppendLine($"                    SqlInterpol.Schema.ISqlEntityBase? rawEnt_{segmentIndex} = rawObj_{segmentIndex} as SqlInterpol.Schema.ISqlEntityBase;");
+                            sb.AppendLine($"                    if (rawObj_{segmentIndex} is SqlInterpol.Schema.ISqlDeclaration decl_{segmentIndex}) rawEnt_{segmentIndex} = decl_{segmentIndex}.Entity;");
+                            
+                            sb.AppendLine($"                    if (rawEnt_{segmentIndex} != null)");
                             sb.AppendLine($"                    {{");
-                            sb.AppendLine($"                        if (!string.IsNullOrEmpty(entBase_{segmentIndex}.Reference.Alias)) alias_{segmentIndex} = entBase_{segmentIndex}.Reference.Alias;");
-                            sb.AppendLine($"                        else if (string.IsNullOrEmpty(alias_{segmentIndex})) alias_{segmentIndex} = entBase_{segmentIndex}.Reference.FallbackAlias ?? \"{Escape(tableDecl.MappedTableName)}\";");
+                            sb.AppendLine($"                        if (!string.IsNullOrEmpty(rawEnt_{segmentIndex}.Reference.Alias)) alias_{segmentIndex} = rawEnt_{segmentIndex}.Reference.Alias;");
+                            sb.AppendLine($"                        else if (string.IsNullOrEmpty(alias_{segmentIndex})) alias_{segmentIndex} = rawEnt_{segmentIndex}.Reference.FallbackAlias ?? \"{Escape(tableDecl.MappedTableName)}\";");
+                            sb.AppendLine($"                    }}");
+                            sb.AppendLine($"                    else");
+                            sb.AppendLine($"                    {{");
+                            sb.AppendLine($"                        var segVal_{segmentIndex} = handler.GetSegment({segmentIndex}).Value;");
+                            sb.AppendLine($"                        if (segVal_{segmentIndex} is SqlInterpol.Schema.ISqlAliasable directAliasable_{segmentIndex})");
+                            sb.AppendLine($"                        {{");
+                            sb.AppendLine($"                            if (!string.IsNullOrEmpty(directAliasable_{segmentIndex}.Alias)) alias_{segmentIndex} = directAliasable_{segmentIndex}.Alias;");
+                            sb.AppendLine($"                            else if (string.IsNullOrEmpty(alias_{segmentIndex}))");
+                            sb.AppendLine($"                            {{");
+                            sb.AppendLine($"                                if (segVal_{segmentIndex} is SqlInterpol.Schema.ISqlReference segRef_{segmentIndex} && !string.IsNullOrEmpty(segRef_{segmentIndex}.FallbackAlias))");
+                            sb.AppendLine($"                                    alias_{segmentIndex} = segRef_{segmentIndex}.FallbackAlias;");
+                            sb.AppendLine($"                                else");
+                            sb.AppendLine($"                                    alias_{segmentIndex} = \"{Escape(tableDecl.MappedTableName)}\";");
+                            sb.AppendLine($"                            }}");
+                            sb.AppendLine($"                            // Set the alias so JIT-fallback SELECT expansions and ResolveAlias see it correctly.");
+                            sb.AppendLine($"                            if (!string.IsNullOrEmpty(alias_{segmentIndex}) && string.IsNullOrEmpty(directAliasable_{segmentIndex}.Alias))");
+                            sb.AppendLine($"                            {{");
+                            sb.AppendLine($"                                directAliasable_{segmentIndex}.Alias = alias_{segmentIndex};");
+                            sb.AppendLine($"                                directAliasable_{segmentIndex}.IsAliasQuoted = true;");
+                            sb.AppendLine($"                            }}");
+                            sb.AppendLine($"                        }}");
                             sb.AppendLine($"                    }}");
 
                             if (isRuntime) sb.AppendLine($"                    genDb.AppendRaw({QuoteVar($"alias_{segmentIndex}")});");
                             else sb.AppendLine($"                    genDb.AppendRaw(\"{Escape(quotes.Open)}\" + alias_{segmentIndex} + \"{Escape(quotes.Close)}\");");
+                            
+                            // Persist the resolved alias on the entity reference so JIT-fallback SELECT
+                            // column expansions and subsequent ResolveAlias calls see it correctly.
+                            sb.AppendLine($"                    if (rawEnt_{segmentIndex} != null && rawEnt_{segmentIndex}.Reference is SqlInterpol.Schema.ISqlAliasable aliasSetter_{segmentIndex} && string.IsNullOrEmpty(rawEnt_{segmentIndex}.Reference.Alias))");
+                            sb.AppendLine($"                    {{");
+                            sb.AppendLine($"                        aliasSetter_{segmentIndex}.Alias = alias_{segmentIndex};");
+                            sb.AppendLine($"                        aliasSetter_{segmentIndex}.IsAliasQuoted = true;");
+                            sb.AppendLine($"                    }}");
                         }
                     }
                     else if (string.Equals(format, "base", StringComparison.OrdinalIgnoreCase))
                     {
                         sb.AppendLine($"                    // AOT Mapped Base-Only: {tableDecl.VariableName}");
+
+                        if (isRuntime) appendDynamic(QuoteEnt(tableDecl.MappedTableName, tableDecl.MappedSchemaName));
+                        else appendLiteral(QuoteEntRaw(tableDecl.MappedTableName, tableDecl.MappedSchemaName));
+                    }
+                    else if (isFollowedByExplicitAliasHole)
+                    {
+                        // The alias is supplied by the subsequent "AS {{entity:alias}}" pattern.
+                        // Emit only the base table name here to avoid a double-alias.
+                        sb.AppendLine($"                    // AOT Mapped Table (base-only, alias supplied by following AS hole): {tableDecl.VariableName}");
+
                         if (isRuntime) appendDynamic(QuoteEnt(tableDecl.MappedTableName, tableDecl.MappedSchemaName));
                         else appendLiteral(QuoteEntRaw(tableDecl.MappedTableName, tableDecl.MappedSchemaName));
                     }

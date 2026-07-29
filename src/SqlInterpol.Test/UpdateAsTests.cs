@@ -19,17 +19,16 @@ public class UpdateAsTests
         {
             db.Entity<OrderModel>(out var o);
 
-#pragma warning disable SQLIG10
             return db.Append($$"""
                 UPDATE {{o}} AS {{"ord"}}
                 SET {{updateDto}}
                 WHERE {{o.Id}} = 1
                 """).Build();
-#pragma warning restore SQLIG10
         });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     public static TheoryData<SqlTestCase> UpdateSetWithAliasData

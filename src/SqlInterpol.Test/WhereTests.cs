@@ -44,18 +44,17 @@ public class WhereTests
         {
             db.Entity<Product>(out var p);
 
-#pragma warning disable SQLIG10
             return db.Append($$"""
                 SELECT
                     {{p.Id}}
                 FROM {{p}}
                 WHERE {{p.CategoryId}} IN ({{categoryIds}})
                 """).Build();
-#pragma warning restore SQLIG10
         });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     public static TheoryData<SqlTestCase> WhereSimpleParameterData

@@ -16,7 +16,6 @@ public class WindowFunctionTests
         // Act
         testCase.Action(() => 
         {
-            #pragma warning disable SQLIG10
             db.Entity<Product>(out var p);
             return db.Append($$"""
                 SELECT
@@ -27,11 +26,11 @@ public class WindowFunctionTests
                     ) AS CategoryTotal
                 FROM {{p}}
                 """).Build();
-            #pragma warning restore SQLIG10
         });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -44,7 +43,6 @@ public class WindowFunctionTests
         // Act
         testCase.Action(() => 
         {
-            #pragma warning disable SQLIG10
             db.Entity<Product>(out var p);
             return db.Append($$"""
                 SELECT 
@@ -53,11 +51,11 @@ public class WindowFunctionTests
                     AVG({{p.Price}}) OVER (PARTITION BY {{p.CategoryId}}) AS AvgCategoryPrice
                 FROM {{p}}
                 """).Build();
-            #pragma warning restore SQLIG10
         });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     public static TheoryData<SqlTestCase> WindowFunctionData =>

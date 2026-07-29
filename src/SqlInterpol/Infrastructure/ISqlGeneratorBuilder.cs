@@ -56,4 +56,13 @@ public interface ISqlGeneratorBuilder
     /// <param name="variableName">The C# local variable name.</param>
     /// <param name="wasAutoAliased">True if the alias was derived via CallerArgumentExpression.</param>
     void AppendDeclaration(string tableName, string? schema, string variableName, bool wasAutoAliased);
+
+    /// <summary>
+    /// Returns the <c>FallbackAlias</c> for a tracked entity variable (e.g. the CLR type name),
+    /// without considering the explicit alias or auto-aliasing rules.
+    /// Used by the AOT emitter as a final prefix fallback when no explicit alias has been set yet.
+    /// </summary>
+    /// <param name="variableName">The C# local variable name (e.g., <c>"p"</c>).</param>
+    /// <returns>The fallback alias string, or an empty string if not resolvable.</returns>
+    string ResolveFallbackAlias(string variableName);
 }

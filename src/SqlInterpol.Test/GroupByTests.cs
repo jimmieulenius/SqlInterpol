@@ -44,7 +44,7 @@ public class GroupByTests
         {
             db.Entity<OrderModel>(out var o);
             
-#pragma warning disable SQLIG10 // Dynamic LINQ execution evaluated at runtime via JIT
+#pragma warning disable SQLIG10
             return db.Append($$"""
             SELECT CategoryId, order_status, COUNT(*)
             FROM {{o}}
@@ -69,7 +69,7 @@ public class GroupByTests
         {
             db.Entity<OrderModel>(out var o);
 
-#pragma warning disable SQLIG10 // Sql.Raw dynamically evaluates SQL fragments via JIT
+#pragma warning disable SQLIG10
             return db.Append($$"""
             SELECT YEAR(created_at), COUNT(*)
             FROM {{o}}
@@ -94,7 +94,7 @@ public class GroupByTests
         {
             db.Entity<OrderModel>(out var o);
 
-#pragma warning disable SQLIG10 // Sql.Raw dynamically evaluates SQL fragments via JIT
+#pragma warning disable SQLIG10
             return db.Append($$"""
             SELECT order_status, YEAR(created_at), COUNT(*)
             FROM {{o}}

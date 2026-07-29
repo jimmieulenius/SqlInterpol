@@ -79,15 +79,37 @@ public ref struct SqlQueryInterpolatedStringHandler
     }
 
     /// <summary>
+    /// Retrieves the raw, unevaluated object passed into the interpolation hole.
+    /// Used by the AOT compiler to safely extract schema metadata (like FallbackAlias)
+    /// without triggering runtime column expansions or value mutations.
+    /// </summary>
+    public object? GetRawObject(int formattedHoleIndex)
+    {
+        int holeCount = 0;
+        for (int i = 0; i < _count; i++)
+        {
+            ref var hole = ref _holes[i];
+            if (!hole.IsLiteral)
+            {
+                if (holeCount == formattedHoleIndex)
+                {
+                    var value = hole.ObjectValue;
+                    if (value is ISqlRenderModifier modifier)
+                    {
+                        return modifier.Value;
+                    }
+                    return value;
+                }
+                holeCount++;
+            }
+        }
+        throw new ArgumentOutOfRangeException(nameof(formattedHoleIndex), "AOT requested a hole index that does not exist in the handler.");
+    }
+
+    /// <summary>
     /// Evaluates a specific formatted hole on demand. Used exclusively by the AOT interceptor
     /// to access individual holes by index without iterating the full buffer.
     /// </summary>
-    /// <param name="formattedHoleIndex">The zero-based index into the formatted (non-literal) holes only.</param>
-    /// <returns>The evaluated <see cref="SqlSegment"/> for the requested hole.</returns>
-    /// <exception cref="ArgumentOutOfRangeException">
-    /// Thrown when <paramref name="formattedHoleIndex"/> exceeds the number of formatted holes
-    /// captured by this handler.
-    /// </exception>
     public SqlSegment GetSegment(int formattedHoleIndex)
     {
         int holeCount = 0;
@@ -111,7 +133,6 @@ public ref struct SqlQueryInterpolatedStringHandler
     /// interception is not available. Transfers all accumulated holes into
     /// <paramref name="destination"/> and returns the pooled buffer to <see cref="System.Buffers.ArrayPool{T}"/>.
     /// </summary>
-    /// <param name="destination">The segment list to populate.</param>
     internal void TransferSegments(List<SqlSegment> destination)
     {
         for (int i = 0; i < _count; i++)
@@ -170,10 +191,36 @@ public ref struct SqlQueryInterpolatedStringHandler
         var value = hole.ObjectValue;
         var format = hole.StringValue;
         var expression = hole.Expression;
+        SqlRenderMode? explicitMode = null;
+
+        // Automatically unwrap strongly-typed render extensions
+        if (value is ISqlRenderModifier modifier)
+        {
+            value = modifier.Value;
+            explicitMode = modifier.Mode;
+            
+            if (!string.IsNullOrEmpty(modifier.OriginalExpression))
+            {
+                // The compiler's CallerArgumentExpression cleanly extracted the base (e.g. "p" or "p.Name")
+                expression = modifier.OriginalExpression;
+            }
+            else if (!string.IsNullOrEmpty(expression))
+            {
+                // Fallback: compiler bug where it only captured the outer AppendFormatted expression.
+                // We have "p.AsDeclaration()" or "p.Name.AsColumn()". We need to strip the method call.
+                int lastDot = expression!.LastIndexOf('.');
+                if (lastDot > 0)
+                {
+                    expression = expression.Substring(0, lastDot);
+                }
+            }
+        }
+
         if (value is ISqlFragment frag)
         {
             return _builder.ProcessValue(frag);
         }
+
         if (!string.IsNullOrEmpty(expression))
         {
             int dotIndex = expression!.IndexOf('.');
@@ -183,18 +230,20 @@ public ref struct SqlQueryInterpolatedStringHandler
                 {
                     if (tableEntity is ISqlQuery queryEntity && tableEntity is ISqlEntityBase queryEntityBase)
                     {
-                        SqlSegment segment;
-                        if (format == "alias")
+                        var resolvedMode = explicitMode ?? format switch
                         {
-                            segment = _builder.ProcessValue(queryEntityBase.Reference);
-                            segment = new SqlSegment(segment.Type, segment.Value, SqlRenderMode.AliasOnly, segment.Tags);
-                        }
-                        else if (format == "base")
+                            "alias" => SqlRenderMode.AliasOnly,
+                            "base"  => SqlRenderMode.BaseName,
+                            "decl"  => SqlRenderMode.Declaration,
+                            _       => null
+                        };
+
+                        if (resolvedMode == SqlRenderMode.AliasOnly || resolvedMode == SqlRenderMode.BaseName)
                         {
-                            segment = _builder.ProcessValue(queryEntityBase.Reference);
-                            segment = new SqlSegment(segment.Type, segment.Value, SqlRenderMode.BaseName, segment.Tags);
+                            var refSegment = _builder.ProcessValue(queryEntityBase.Reference);
+                            return new SqlSegment(refSegment.Type, refSegment.Value, resolvedMode, refSegment.Tags);
                         }
-                        else if (format == "decl" || (format == null && _builder.Context.Options.EntityAutoAliasing))
+                        else if (resolvedMode == SqlRenderMode.Declaration || (resolvedMode == null && _builder.Context.Options.EntityAutoAliasing))
                         {
                             if (string.IsNullOrEmpty(queryEntityBase.Reference.Alias) && queryEntityBase.Reference is ISqlAliasable aliasable)
                             {
@@ -202,29 +251,29 @@ public ref struct SqlQueryInterpolatedStringHandler
                                 aliasable.IsAliasQuoted = true;
                             }
                             var declFragment = new SqlSubqueryDeclarationFragment(queryEntity);
-                            segment = _builder.ProcessValue(declFragment);
+                            return _builder.ProcessValue(declFragment);
                         }
-                        else
-                        {
-                            segment = _builder.ProcessValue((ISqlFragment)queryEntity);
-                        }
-                        return segment;
+                        
+                        return _builder.ProcessValue((ISqlFragment)queryEntity);
                     }
+                    
                     ISqlEntityBase? standardEntityBase = tableEntity as ISqlEntityBase;
                     if (tableEntity is ISqlDeclaration decl)
                     {
                         standardEntityBase = decl.Entity;
                     }
+
                     if (standardEntityBase != null)
                     {
-                        SqlRenderMode? mode = format switch
+                        SqlRenderMode? mode = explicitMode ?? format switch
                         {
                             "decl"  => SqlRenderMode.Declaration,
                             "alias" => SqlRenderMode.AliasOnly,
                             "base"  => SqlRenderMode.BaseName,
                             _       => null
                         };
-                        if (format == "decl" || (format == null && _builder.Context.Options.EntityAutoAliasing))
+                        
+                        if (mode == SqlRenderMode.Declaration || (mode == null && format == null && _builder.Context.Options.EntityAutoAliasing))
                         {
                             mode = SqlRenderMode.Declaration;
                             if (string.IsNullOrEmpty(standardEntityBase.Reference.Alias) && standardEntityBase.Reference is ISqlAliasable aliasable)
@@ -233,10 +282,20 @@ public ref struct SqlQueryInterpolatedStringHandler
                                 aliasable.IsAliasQuoted = true;
                             }
                         }
+
+                        // PREVENT JIT FROM EXPANDING INTO COLUMNS FOR ALIAS/BASE EXPLICIT MODES
+                        if (mode == SqlRenderMode.AliasOnly || mode == SqlRenderMode.BaseName)
+                        {
+                            var refSegment = _builder.ProcessValue(standardEntityBase.Reference);
+                            return new SqlSegment(refSegment.Type, refSegment.Value, mode.Value, refSegment.Tags);
+                        }
+
+                        // FULL ENTITY PASS-THROUGH FOR DECLARATIONS AND DEFAULTS 
+                        // (Allows SqlBuilder to natively detect DML context and safely strip auto-aliases)
                         var segmentResult = _builder.ProcessValue(tableEntity);
                         if (mode != null)
                         {
-                            segmentResult = new SqlSegment(segmentResult.Type, segmentResult.Value, mode, segmentResult.Tags);
+                            segmentResult = new SqlSegment(segmentResult.Type, segmentResult.Value, mode.Value, segmentResult.Tags);
                         }
                         return segmentResult;
                     }
@@ -244,15 +303,17 @@ public ref struct SqlQueryInterpolatedStringHandler
             }
             else if (dotIndex > 0 && expression.LastIndexOf('.') == dotIndex)
             {
-                var varName = expression[..dotIndex];
-                var propertyName = expression[(dotIndex + 1)..];
+                var varName = expression.Substring(0, dotIndex);
+                var propertyName = expression.Substring(dotIndex + 1);
+
                 if (_builder.ScopedVariables.TryGetValue(varName, out var entity))
                 {
                     ISqlEntityBase? entityBase = entity as ISqlEntityBase;
-                    if (entity is ISqlDeclaration decl)
+                    if (entity is ISqlDeclaration innerDecl)
                     {
-                        entityBase = decl.Entity;
+                        entityBase = innerDecl.Entity;
                     }
+
                     if (entityBase != null)
                     {
                         var meta = SqlMetadataRegistry.GetMetadata(entityBase.ModelType);
@@ -261,12 +322,14 @@ public ref struct SqlQueryInterpolatedStringHandler
 
                         var columnRef = new SqlColumnReference(entityBase.Reference, physicalColumnName, propertyName);
 
-                        SqlRenderMode? mode = format switch
+                        SqlRenderMode? mode = explicitMode ?? format switch
                         {
                             "col"   => SqlRenderMode.BaseName,
                             "alias" => SqlRenderMode.AliasOnly,
+                            "base"  => SqlRenderMode.BaseName,
                             _       => null
                         };
+
                         var segmentResult = _builder.ProcessValue(columnRef);
                         if (mode != null)
                         {
@@ -277,6 +340,7 @@ public ref struct SqlQueryInterpolatedStringHandler
                 }
             }
         }
+
         return _builder.ProcessValue(value);
     }
 }

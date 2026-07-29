@@ -80,6 +80,23 @@ public partial class SqlSegmentPreprocessor
         }
 
         if (targetEntity == null)
+        {
+            // Fallback: the entity was registered but only appears via `:alias` format specifiers,
+            // so it never added an ISqlEntityBase segment. Look it up from the builder's scope.
+            if (context is SqlContext sqlContext)
+            {
+                foreach (var registeredEntity in sqlContext.Builder.ScopedVariables.Values)
+                {
+                    if (registeredEntity.ModelType == dynCol.EntityType)
+                    {
+                        targetEntity = registeredEntity;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (targetEntity == null)
             throw new InvalidOperationException($"Could not find registered entity of type '{dynCol.EntityType.Name}' in context.");
 
         ISqlReference activeRef = targetEntity.Reference;

@@ -87,4 +87,16 @@ public partial class SqlBuilder : ISqlGeneratorBuilder
             genDb.AppendRaw(dialect.QuoteIdentifier(alias));
         }
     }
+
+    /// <inheritdoc />
+    string ISqlGeneratorBuilder.ResolveFallbackAlias(string variableName)
+    {
+        if (ScopedVariables.TryGetValue(variableName, out var entity))
+        {
+            ISqlEntityBase? eBase = entity as ISqlEntityBase;
+            if (entity is ISqlDeclaration decl) eBase = decl.Entity;
+            if (eBase != null) return eBase.Reference.FallbackAlias ?? "";
+        }
+        return "";
+    }
 }

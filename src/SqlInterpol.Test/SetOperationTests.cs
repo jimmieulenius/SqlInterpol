@@ -16,18 +16,17 @@ public class SetOperationTests
         // Act
         testCase.Action(() => 
         {
-            #pragma warning disable SQLIG10
             db.Entity<Product>(out var p);
             return db.Append($$"""
                 SELECT {{p.Id}} FROM {{p}}
                 INTERSECT
                 SELECT {{p.Id}} FROM {{p}} WHERE {{p.CategoryId}} = {{1}}
                 """).Build();
-            #pragma warning restore SQLIG10
         });
 
         // Assert - Natively verifies the SQL string AND the hoisted parameter!
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -47,17 +46,16 @@ public class SetOperationTests
         // Act
         testCase.Action(() => 
         {
-            #pragma warning disable SQLIG10
             return db.Append($$"""
                 {{q1}}
                 INTERSECT
                 {{q2}}
                 """).Build();
-            #pragma warning restore SQLIG10
         });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -70,18 +68,17 @@ public class SetOperationTests
         // Act
         testCase.Action(() => 
         {
-            #pragma warning disable SQLIG10
             db.Entity<Product>(out var p);
             return db.Append($$"""
                 SELECT {{p.Id}} FROM {{p}}
                 EXCEPT
                 SELECT {{p.Id}} FROM {{p}} WHERE {{p.CategoryId}} = {{2}}
                 """).Build();
-            #pragma warning restore SQLIG10
         });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -99,17 +96,16 @@ public class SetOperationTests
         // Act
         testCase.Action(() => 
         {
-#pragma warning disable SQLIG10
             return db.Append($$"""
                 {{q1}}
                 EXCEPT
                 {{q2}}
                 """).Build();
-#pragma warning restore SQLIG10
         });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
@@ -141,17 +137,16 @@ public class SetOperationTests
         // Act - Pure WYSIWYG Union!
         testCase.Action(() => 
         {
-#pragma warning disable SQLIG10
             return db.Append($$"""
                 {{query1}}
                 UNION ALL
                 {{query2}}
                 """).Build();
-#pragma warning restore SQLIG10
         });
 
         // Assert - Proof that the context successfully shared the parameter counter across nested builders!
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     public static TheoryData<SqlTestCase> QueryIntersectData

@@ -18,14 +18,14 @@ public class OrderByTests
         // Act
         testCase.Action(() => 
         {
-            #pragma warning disable SQLIG10
+#pragma warning disable SQLIG10
             db.Entity<OrderModel>(out var o);
             return db.Append($$"""
             SELECT *
             FROM {{o}}
             ORDER BY {{o.OrderBy(x => x.CreatedAt, SqlOrderDirection.Desc)}}
             """).Build();
-            #pragma warning restore SQLIG10
+#pragma warning restore SQLIG10
         });
 
         // Assert

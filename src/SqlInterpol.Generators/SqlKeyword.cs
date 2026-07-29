@@ -27,6 +27,8 @@ internal sealed class SqlKeyword
     public static readonly SqlKeyword OrderBy = new("ORDER BY");
     public static readonly SqlKeyword GroupBy = new("GROUP BY");
     public static readonly SqlKeyword Having = new("HAVING");
+    public static readonly SqlKeyword Limit = new("LIMIT");
+    public static readonly SqlKeyword Offset = new("OFFSET");
     public static readonly SqlKeyword Returning = new("RETURNING");
     public static readonly SqlKeyword On = new("ON");
 
@@ -48,6 +50,6 @@ internal sealed class SqlKeyword
     {
         SelectDistinct, OrderBy, GroupBy, OnConflict, OnDuplicate,
         Select, From, Join, Insert, Update, Delete, Set, Values, Into, 
-        Where, Having, Returning, On, As, Intersect, Union, Except, Over, Merge
+        Where, Having, Limit, Offset, Returning, On, As, Intersect, Union, Except, Over, Merge
     };
 }

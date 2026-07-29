@@ -16,7 +16,6 @@ public class HavingTests
         // Act
         testCase.Action(() =>
         {
-            #pragma warning disable SQLIG10
             db.Entity<Product>(out var p);
             return db.Append($$"""
                 SELECT 
@@ -26,11 +25,11 @@ public class HavingTests
                 GROUP BY {{p.CategoryId}}
                 HAVING COUNT({{p.Id}}) > {{5}}
                 """).Build();
-            #pragma warning restore SQLIG10
         });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     public static TheoryData<SqlTestCase> SelectGroupByAndHavingData

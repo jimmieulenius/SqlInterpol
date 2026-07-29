@@ -16,7 +16,6 @@ public class OrderByAsTests
         // Act
         testCase.Action(() => 
         {
-            #pragma warning disable SQLIG10
             db.Entity<Product>(out var prod, "prod");
             return db.Append($$"""
                 SELECT *
@@ -24,11 +23,11 @@ public class OrderByAsTests
                 ORDER BY
                     {{prod.Name}} ASC
                 """).Build();
-            #pragma warning restore SQLIG10
         });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     public static TheoryData<SqlTestCase> OrderByWithExplicitAliasData =>

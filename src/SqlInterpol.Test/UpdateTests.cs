@@ -25,17 +25,16 @@ public class UpdateTests
         {
             db.Entity<OrderModel>(out var o);
 
-#pragma warning disable SQLIG10
             return db.Append($$"""
                 UPDATE {{o}}
                 SET {{updateDto}}
                 WHERE {{o.Id}} = {{TargetOrderId}}
                 """).Build();
-#pragma warning restore SQLIG10
         });
 
         // Assert
         testCase.Assert();
+        db.AssertAotIntercepted();
     }
 
     [Theory]
