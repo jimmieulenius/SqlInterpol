@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using SqlInterpol.Schema;
 using SqlInterpol.Testing.Xunit;
 using Xunit;
@@ -6,6 +7,13 @@ namespace SqlInterpol.Testing.Specifications;
 
 public abstract class LockTestSuiteBase<T> : SqlTestSuiteBase<T>
 {
+    static LockTestSuiteBase()
+    {
+        // This forces the derived class (e.g. SqlServerLockSuite) to run its 
+        // static constructor immediately, populating the test data before xUnit reads it.
+        RuntimeHelpers.RunClassConstructor(typeof(T).TypeHandle);
+    }
+
     [Theory]
     [MemberData(nameof(SelectWithForUpdateData))]
     public void Select_WithForUpdate(SqlTestCase testCase)
