@@ -23,9 +23,12 @@
 
   <!-- Link the shared test implementations -->
   <ItemGroup>
-    <Compile Include="..\SqlInterpol.Tests.Shared\**\*.cs" 
-             Exclude="..\SqlInterpol.Tests.Shared\obj\**;..\SqlInterpol.Tests.Shared\bin\**" 
-             LinkBase="SharedTests" />
+    <Compile
+      Include="..\SqlInterpol.Tests.Shared\**\*.cs"
+      Exclude="..\SqlInterpol.Tests.Shared\obj\**;..\SqlInterpol.Tests.Shared\bin\**">
+      <Link>.HiddenShared\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <Visible>false</Visible>
+    </Compile>
   </ItemGroup>
 
   <!-- NuGet Test Dependencies -->

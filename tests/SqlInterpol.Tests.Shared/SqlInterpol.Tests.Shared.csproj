@@ -7,6 +7,15 @@
     <IsPackable>false</IsPackable>
     
     <IsTestProject>false</IsTestProject>
+    <DiscoverTests>false</DiscoverTests>
+    <ExcludeFromTestExplorer>true</ExcludeFromTestExplorer>
+    
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+    <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
+
+    <CopyBuildOutputToOutputDirectory>false</CopyBuildOutputToOutputDirectory>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <TargetExt>.shared</TargetExt>
   </PropertyGroup>
 
   <ItemGroup>
@@ -14,8 +23,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="xunit.core" Version="2.9.3" />
-    <PackageReference Include="xunit.assert" Version="2.9.3" />
+    <PackageReference Include="xunit.core" Version="2.9.3" ExcludeAssets="build;buildTransitive" />
+    <PackageReference Include="xunit.assert" Version="2.9.3" ExcludeAssets="build;buildTransitive" />
   </ItemGroup>
 
 </Project>
