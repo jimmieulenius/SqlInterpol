@@ -8,8 +8,8 @@
     <Project Path="src/SqlInterpol.EntityFrameworkCore/SqlInterpol.EntityFrameworkCore.csproj" />
     <Project Path="src/SqlInterpol.EntityFrameworkCore.Test/SqlInterpol.EntityFrameworkCore.Test.csproj" />
     <Project Path="src/SqlInterpol.Generators/SqlInterpol.Generators.csproj" />
-    <!-- <Project Path="src/SqlInterpol.Test/SqlInterpol.Test.csproj" />
-    <Project Path="src/SqlInterpol.Test.Aot/SqlInterpol.Test.Aot.csproj" /> -->
+    <Project Path="src/SqlInterpol.Test/SqlInterpol.Test.csproj" />
+    <Project Path="src/SqlInterpol.Test.Aot/SqlInterpol.Test.Aot.csproj" />
     <Project Path="src/SqlInterpol.Testing.Specifications/SqlInterpol.Testing.Specifications.csproj" />
     <Project Path="src/SqlInterpol.Testing.Xunit/SqlInterpol.Testing.Xunit.csproj" />
   </Folder>
