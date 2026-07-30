@@ -25,4 +25,8 @@
       OutputItemType="Analyzer" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="SqlInterpol.Testing.Xunit" />
+  </ItemGroup>
+
 </Project>

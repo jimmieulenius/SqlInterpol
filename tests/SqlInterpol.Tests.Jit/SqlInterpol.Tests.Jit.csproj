@@ -1,0 +1,42 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    
+    <SqlInterpolDialects>PostgreSql,SqlServer</SqlInterpolDialects>
+    <SqlInterpolDisableAot>true</SqlInterpolDisableAot>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <CompilerVisibleProperty Include="SqlInterpolDialects" />
+    <CompilerVisibleProperty Include="SqlInterpolDisableAot" />
+  </ItemGroup>
+
+  <!-- Core Engine and Testing Framework References -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\SqlInterpol.Testing.Specifications\SqlInterpol.Testing.Specifications.csproj" />
+  </ItemGroup>
+
+  <!-- Link the shared test implementations -->
+  <ItemGroup>
+    <Compile Include="..\SqlInterpol.Tests.Shared\**\*.cs" 
+             Exclude="..\SqlInterpol.Tests.Shared\obj\**;..\SqlInterpol.Tests.Shared\bin\**" 
+             LinkBase="SharedTests" />
+  </ItemGroup>
+
+  <!-- NuGet Test Dependencies -->
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" /> 
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,22 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SqlInterpol/SqlInterpol.csproj" />
+    <Project Path="src/SqlInterpol.Analyzers/SqlInterpol.Analyzers.csproj" />
+    <Project Path="src/SqlInterpol.Benchmarks/SqlInterpol.Benchmarks.csproj" />
+    <Project Path="src/SqlInterpol.Dapper/SqlInterpol.Dapper.csproj" />
+    <Project Path="src/SqlInterpol.Dapper.Test/SqlInterpol.Dapper.Test.csproj" />
+    <Project Path="src/SqlInterpol.EntityFrameworkCore/SqlInterpol.EntityFrameworkCore.csproj" />
+    <Project Path="src/SqlInterpol.EntityFrameworkCore.Test/SqlInterpol.EntityFrameworkCore.Test.csproj" />
+    <Project Path="src/SqlInterpol.Generators/SqlInterpol.Generators.csproj" />
+    <!-- <Project Path="src/SqlInterpol.Test/SqlInterpol.Test.csproj" />
+    <Project Path="src/SqlInterpol.Test.Aot/SqlInterpol.Test.Aot.csproj" /> -->
+    <Project Path="src/SqlInterpol.Testing.Specifications/SqlInterpol.Testing.Specifications.csproj" />
+    <Project Path="src/SqlInterpol.Testing.Xunit/SqlInterpol.Testing.Xunit.csproj" />
+  </Folder>
+
+  <Folder Name="/tests/">
+    <Project Path="tests/SqlInterpol.Tests.Aot/SqlInterpol.Tests.Aot.csproj" />
+    <Project Path="tests/SqlInterpol.Tests.Jit/SqlInterpol.Tests.Jit.csproj" />
+    <Project Path="tests/SqlInterpol.Tests.Shared/SqlInterpol.Tests.Shared.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,76 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    
+    <DefineConstants>$(DefineConstants);AOT_ENABLED</DefineConstants>
+    <SqlInterpolDialects>PostgreSql,SqlServer</SqlInterpolDialects>
+    <SqlInterpolDisableAot>false</SqlInterpolDisableAot>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <CompilerVisibleProperty Include="SqlInterpolDialects" />
+    <CompilerVisibleProperty Include="SqlInterpolDisableAot" />
+  </ItemGroup>
+
+  <!-- Core Engine and Testing Framework References -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\SqlInterpol.Testing.Specifications\SqlInterpol.Testing.Specifications.csproj" />
+  </ItemGroup>
+
+  <!-- Link the shared test implementations -->
+  <ItemGroup>
+    <Compile Include="..\SqlInterpol.Tests.Shared\**\*.cs" 
+             Exclude="..\SqlInterpol.Tests.Shared\obj\**;..\SqlInterpol.Tests.Shared\bin\**" 
+             LinkBase="SharedTests" />
+  </ItemGroup>
+
+  <!-- NuGet Test Dependencies -->
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" /> 
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <!-- Source Generators and Analyzers -->
+  <ItemGroup>
+    <ProjectReference 
+      Include="..\..\src\SqlInterpol.Analyzers\SqlInterpol.Analyzers.csproj" 
+      ReferenceOutputAssembly="false" 
+      OutputItemType="Analyzer" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference 
+      Include="..\..\src\SqlInterpol.Generators\SqlInterpol.Generators.csproj" 
+      OutputItemType="Analyzer" 
+      ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <!-- General Source Generation Outputs -->
+  <PropertyGroup>
+    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+    <CompilerGeneratedFilesOutputPath>obj/Generated</CompilerGeneratedFilesOutputPath>
+  </PropertyGroup>
+
+  <!-- .NET 8 (C# 12) Specific Interceptor Settings -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net8.0'">
+    <LangVersion>preview</LangVersion>
+    <InterceptorsPreviewNamespaces>$(InterceptorsPreviewNamespaces);SqlInterpol.Generators.Generated</InterceptorsPreviewNamespaces>
+  </PropertyGroup>
+
+  <!-- .NET 10 Specific Interceptor Settings -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <Features>InterceptorsPreview</Features>
+    <InterceptorsNamespaces>$(InterceptorsNamespaces);SqlInterpol.Generators.Generated</InterceptorsNamespaces>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

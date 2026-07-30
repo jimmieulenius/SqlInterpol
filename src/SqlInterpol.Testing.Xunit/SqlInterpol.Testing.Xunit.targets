@@ -1,0 +1,6 @@
+<Project>
+  <!-- If the consuming test project defines AOT_ENABLED in DefineConstants, inject the assembly attribute -->
+  <ItemGroup Condition="$(DefineConstants.Contains('AOT_ENABLED'))">
+    <AssemblyAttribute Include="SqlInterpol.Testing.Xunit.SqlInterpolAotEnabledAttribute" />
+  </ItemGroup>
+</Project>
