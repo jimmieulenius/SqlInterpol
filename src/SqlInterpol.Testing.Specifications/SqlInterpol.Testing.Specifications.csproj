@@ -8,12 +8,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Content Include="**\*.cs" Exclude="obj\**;bin\**">
+    <Compile Update="**\*.cs">
       <Pack>true</Pack>
       <PackagePath>contentFiles\cs\any\SqlInterpol.Testing.Specifications\</PackagePath>
       <PackageCopyToOutput>false</PackageCopyToOutput>
       <BuildAction>AdditionalFiles</BuildAction>
-    </Content>
+    </Compile>
   </ItemGroup>
 
   <ItemGroup>
