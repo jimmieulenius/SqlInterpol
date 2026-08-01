@@ -611,7 +611,7 @@ public partial class SqlAotInterceptorGenerator
                         // Only emit column-by-column code when NOT in the JIT fallback branch.
                         bool needsClosingBrace = inlineAlias == null && tableDecl.ExplicitAlias == null;
                         
-                        for (int k = 0; k < tableDecl.Columns.Count; k++)
+                        for (int k = 0; k < tableDecl.Columns.Length; k++)
                         {
                             var col = tableDecl.Columns[k];
 

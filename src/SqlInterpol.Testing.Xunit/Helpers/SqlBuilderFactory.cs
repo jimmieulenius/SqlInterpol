@@ -3,6 +3,18 @@ using SqlInterpol.Configuration;
 
 namespace SqlInterpol.Testing.Xunit;
 
+/// <summary>
+/// A thread-safe registry that maps SQL dialect names to <see cref="SqlBuilder"/> factory
+/// delegates, enabling xUnit's cross-AppDomain deserialization to reconstruct a dialect-specific
+/// builder from the string identifier stored in <see cref="SqlTestCaseBase.Dialect"/>.
+/// </summary>
+/// <remarks>
+/// All built-in dialects (SqlServer, PostgreSql, MySql, SqLite, Oracle, Firebird) are
+/// pre-registered in the static constructor and available out of the box.
+/// Third-party dialect authors must call <see cref="Register"/> once during test assembly
+/// initialization (e.g. from an <c>ICollectionFixture</c> or assembly-level fixture) so that
+/// deserialized test cases can resolve the correct builder at runtime.
+/// </remarks>
 public static class SqlBuilderFactory
 {
     // A thread-safe registry of builder factories for the test runner

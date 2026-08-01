@@ -71,32 +71,24 @@ public partial class SqlAotInterceptorGenerator
 
     private static void UnwrapRenderExtension(ref ExpressionSyntax baseExpr, ref string? explicitExtensionMode)
     {
-        if (baseExpr is InvocationExpressionSyntax invExpr &&
-            invExpr.Expression is MemberAccessExpressionSyntax invMa)
+        if (baseExpr is not InvocationExpressionSyntax invExpr) return;
+        if (invExpr.Expression is not MemberAccessExpressionSyntax invMa) return;
+
+        var methodName = invMa.Name.Identifier.Text;
+
+        string? resolvedMode = methodName switch
         {
-            var methodName = invMa.Name.Identifier.Text;
-            
-            if (methodName == "AsDeclaration")
-            {
-                baseExpr = invMa.Expression;
-                explicitExtensionMode = "decl";
-            }
-            else if (methodName == "AsAlias")
-            {
-                baseExpr = invMa.Expression;
-                explicitExtensionMode = "alias";
-            }
-            else if (methodName == "AsBase")
-            {
-                baseExpr = invMa.Expression;
-                explicitExtensionMode = "base";
-            }
-            else if (methodName == "AsColumn")
-            {
-                baseExpr = invMa.Expression;
-                explicitExtensionMode = "col";
-            }
-        }
+            GeneratorConstants.ExtensionAsDeclaration => GeneratorConstants.FormatDeclaration,
+            GeneratorConstants.ExtensionAsAlias        => GeneratorConstants.FormatAlias,
+            GeneratorConstants.ExtensionAsBase         => GeneratorConstants.FormatBaseName,
+            GeneratorConstants.ExtensionAsColumn       => GeneratorConstants.FormatColumn,
+            _                                          => null
+        };
+
+        if (resolvedMode is null) return;
+
+        baseExpr = invMa.Expression;
+        explicitExtensionMode = resolvedMode;
     }
 
     private static Dictionary<string, (string Open, string Close)> ExtractDialectQuotes(

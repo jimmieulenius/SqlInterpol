@@ -68,13 +68,7 @@ public partial class SqlAotInterceptorGenerator : IIncrementalGenerator
             if (config.IsDisabled)
             {
                 var diagnostic = Diagnostic.Create(
-                    new DiagnosticDescriptor(
-                        id: GeneratorConstants.DiagnosticAotDisabled,
-                        title: "SqlInterpol AOT Disabled",
-                        messageFormat: "SqlInterpol AOT generation has been disabled via the <SqlInterpolDisableAot> MSBuild property. Falling back to runtime JIT compilation.",
-                        category: "Configuration",
-                        defaultSeverity: DiagnosticSeverity.Warning,
-                        isEnabledByDefault: true),
+                    SqlAotDiagnostics.AotDisabledDiagnostic,
                     Location.None);
                 
                 spc.ReportDiagnostic(diagnostic);

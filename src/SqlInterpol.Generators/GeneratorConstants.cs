@@ -45,6 +45,20 @@ internal static class GeneratorConstants
     /// <summary>Format specifier that renders only the column name (no qualifier).</summary>
     public const string FormatColumn = "col";
 
+    // Extension method names that set an explicit render mode on an interpolation hole.
+    // These must stay in sync with the actual extension method names on SqlInterpol's entity types.
+    /// <summary>Extension method name that sets the <c>decl</c> render mode on a hole.</summary>
+    public const string ExtensionAsDeclaration = "AsDeclaration";
+
+    /// <summary>Extension method name that sets the <c>alias</c> render mode on a hole.</summary>
+    public const string ExtensionAsAlias = "AsAlias";
+
+    /// <summary>Extension method name that sets the <c>base</c> render mode on a hole.</summary>
+    public const string ExtensionAsBase = "AsBase";
+
+    /// <summary>Extension method name that sets the <c>col</c> render mode on a hole.</summary>
+    public const string ExtensionAsColumn = "AsColumn";
+
     // Named argument / parameter names used in Entity<T>() calls
     /// <summary>Named argument <c>alias</c> in <c>db.Entity&lt;T&gt;(alias: "a", out var t)</c>.</summary>
     public const string ParamAlias = "alias";

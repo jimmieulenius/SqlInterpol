@@ -31,13 +31,7 @@ public class SqlQueryGenerator : IIncrementalGenerator
         if (!containingClass.IsStatic)
         {
             var diagnostic = Diagnostic.Create(
-                new DiagnosticDescriptor(
-                    id: GeneratorConstants.DiagnosticInvalidContainer,
-                    title: "Invalid SqlQuery Container",
-                    messageFormat: "The class '{0}' must be static to contain a [SqlQuery] method",
-                    category: "Usage",
-                    defaultSeverity: DiagnosticSeverity.Error,
-                    isEnabledByDefault: true),
+                SqlAotDiagnostics.InvalidContainerDiagnostic,
                 method.Locations.FirstOrDefault(),
                 containingClass.Name);
 
@@ -49,13 +43,7 @@ public class SqlQueryGenerator : IIncrementalGenerator
         if (method.IsExtensionMethod)
         {
             var diagnostic = Diagnostic.Create(
-                new DiagnosticDescriptor(
-                    id: GeneratorConstants.DiagnosticInvalidSignature,
-                    title: "Invalid SqlQuery Signature",
-                    messageFormat: "The method '{0}' cannot be an extension method. Remove the 'this' modifier from the first parameter. The source generator will automatically emit the 'this' modifier on the generated public wrapper.",
-                    category: "Usage",
-                    defaultSeverity: DiagnosticSeverity.Error,
-                    isEnabledByDefault: true),
+                SqlAotDiagnostics.InvalidSignatureDiagnostic,
                 method.Locations.FirstOrDefault(),
                 method.Name);
 

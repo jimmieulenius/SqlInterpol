@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -130,7 +131,8 @@ public class SqlAotSyntaxWalker : CSharpSyntaxWalker
         string typeName = typeArg.ToString();
         string mappedTableName = typeName;
         string? mappedSchemaName = null;
-        var columns = new List<ColumnMap>();
+        var columnList = new List<ColumnMap>();
+        var columns = ImmutableArray<ColumnMap>.Empty;
 
         if (typeSymbol != null)
         {
@@ -185,22 +187,22 @@ public class SqlAotSyntaxWalker : CSharpSyntaxWalker
                     }
                 }
                                 
-                columns.Add(new ColumnMap(member.Name, colName));
+                columnList.Add(new ColumnMap(member.Name, colName));
             }
             
-            columns = columns.OrderBy(c => c.PropertyName).ToList();
+            columns = [.. columnList.OrderBy(c => c.PropertyName)];
         }
 
         if (customName != null) mappedTableName = customName;
         if (customSchema != null) mappedSchemaName = customSchema;
 
         var declaration = new EntityDeclaration(
-            variableName, 
-            typeName, 
-            mappedTableName, 
-            mappedSchemaName, 
-            explicitAlias, 
-            wasAutoAliased, 
+            variableName,
+            typeName,
+            mappedTableName,
+            mappedSchemaName,
+            explicitAlias,
+            wasAutoAliased,
             columns);
             
         CurrentContext.Entities[variableName] = declaration;
