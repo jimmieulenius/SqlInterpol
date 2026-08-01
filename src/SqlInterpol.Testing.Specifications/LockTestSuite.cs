@@ -1,6 +1,5 @@
 using SqlInterpol.Schema;
 using SqlInterpol.Testing.Xunit;
-using Xunit;
 
 namespace SqlInterpol.Testing.Specifications;
 
