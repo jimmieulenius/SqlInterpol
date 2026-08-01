@@ -18,13 +18,16 @@
     <TargetExt>.shared</TargetExt>
   </PropertyGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\..\src\SqlInterpol.Testing.Specifications\SqlInterpol.Testing.Specifications.csproj" />
-  </ItemGroup>
-
+  <!-- xUnit Dependencies -->
   <ItemGroup>
     <PackageReference Include="xunit.core" Version="2.9.3" ExcludeAssets="build;buildTransitive" />
     <PackageReference Include="xunit.assert" Version="2.9.3" ExcludeAssets="build;buildTransitive" />
+  </ItemGroup>
+
+  <!-- Standard Project References (No more source-linking!) -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\SqlInterpol.Testing.Specifications\SqlInterpol.Testing.Specifications.csproj" />
+    <ProjectReference Include="..\..\src\SqlInterpol.Testing.Xunit\SqlInterpol.Testing.Xunit.csproj" />
   </ItemGroup>
 
 </Project>

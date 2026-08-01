@@ -15,28 +15,36 @@
     <CompilerVisibleProperty Include="SqlInterpolDisableAot" />
   </ItemGroup>
 
-  <!-- Core Engine and Testing Framework References -->
   <ItemGroup>
-    <ProjectReference Include="..\..\src\SqlInterpol.Testing.Specifications\SqlInterpol.Testing.Specifications.csproj" />
+    <!-- We keep the Shared folder source-linked so F12/Ctrl+Click navigation works for your test data! -->
+    <Compile Include="..\SqlInterpol.Tests.Shared\**\*.cs" 
+             Exclude="..\SqlInterpol.Tests.Shared\obj\**;..\SqlInterpol.Tests.Shared\bin\**" />
   </ItemGroup>
 
-  <!-- Link the shared test implementations -->
-  <ItemGroup>
-    <Compile
-      Include="..\SqlInterpol.Tests.Shared\**\*.cs"
-      Exclude="..\SqlInterpol.Tests.Shared\obj\**;..\SqlInterpol.Tests.Shared\bin\**">
-      <Link>.HiddenShared\%(RecursiveDir)%(Filename)%(Extension)</Link>
-      <Visible>false</Visible>
-    </Compile>
-  </ItemGroup>
-
-  <!-- NuGet Test Dependencies -->
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="xunit" Version="2.9.3" /> 
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
   </ItemGroup>
+
+  <ItemGroup>
+    <!-- 1. The runtime DLL dependency (Provides the [SqlTestSuite] attributes) -->
+    <ProjectReference Include="..\..\src\SqlInterpol.Testing.Specifications\SqlInterpol.Testing.Specifications.csproj" />
+    
+    <!-- 2. Pass the specifications as pure text templates to the Generator! -->
+    <!-- Exclude obj/ and bin/ to prevent parsing MSBuild's auto-generated files -->
+    <AdditionalFiles Include="..\..\src\SqlInterpol.Testing.Specifications\**\*.cs" 
+                     Exclude="..\..\src\SqlInterpol.Testing.Specifications\obj\**;..\..\src\SqlInterpol.Testing.Specifications\bin\**" />
+    
+    <ProjectReference Include="..\..\src\SqlInterpol.Testing.Xunit\SqlInterpol.Testing.Xunit.csproj" />
+    <ProjectReference Include="..\..\src\SqlInterpol.Generators\SqlInterpol.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+    <CompilerGeneratedFilesOutputPath>obj/Generated</CompilerGeneratedFilesOutputPath>
+  </PropertyGroup>
 
   <ItemGroup>
     <Using Include="Xunit" />

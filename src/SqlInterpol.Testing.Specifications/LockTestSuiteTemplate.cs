@@ -1,28 +1,20 @@
-using System.Runtime.CompilerServices;
 using SqlInterpol.Schema;
 using SqlInterpol.Testing.Xunit;
 using Xunit;
 
 namespace SqlInterpol.Testing.Specifications;
 
-public abstract class LockTestSuiteBase<T> : SqlTestSuiteBase<T>
+public abstract class LockTestSuiteTemplate
 {
-    static LockTestSuiteBase()
-    {
-        // This forces the derived class (e.g. SqlServerLockSuite) to run its 
-        // static constructor immediately, populating the test data before xUnit reads it.
-        RuntimeHelpers.RunClassConstructor(typeof(T).TypeHandle);
-    }
+    [SqlIgnoreMember]
+    public abstract SqlBuilder CreateBuilder();
 
-    [Theory]
-    [MemberData(nameof(SelectWithForUpdateData))]
+    [SqlTest("SelectWithForUpdateData")]
     public void Select_WithForUpdate(SqlTestCase testCase)
     {
-        // Arrange
         var db = CreateBuilder();
         int id = 5;
 
-        // Act
         testCase.Act(() => 
         {
             db.Entity<Product>(out var p);
@@ -33,24 +25,16 @@ public abstract class LockTestSuiteBase<T> : SqlTestSuiteBase<T>
                 """).Build();
         });
 
-        // Assert
         testCase.Assert();
-
-        if (SelectWithForUpdateTheory?.AotCompatible ?? false)
-        {
-            db.AssertAotIntercepted();
-        }
+        db.AssertAotIntercepted();
     }
 
-    [Theory]
-    [MemberData(nameof(SelectWithForShareData))]
+    [SqlTest("SelectWithForShareData")]
     public void Select_WithForShare(SqlTestCase testCase)
     {
-        // Arrange
         var db = CreateBuilder();
         int id = 5;
 
-        // Act
         testCase.Act(() => 
         {
             db.Entity<Product>(out var p);
@@ -61,22 +45,9 @@ public abstract class LockTestSuiteBase<T> : SqlTestSuiteBase<T>
                 """).Build();
         });
 
-        // Assert
         testCase.Assert();
-
-        if (SelectWithForShareTheory?.AotCompatible ?? false)
-        {
-            db.AssertAotIntercepted();
-        }
+        db.AssertAotIntercepted();
     }
-
-    public static SqlTestTheory? SelectWithForUpdateTheory { get; set; }
-
-    public static TheoryData<SqlTestCase>? SelectWithForUpdateData => SelectWithForUpdateTheory?.Data;
-
-    public static SqlTestTheory? SelectWithForShareTheory { get; set; }
-
-    public static TheoryData<SqlTestCase>? SelectWithForShareData => SelectWithForShareTheory?.Data;
 
     [SqlTable(name: "Products", schema: "dbo")]
     public class Product

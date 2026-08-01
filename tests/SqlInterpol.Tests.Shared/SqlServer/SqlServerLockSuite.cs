@@ -1,51 +1,40 @@
 using SqlInterpol.Testing.Specifications;
 using SqlInterpol.Testing.Xunit;
+using Xunit;
 
-namespace SqlInterpol.Tests.Shared;
+namespace SqlInterpol.Tests.SqlServer;
 
-public class SqlServerLockSuite : LockTestSuiteBase<SqlServerLockSuite>
+public partial class SqlServerLockSuite : ILockTestSuite
 {
-    static SqlServerLockSuite()
-    {
-        object?[] expectedParams = [5];
+    public SqlBuilder CreateBuilder() => SqlBuilder.SqlServer();
 
-        SelectWithForUpdateTheory = new SqlTestTheory(() =>
+    public static TheoryData<SqlTestCase> SelectWithForUpdateData => 
+        new TheoryData<SqlTestCase>
         {
-            return [
-                new SqlTestCase(
-                    expectedSql: [
-                        """
-                        SELECT [dbo].[Products].[Id], [dbo].[Products].[PROD_NAME]
-                        FROM [dbo].[Products] WITH (UPDLOCK)
-                        WHERE [dbo].[Products].[Id] = @p0
-                        """
-                    ],
-                    expectedParameters: expectedParams
-                )
-            ];
-        })
-        {
-            AotCompatible = true
+            new SqlTestCase(
+                expectedSql: [
+                    """
+                    SELECT [dbo].[Products].[Id], [dbo].[Products].[PROD_NAME]
+                    FROM [dbo].[Products] WITH (UPDLOCK)
+                    WHERE [dbo].[Products].[Id] = @p0
+                    """
+                ],
+                expectedParameters: [5]
+            )
         };
-        SelectWithForShareTheory = new SqlTestTheory(() =>
-        {
-            return [
-                new SqlTestCase(
-                    expectedSql: [
-                        """
-                        SELECT [dbo].[Products].[Id], [dbo].[Products].[PROD_NAME]
-                        FROM [dbo].[Products] WITH (ROWLOCK, HOLDLOCK)
-                        WHERE [dbo].[Products].[Id] = @p0
-                        """
-                    ],
-                    expectedParameters: expectedParams
-                )
-            ];
-        })
-        {
-            AotCompatible = true
-        };
-    }
 
-    protected override SqlBuilder CreateBuilder() => SqlBuilder.SqlServer();
+    public static TheoryData<SqlTestCase> SelectWithForShareData => 
+        new TheoryData<SqlTestCase>
+        {
+            new SqlTestCase(
+                expectedSql: [
+                    """
+                    SELECT [dbo].[Products].[Id], [dbo].[Products].[PROD_NAME]
+                    FROM [dbo].[Products] WITH (ROWLOCK, HOLDLOCK)
+                    WHERE [dbo].[Products].[Id] = @p0
+                    """
+                ],
+                expectedParameters: [5]
+            )
+        };
 }
