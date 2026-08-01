@@ -4,7 +4,7 @@ using Xunit;
 
 namespace SqlInterpol.Testing.Specifications;
 
-public abstract class LockTestSuiteTemplate
+public abstract class LockTestSuite
 {
     [SqlIgnoreMember]
     public abstract SqlBuilder CreateBuilder();
