@@ -4,7 +4,7 @@ using SqlInterpol;
 using SqlInterpol.Dapper;
 using SqlInterpol.Schema;
 
-namespace SqlInterpol.IntegrationTests;
+namespace SqlInterpol.Dapper.Tests;
 
 public class DapperSqLiteTests
 {

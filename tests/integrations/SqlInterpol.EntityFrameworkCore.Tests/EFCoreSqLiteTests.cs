@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using SqlInterpol.EFCore;
 using SqlInterpol.Schema;
 
-namespace SqlInterpol.IntegrationTests;
+namespace SqlInterpol.EntityFrameworkCore.Tests;
 
 public class EFCoreSqLiteTests
 {

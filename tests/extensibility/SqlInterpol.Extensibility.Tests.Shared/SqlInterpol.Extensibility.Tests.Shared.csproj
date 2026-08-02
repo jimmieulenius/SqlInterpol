@@ -18,16 +18,21 @@
     <TargetExt>.shared</TargetExt>
   </PropertyGroup>
 
-  <!-- xUnit Dependencies -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <LangVersion>preview</LangVersion>
+    <EnablePreviewFeatures>true</EnablePreviewFeatures>
+    <DefineConstants>$(DefineConstants);CSHARP14_EXTENSION_TYPES</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="xunit.core" Version="2.9.3" ExcludeAssets="build;buildTransitive" />
     <PackageReference Include="xunit.assert" Version="2.9.3" ExcludeAssets="build;buildTransitive" />
   </ItemGroup>
 
-  <!-- Standard Project References (No more source-linking!) -->
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\SqlInterpol.Testing.Specifications\SqlInterpol.Testing.Specifications.csproj" />
     <ProjectReference Include="..\..\..\src\SqlInterpol.Testing.Xunit\SqlInterpol.Testing.Xunit.csproj" />
+    <ProjectReference Include="..\SqlInterpol.Extensibility\SqlInterpol.Extensibility.csproj" />
   </ItemGroup>
 
 </Project>

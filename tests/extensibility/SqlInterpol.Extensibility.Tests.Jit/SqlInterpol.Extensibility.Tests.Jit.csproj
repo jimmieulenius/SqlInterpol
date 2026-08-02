@@ -10,13 +10,18 @@
     <SqlInterpolDisableAot>true</SqlInterpolDisableAot>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <LangVersion>preview</LangVersion>
+    <EnablePreviewFeatures>true</EnablePreviewFeatures>
+    <DefineConstants>$(DefineConstants);CSHARP14_EXTENSION_TYPES</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup>
     <CompilerVisibleProperty Include="SqlInterpolDialects" />
     <CompilerVisibleProperty Include="SqlInterpolDisableAot" />
   </ItemGroup>
 
   <ItemGroup>
-    <!-- We keep the Shared folder source-linked so F12/Ctrl+Click navigation works for your test data! -->
     <Compile Include="..\SqlInterpol.Extensibility.Tests.Shared\**\*.cs" Exclude="..\SqlInterpol.Extensibility.Tests.Shared\obj\**;..\SqlInterpol.Extensibility.Tests.Shared\bin\**" />
   </ItemGroup>
 
@@ -28,15 +33,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- 1. The runtime DLL dependency (Provides the [SqlTestSuite] attributes) -->
     <ProjectReference Include="..\..\..\src\SqlInterpol.Testing.Specifications\SqlInterpol.Testing.Specifications.csproj" />
     
-    <!-- 2. Pass the specifications as pure text templates to the Generator! -->
-    <!-- Exclude obj/ and bin/ to prevent parsing MSBuild's auto-generated files -->
     <AdditionalFiles Include="..\..\..\src\SqlInterpol.Testing.Specifications\**\*.cs" Exclude="..\..\..\src\SqlInterpol.Testing.Specifications\obj\**;..\..\..\src\SqlInterpol.Testing.Specifications\bin\**" />
     
     <ProjectReference Include="..\..\..\src\SqlInterpol.Testing.Xunit\SqlInterpol.Testing.Xunit.csproj" />
     <ProjectReference Include="..\..\..\src\SqlInterpol.Generators\SqlInterpol.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\SqlInterpol.Extensibility\SqlInterpol.Extensibility.csproj" />
   </ItemGroup>
 
   <PropertyGroup>
