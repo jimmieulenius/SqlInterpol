@@ -190,12 +190,30 @@ public sealed class SqlTestSuiteGenerator : IIncrementalGenerator
 
         // Partial class merges with the user's handwritten test data file.
         sb.AppendLine($"public partial class {className}");
-        sb.AppendLine("{");
+        sb.Append("{");
 
-        foreach (var member in classSyntax.Members)
-            EmitMember(sb, member, target.ClassSymbol, normalizedPath);
+        // Pre-filter ignored members so our spacing logic is accurate regardless of member order
+        var activeMembers = classSyntax.Members
+            .Where(m => !m.AttributeLists
+                .SelectMany(al => al.Attributes)
+                .Any(a => a.Name.ToString() is "SqlIgnoreMember" or "SqlIgnoreMemberAttribute"))
+            .ToList();
 
-        sb.AppendLine("}");
+        for (int i = 0; i < activeMembers.Count; i++)
+        {
+            sb.AppendLine();
+
+            EmitMember(sb, activeMembers[i], target.ClassSymbol, normalizedPath);
+
+            // Add exact spacing between active members, but not after the last one
+            if (i < activeMembers.Count - 1)
+            {
+                sb.AppendLine(); 
+            }
+        }
+
+        sb.AppendLine(); 
+        sb.Append("}");
 
         context.AddSource($"{className}.g.cs", SourceText.From(sb.ToString(), Encoding.UTF8));
     }
@@ -253,7 +271,6 @@ public sealed class SqlTestSuiteGenerator : IIncrementalGenerator
 
     /// <summary>
     /// Emits a single template member into the generated partial class.
-    /// Members annotated with <c>[SqlIgnoreMember]</c> are skipped.
     /// Methods annotated with <c>[SqlTest]</c> are promoted to xUnit <c>[Theory]</c> methods.
     /// All other members are emitted verbatim.
     /// </summary>
@@ -263,12 +280,6 @@ public sealed class SqlTestSuiteGenerator : IIncrementalGenerator
         INamedTypeSymbol classSymbol,
         string? normalizedFilePath)
     {
-        bool hasIgnoreAttr = member.AttributeLists
-            .SelectMany(al => al.Attributes)
-            .Any(a => a.Name.ToString() is "SqlIgnoreMember" or "SqlIgnoreMemberAttribute");
-
-        if (hasIgnoreAttr) return;
-
         if (member is MethodDeclarationSyntax method)
         {
             var sqlTestAttr = method.AttributeLists
@@ -283,8 +294,7 @@ public sealed class SqlTestSuiteGenerator : IIncrementalGenerator
         }
 
         // Fields, nested types, and helper methods are pasted verbatim.
-        sb.AppendLine("    " + member.ToFullString().Trim());
-        sb.AppendLine();
+        sb.Append("    " + member.ToFullString().Trim());
     }
 
     /// <summary>
@@ -321,8 +331,7 @@ public sealed class SqlTestSuiteGenerator : IIncrementalGenerator
             modifiers = "public " + modifiers;
 
         sb.AppendLine($"    {modifiers.Trim()} {method.ReturnType} {method.Identifier}{method.ParameterList}");
-        sb.AppendLine(method.Body?.ToFullString() ?? $"    {{ {method.ExpressionBody?.ToFullString()}; }}");
-        sb.AppendLine();
+        sb.Append((method.Body?.ToFullString() ?? $"    {{ {method.ExpressionBody?.ToFullString()}; }}").TrimEnd());
     }
 
     /// <summary>

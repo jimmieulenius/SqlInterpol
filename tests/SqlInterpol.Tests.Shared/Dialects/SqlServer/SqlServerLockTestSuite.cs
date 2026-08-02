@@ -2,7 +2,7 @@ using SqlInterpol.Testing.Specifications;
 using SqlInterpol.Testing.Xunit;
 using Xunit;
 
-namespace SqlInterpol.Tests.SqlServer;
+namespace SqlInterpol.Tests.Dialects.SqlServer;
 
 public partial class SqlServerLockTestSuite : ILockTestSuite
 {
