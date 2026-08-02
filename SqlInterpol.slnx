@@ -15,6 +15,13 @@
   </Folder>
 
   <Folder Name="/tests/">
+    <Folder Name="/extensibility/">
+      <Project Path="tests/extensibility/SqlInterpol.Extensibility/SqlInterpol.Extensibility.csproj" />
+      <Project Path="tests/extensibility/SqlInterpol.Extensibility.Tests.Aot/SqlInterpol.Extensibility.Tests.Aot.csproj" />
+      <Project Path="tests/extensibility/SqlInterpol.Extensibility.Tests.Jit/SqlInterpol.Extensibility.Tests.Jit.csproj" />
+      <Project Path="tests/extensibility/SqlInterpol.Extensibility.Tests.Shared/SqlInterpol.Extensibility.Tests.Shared.csproj" />
+    </Folder>
+
     <Project Path="tests/SqlInterpol.Tests.Aot/SqlInterpol.Tests.Aot.csproj" />
     <Project Path="tests/SqlInterpol.Tests.Jit/SqlInterpol.Tests.Jit.csproj" />
     <Project Path="tests/SqlInterpol.Tests.Shared/SqlInterpol.Tests.Shared.csproj" />
