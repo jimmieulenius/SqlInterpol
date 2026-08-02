@@ -58,6 +58,4 @@ public abstract class LockTestSuite
         public int CategoryId { get; set; }
         public decimal Price { get; set; }
     }
-
-    private int i = 1;
 }
