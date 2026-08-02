@@ -6,7 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <AdditionalFiles Include="$(MSBuildThisFileDirectory)..\Templates\**\*.cs" Visible="false" />
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)..\Templates\Specifications\**\*.cs" Visible="false" />
   </ItemGroup>
 
 </Project>

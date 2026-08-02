@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="**\*.cs" Exclude="obj\**;bin\**" Pack="true" PackagePath="Templates\%(RecursiveDir)" />
+    <None Include="Specifications\**\*.cs" Pack="true" PackagePath="Templates\Specifications" />
     <None Include="SqlInterpol.Testing.Specifications.props" Pack="true" PackagePath="build\;buildTransitive\" />
   </ItemGroup>
 
