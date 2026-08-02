@@ -8,7 +8,7 @@ public abstract class LockTestSuite
     [SqlIgnoreMember]
     public abstract SqlBuilder CreateBuilder();
 
-    [SqlTest("SelectWithForUpdateData")]
+    [SqlTest(nameof(ILockTestSuite.SelectWithForUpdateData))]
     public void Select_WithForUpdate(SqlTestCase testCase)
     {
         var db = CreateBuilder();
@@ -28,7 +28,7 @@ public abstract class LockTestSuite
         db.AssertAotIntercepted();
     }
 
-    [SqlTest("SelectWithForShareData")]
+    [SqlTest(nameof(ILockTestSuite.SelectWithForShareData))]
     public void Select_WithForShare(SqlTestCase testCase)
     {
         var db = CreateBuilder();

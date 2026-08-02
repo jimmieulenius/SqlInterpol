@@ -39,7 +39,7 @@ public sealed class SqlTestSuiteGenerator : IIncrementalGenerator
         var classDeclarations = context.SyntaxProvider
             .CreateSyntaxProvider(
                 predicate: static (node, _) => node is ClassDeclarationSyntax c
-                                                && c.BaseList?.Types.Count > 0,
+                                               && c.BaseList?.Types.Count > 0,
                 transform: static (ctx, _) => GetSemanticTarget(ctx))
             .Where(static target => target is not null);
 
@@ -174,6 +174,7 @@ public sealed class SqlTestSuiteGenerator : IIncrementalGenerator
         {
             "using SqlInterpol;",
             "using SqlInterpol.Schema;",
+            "using SqlInterpol.Testing.Specifications;",
             "using SqlInterpol.Testing.Xunit;",
             "using Xunit;"
         };
@@ -296,7 +297,7 @@ public sealed class SqlTestSuiteGenerator : IIncrementalGenerator
         INamedTypeSymbol classSymbol,
         string? normalizedFilePath)
     {
-        var dataPropertyName = sqlTestAttr.ArgumentList?.Arguments.FirstOrDefault()?.ToString().Trim('"');
+        var dataPropertyName = ExtractDataPropertyName(sqlTestAttr);
         if (string.IsNullOrWhiteSpace(dataPropertyName)) return;
 
         // Look up the line number of the TheoryData property for the Ctrl+Click navigation hint.
@@ -322,6 +323,43 @@ public sealed class SqlTestSuiteGenerator : IIncrementalGenerator
         sb.AppendLine($"    {modifiers.Trim()} {method.ReturnType} {method.Identifier}{method.ParameterList}");
         sb.AppendLine(method.Body?.ToFullString() ?? $"    {{ {method.ExpressionBody?.ToFullString()}; }}");
         sb.AppendLine();
+    }
+
+    /// <summary>
+    /// Safely unwraps the raw identifier from the syntax tree, accounting for
+    /// standard string literals and compiler intrinsics like <c>nameof(...)</c>.
+    /// </summary>
+    private static string? ExtractDataPropertyName(AttributeSyntax sqlTestAttr)
+    {
+        var argExpr = sqlTestAttr.ArgumentList?.Arguments.FirstOrDefault()?.Expression;
+        if (argExpr is null) return null;
+
+        // Handle string literal: [SqlTest("MyDataProperty")]
+        if (argExpr is LiteralExpressionSyntax literal)
+        {
+            return literal.Token.ValueText;
+        }
+
+        // Handle compiler intrinsic: [SqlTest(nameof(ILockTestSuite.MyDataProperty))]
+        if (argExpr is InvocationExpressionSyntax invocation &&
+            invocation.Expression is IdentifierNameSyntax { Identifier.Text: "nameof" })
+        {
+            var nameofArg = invocation.ArgumentList.Arguments.FirstOrDefault()?.Expression;
+            
+            // Handles `nameof(Interface.Property)`
+            if (nameofArg is MemberAccessExpressionSyntax memberAccess)
+            {
+                return memberAccess.Name.Identifier.Text;
+            }
+            // Handles `nameof(Property)`
+            if (nameofArg is IdentifierNameSyntax identifierName)
+            {
+                return identifierName.Identifier.Text;
+            }
+        }
+
+        // Fallback for unexpected or complex syntax scenarios
+        return argExpr.ToString().Trim('"', ' ');
     }
 
     // ── Supporting records ─────────────────────────────────────────────────────

@@ -4,7 +4,7 @@ using Xunit;
 
 namespace SqlInterpol.Tests.SqlServer;
 
-public partial class LockTestSuite : ILockTestSuite
+public partial class SqlServerLockTestSuite : ILockTestSuite
 {
     public SqlBuilder CreateBuilder() => SqlBuilder.SqlServer();
 
