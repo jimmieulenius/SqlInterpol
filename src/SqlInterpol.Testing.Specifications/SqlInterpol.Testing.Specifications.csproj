@@ -8,12 +8,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Update="**\*.cs">
-      <Pack>true</Pack>
-      <PackagePath>contentFiles\cs\any\SqlInterpol.Testing.Specifications\</PackagePath>
-      <PackageCopyToOutput>false</PackageCopyToOutput>
-      <BuildAction>AdditionalFiles</BuildAction>
-    </Compile>
+    <None Include="**\*.cs" Exclude="obj\**;bin\**" Pack="true" PackagePath="Templates\%(RecursiveDir)" />
+    <None Include="SqlInterpol.Testing.Specifications.props" Pack="true" PackagePath="build\;buildTransitive\" />
   </ItemGroup>
 
   <ItemGroup>

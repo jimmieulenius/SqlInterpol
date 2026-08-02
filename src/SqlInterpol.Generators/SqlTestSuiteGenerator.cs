@@ -172,6 +172,7 @@ public sealed class SqlTestSuiteGenerator : IIncrementalGenerator
         // Collect standard and template usings, then deduplicate.
         var usingsList = new List<string>
         {
+            "using SqlInterpol;",
             "using SqlInterpol.Schema;",
             "using SqlInterpol.Testing.Xunit;",
             "using Xunit;"
