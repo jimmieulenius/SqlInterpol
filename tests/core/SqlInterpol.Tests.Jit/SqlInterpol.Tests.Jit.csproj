@@ -16,7 +16,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- We keep the Shared folder source-linked so F12/Ctrl+Click navigation works for your test data! -->
     <Compile Include="..\SqlInterpol.Tests.Shared\**\*.cs" Exclude="..\SqlInterpol.Tests.Shared\obj\**;..\SqlInterpol.Tests.Shared\bin\**" />
   </ItemGroup>
 
@@ -28,15 +27,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- 1. The runtime DLL dependency (Provides the [SqlTestSuite] attributes) -->
-    <ProjectReference Include="..\..\src\SqlInterpol.Testing.Specifications\SqlInterpol.Testing.Specifications.csproj" />
+    <ProjectReference Include="..\..\..\src\SqlInterpol.Testing.Specifications\SqlInterpol.Testing.Specifications.csproj" />
+    <AdditionalFiles Include="..\..\..\src\SqlInterpol.Testing.Specifications\**\*.cs" Exclude="..\..\..\src\SqlInterpol.Testing.Specifications\obj\**;..\..\..\src\SqlInterpol.Testing.Specifications\bin\**" />
     
-    <!-- 2. Pass the specifications as pure text templates to the Generator! -->
-    <!-- Exclude obj/ and bin/ to prevent parsing MSBuild's auto-generated files -->
-    <AdditionalFiles Include="..\..\src\SqlInterpol.Testing.Specifications\**\*.cs" Exclude="..\..\src\SqlInterpol.Testing.Specifications\obj\**;..\..\src\SqlInterpol.Testing.Specifications\bin\**" />
-    
-    <ProjectReference Include="..\..\src\SqlInterpol.Testing.Xunit\SqlInterpol.Testing.Xunit.csproj" />
-    <ProjectReference Include="..\..\src\SqlInterpol.Generators\SqlInterpol.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\..\src\SqlInterpol.Testing.Xunit\SqlInterpol.Testing.Xunit.csproj" />
+    <ProjectReference Include="..\..\..\src\SqlInterpol.Testing.Generators\SqlInterpol.Testing.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+
+    <ProjectReference Include="..\..\..\src\SqlInterpol.Generators\SqlInterpol.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
   <PropertyGroup>

@@ -5,7 +5,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
 
-namespace SqlInterpol.Generators;
+namespace SqlInterpol.Testing.Generators;
 
 /// <summary>
 /// An incremental Roslyn source generator that reads classes implementing an interface
@@ -259,7 +259,7 @@ public sealed class SqlTestSuiteGenerator : IIncrementalGenerator
                 // sees it in their own file. The message guides them to fix either the interface
                 // or the [SqlTest] attribute in the template.
                 context.ReportDiagnostic(Diagnostic.Create(
-                    SqlAotDiagnostics.MismatchedTestDataMemberDiagnostic,
+                    SqlTestingDiagnostics.MismatchedTestDataMemberDiagnostic,
                     target.ClassSyntax.GetLocation(),
                     dataPropertyName,
                     templateMethod.Name,

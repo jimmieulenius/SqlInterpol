@@ -13,13 +13,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\SqlInterpol.Generators\SqlInterpol.Generators.csproj" 
+    <ProjectReference Include="..\SqlInterpol.Testing.Generators\SqlInterpol.Testing.Generators.csproj" 
                       OutputItemType="Analyzer" 
                       ReferenceOutputAssembly="false" />
     
     <ProjectReference Include="..\SqlInterpol.Testing.Xunit\SqlInterpol.Testing.Xunit.csproj" />
                       
-    <None Include="..\SqlInterpol.Generators\bin\$(Configuration)\netstandard2.0\SqlInterpol.Generators.dll" 
+    <None Include="..\SqlInterpol.Testing.Generators\bin\$(Configuration)\netstandard2.0\SqlInterpol.Testing.Generators.dll"
           Pack="true" 
           PackagePath="analyzers/dotnet/cs" 
           Visible="false" />
@@ -32,12 +32,12 @@
 
   <PropertyGroup Condition="'$(TargetFramework)' == 'net8.0'">
     <LangVersion>preview</LangVersion>
-    <InterceptorsPreviewNamespaces>$(InterceptorsPreviewNamespaces);SqlInterpol.Generators.Generated</InterceptorsPreviewNamespaces>
+    <InterceptorsPreviewNamespaces>$(InterceptorsPreviewNamespaces);SqlInterpol.Testing.Generators.Generated</InterceptorsPreviewNamespaces>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0'">
     <Features>InterceptorsPreview</Features>
-    <InterceptorsNamespaces>$(InterceptorsNamespaces);SqlInterpol.Generators.Generated</InterceptorsNamespaces>
+    <InterceptorsNamespaces>$(InterceptorsNamespaces);SqlInterpol.Testing.Generators.Generated</InterceptorsNamespaces>
   </PropertyGroup>
 
 </Project>

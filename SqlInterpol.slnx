@@ -5,6 +5,7 @@
     <Project Path="src/SqlInterpol.Dapper/SqlInterpol.Dapper.csproj" />
     <Project Path="src/SqlInterpol.EntityFrameworkCore/SqlInterpol.EntityFrameworkCore.csproj" />
     <Project Path="src/SqlInterpol.Generators/SqlInterpol.Generators.csproj" />
+    <Project Path="src/SqlInterpol.Testing.Generators/SqlInterpol.Testing.Generators.csproj" />
     <Project Path="src/SqlInterpol.Testing.Specifications/SqlInterpol.Testing.Specifications.csproj" />
     <Project Path="src/SqlInterpol.Testing.Xunit/SqlInterpol.Testing.Xunit.csproj" />
 
@@ -12,10 +13,10 @@
     <Project Path="src/SqlInterpol.Test.Aot/SqlInterpol.Test.Aot.csproj" />
   </Folder>
 
-  <Folder Name="/tests/">
-    <Project Path="tests/SqlInterpol.Tests.Aot/SqlInterpol.Tests.Aot.csproj" />
-    <Project Path="tests/SqlInterpol.Tests.Jit/SqlInterpol.Tests.Jit.csproj" />
-    <Project Path="tests/SqlInterpol.Tests.Shared/SqlInterpol.Tests.Shared.csproj" />
+  <Folder Name="/tests/core/">
+    <Project Path="tests/core/SqlInterpol.Tests.Aot/SqlInterpol.Tests.Aot.csproj" />
+    <Project Path="tests/core/SqlInterpol.Tests.Jit/SqlInterpol.Tests.Jit.csproj" />
+    <Project Path="tests/core/SqlInterpol.Tests.Shared/SqlInterpol.Tests.Shared.csproj" />
   </Folder>
 
   <Folder Name="/tests/extensibility/">

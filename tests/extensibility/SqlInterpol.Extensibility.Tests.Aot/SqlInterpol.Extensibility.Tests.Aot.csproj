@@ -40,6 +40,7 @@
     
     <ProjectReference Include="..\..\..\src\SqlInterpol.Analyzers\SqlInterpol.Analyzers.csproj" ReferenceOutputAssembly="false" OutputItemType="Analyzer" />
     <ProjectReference Include="..\..\..\src\SqlInterpol.Generators\SqlInterpol.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\..\src\SqlInterpol.Testing.Generators\SqlInterpol.Testing.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\..\..\src\SqlInterpol.Testing.Xunit\SqlInterpol.Testing.Xunit.csproj" />
     <ProjectReference Include="..\SqlInterpol.Extensibility\SqlInterpol.Extensibility.csproj" />
   </ItemGroup>
