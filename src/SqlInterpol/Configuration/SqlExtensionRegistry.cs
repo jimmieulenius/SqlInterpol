@@ -89,9 +89,9 @@ public static class SqlExtensionRegistry
                 }
             }
         }
-        catch
+        catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
         {
-            // Fail gracefully in constrained environments (e.g. Strict AOT)
+            // Fail gracefully in constrained environments (e.g. Strict AOT, assembly load restrictions)
         }
 
         return finalExtensions;

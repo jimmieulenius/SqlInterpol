@@ -6,7 +6,7 @@ namespace SqlInterpol.Segments;
 /// A collection fragment for raw SQL string items, rendering them joined by a separator.
 /// </summary>
 /// <param name="items">The raw SQL string items to include.</param>
-public sealed class SqlRawCollectionFragment(List<string> items) : ISqlFragment
+public sealed class SqlRawCollectionFragment(List<string> items) : ISqlCollectionFragment
 {
     /// <inheritdoc />
     public string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default)

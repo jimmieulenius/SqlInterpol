@@ -10,7 +10,7 @@ namespace SqlInterpol.Segments;
 /// <param name="items">The fragments to include in the collection.</param>
 /// <param name="separator">Optional separator override.</param>
 public class SqlCollectionFragmentBase<T>(IEnumerable<T> items, string? separator = null) 
-    : ISqlFragment where T : ISqlFragment
+    : ISqlCollectionFragment where T : ISqlFragment
 {
     /// <summary>Gets the optional explicit separator string assigned to this collection.</summary>
     protected string? Separator { get; } = separator;

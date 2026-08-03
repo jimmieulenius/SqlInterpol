@@ -18,6 +18,22 @@ public partial class SqlBuilder : ISqlEntityRegistry
     private readonly List<ISqlEntityBase> _entities = [];
 
     /// <summary>
+    /// Maps well-known segment tags to their required <see cref="SqlFeature"/> and human-readable
+    /// feature name. Adding a new feature only requires a new entry here — no changes to the
+    /// validation loop in <see cref="BuildSegments"/>.
+    /// </summary>
+    private static readonly IReadOnlyDictionary<string, (SqlFeature Feature, string Name)> _tagFeatureMap =
+        new Dictionary<string, (SqlFeature, string)>(StringComparer.OrdinalIgnoreCase)
+        {
+            [SqlSegmentTag.ForUpdateKeyword]  = (SqlFeature.ForUpdate,  "FOR UPDATE"),
+            [SqlSegmentTag.ForShareKeyword]   = (SqlFeature.ForShare,   "FOR SHARE"),
+            [SqlSegmentTag.ReturningKeyword]  = (SqlFeature.Returning,  "RETURNING"),
+            [SqlSegmentTag.OnConflictKeyword] = (SqlFeature.OnConflict, "ON CONFLICT"),
+            [SqlSegmentTag.DeleteAsKeyword]   = (SqlFeature.DeleteAs,   "DELETE with target alias"),
+            [SqlSegmentTag.UpdateAsKeyword]   = (SqlFeature.UpdateAs,   "UPDATE with target alias"),
+        };
+
+
     /// Tracks variable names mapped from caller argument expressions for zero-allocation property routing.
     /// </summary>
     internal Dictionary<string, ISqlEntityBase> ScopedVariables { get; } = new(StringComparer.Ordinal);
@@ -401,35 +417,17 @@ public partial class SqlBuilder : ISqlEntityRegistry
                 requiredFeature = req.RequiredFeature;
                 featureName = req.FeatureName;
             }
-            else if (segment.HasTag(SqlSegmentTag.ForUpdateKeyword))
+            else if (segment.Tags != null)
             {
-                requiredFeature = SqlFeature.ForUpdate;
-                featureName = "FOR UPDATE";
-            }
-            else if (segment.HasTag(SqlSegmentTag.ForShareKeyword))
-            {
-                requiredFeature = SqlFeature.ForShare;
-                featureName = "FOR SHARE";
-            }
-            else if (segment.HasTag(SqlSegmentTag.ReturningKeyword))
-            {
-                requiredFeature = SqlFeature.Returning;
-                featureName = "RETURNING";
-            }
-            else if (segment.HasTag(SqlSegmentTag.OnConflictKeyword))
-            {
-                requiredFeature = SqlFeature.OnConflict;
-                featureName = "ON CONFLICT";
-            }
-            else if (segment.HasTag(SqlSegmentTag.DeleteAsKeyword))
-            {
-                requiredFeature = SqlFeature.DeleteAs;
-                featureName = "DELETE with target alias";
-            }
-            else if (segment.HasTag(SqlSegmentTag.UpdateAsKeyword))
-            {
-                requiredFeature = SqlFeature.UpdateAs;
-                featureName = "UPDATE with target alias";
+                for (int t = 0; t < segment.Tags.Length; t++)
+                {
+                    if (_tagFeatureMap.TryGetValue(segment.Tags[t], out var mapped))
+                    {
+                        requiredFeature = mapped.Feature;
+                        featureName = mapped.Name;
+                        break;
+                    }
+                }
             }
 
             if (requiredFeature.HasValue && !Context.Dialect.SupportedFeatures.Contains(requiredFeature.Value))

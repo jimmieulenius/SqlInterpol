@@ -175,28 +175,13 @@ public class SqlSegmentRenderer : ISqlSegmentRenderer
 
         if (segment.Value is ISqlFragment && segment.Type != SqlSegmentType.Projection && rendered != null)
         {
-            if (!IsCollectionFragment(segment.Value.GetType()))
+            if (segment.Value is not ISqlCollectionFragment)
             {
                 rendered = ApplyAutoIndentation(rendered, index, segments);
             }
         }
 
         return rendered;
-    }
-
-    private static bool IsCollectionFragment(Type? type)
-    {
-        if (type == typeof(SqlRawCollectionFragment)) return true;
-
-        while (type != null && type != typeof(object))
-        {
-            if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(SqlCollectionFragmentBase<>))
-            {
-                return true;
-            }
-            type = type.BaseType;
-        }
-        return false;
     }
 
     private static string ApplyAutoIndentation(string rendered, int index, IReadOnlyList<SqlSegment> segments)
