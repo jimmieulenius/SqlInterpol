@@ -13,7 +13,7 @@ public class UnintentionalSystemMethodAnalyzer : DiagnosticAnalyzer
     private static readonly DiagnosticDescriptor Rule = new(
         id: "SQLIA04",
         title: "Unintentional System Method Call inside SQL Interpolation",
-        messageFormat: "Do not call '{0}()' on a SQL framework object inside a query string. Pass the object directly (e.g., {{{1}}}) so the engine can parse its AST.",
+        messageFormat: "Do not call '{0}()' on a SQL framework object inside a query string. Pass the object directly (e.g., {{{1}}}) so the engine can process its metadata.",
         category: "Usage",
         defaultSeverity: DiagnosticSeverity.Error, // Error, because this will 100% generate invalid SQL at runtime
         isEnabledByDefault: true);

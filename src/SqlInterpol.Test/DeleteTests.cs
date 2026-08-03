@@ -157,7 +157,7 @@ public class DeleteTests
                 new SqlTestCase(
                     SqlDialectKind.Oracle,
                     [
-                        // Oracle flawlessly transforms the entire AST into an EXISTS subquery block!
+                        // Oracle flawlessly transforms the entire query structure into an EXISTS subquery block!
                         """
                         DELETE FROM "dbo"."Products"
                         WHERE EXISTS (

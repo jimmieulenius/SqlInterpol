@@ -16,7 +16,7 @@ public class RawSqlTests
 
         #pragma warning disable SQLIG10
         // Act
-        // We are mixing AST nodes {{p}}, parameters {{minPrice}}, and RAW SQL here!
+        // We are mixing entity references {{p}}, parameters {{minPrice}}, and RAW SQL here!
         testCase.Action(() =>
         db.Entity<Product>(out var p)
             .Append($$"""
@@ -45,7 +45,7 @@ public class RawSqlTests
         var db = testCase.CreateBuilder();
 
         // Act
-        // Proving that window functions and raw SQL keywords flow perfectly around our AST tags
+        // Proving that window functions and raw SQL keywords flow perfectly around our interpolation tags
         #pragma warning disable SQLIG10
         testCase.Action(() => db.Entity<Product>(out var p)
             .Append($$"""

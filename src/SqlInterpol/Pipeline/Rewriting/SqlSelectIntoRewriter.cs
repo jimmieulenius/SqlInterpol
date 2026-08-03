@@ -104,7 +104,7 @@ public class SqlSelectIntoRewriter : ISqlSegmentRewriter
         }
         else if (targetSegment != null)
         {
-            // Parameterized: Let the AST natively render it
+            // Parameterized: Let the rendering pipeline handle it natively
             rewritten.Add(targetSegment);
         }
 

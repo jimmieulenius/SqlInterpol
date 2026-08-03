@@ -134,7 +134,7 @@ public class ParserTests
         // Arrange
         var db = testCase.CreateBuilder();
 
-        // Act - Proof that AST keyword interceptors (like FOR UPDATE or RETURNING) ignore strings
+        // Act - Proof that pipeline keyword interceptors (like FOR UPDATE or RETURNING) ignore strings
         testCase.Action(() => 
         {
             db.Entity<Product>(out var p);
@@ -157,7 +157,7 @@ public class ParserTests
         // Arrange
         var db = testCase.CreateBuilder();
 
-        // Act - Proof that AST keyword interceptors ignore comments
+        // Act - Proof that pipeline keyword interceptors ignore comments
         testCase.Action(() => 
         {
             db.Entity<Product>(out var p);

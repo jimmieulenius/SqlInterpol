@@ -4,7 +4,7 @@ namespace SqlInterpol;
 
 /// <summary>
 /// Represents a value wrapped with a specific SQL rendering mode directive.
-/// Used by the interpolation handler to dynamically adjust how AST nodes are formatted.
+/// Used by the interpolation handler to dynamically adjust how segments are formatted.
 /// </summary>
 public interface ISqlRenderModifier
 {

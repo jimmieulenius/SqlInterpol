@@ -4,7 +4,7 @@ using SqlInterpol.Segments;
 namespace SqlInterpol.Testing.Xunit.Dialects;
 
 /// <summary>
-/// A completely vanilla, predictable SQL dialect intended solely for testing structural rewriters and AST generation.
+/// A completely vanilla, predictable SQL dialect intended solely for testing structural rewriters and query generation.
 /// Uses standard double quotes for identifiers and '@' for parameters.
 /// </summary>
 public sealed class MockDialect : ISqlDialect

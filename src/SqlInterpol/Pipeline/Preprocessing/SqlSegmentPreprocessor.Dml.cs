@@ -15,7 +15,7 @@ public partial class SqlSegmentPreprocessor
         {
             if (IsInInsertColumnList(state.Refined))
             {
-                // Permanently bake the RenderMode into the AST node
+                // Permanently bake the RenderMode into the segment
                 segment = new SqlSegment(segment.Type, segment.Value, SqlRenderMode.BaseName, segment.Tags);
             }
         }
@@ -26,8 +26,8 @@ public partial class SqlSegmentPreprocessor
 
     private bool ProcessTargetTracking(SqlSegment segment, IReadOnlyList<SqlSegment> segments, SqlPreprocessorState state)
     {
-        // 🌟 FIX: Safely promote dynamic or raw columns to Projections and register them 
-        // as the active aliasable target so Lexer AS queries can attach natively!
+        // 🌟 FIX: Promote dynamic/raw columns to Projections and register as the 
+        // active aliasable target so Lexer AS queries can attach natively!
         if (segment.Value is SqlDynamicColumnFragment dynCol)
         {
             var colRef = ResolveDynamicColumn(dynCol, segments, state.Context);
@@ -140,7 +140,7 @@ public partial class SqlSegmentPreprocessor
                 {
                     if (!hasExplicitColumns)
                     {
-                        // AST Hijack: Safely drop the column list right BEFORE the VALUES keyword!
+                        // Segment Injection: Safely drop the column list right BEFORE the VALUES keyword!
                         state.Refined.Insert(valuesIndex, new SqlSegment(SqlSegmentType.Literal, $"({string.Join(", ", cols)}){Environment.NewLine}"));
                     }
                     

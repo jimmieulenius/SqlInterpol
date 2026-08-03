@@ -15,7 +15,7 @@ public class SqlTemplateMisuseAnalyzer : DiagnosticAnalyzer
 
     private static readonly LocalizableString Title = "Template initialized on execution path";
     private static readonly LocalizableString MessageFormat = "Templates initialized on the execution path allocate memory. Move this Template to a static readonly field, or use standard db.Append() to utilize the AOT compiler.";
-    private static readonly LocalizableString Description = "SqlBuilder.Template() evaluates the $ string and allocates an AST. To get zero-allocation performance, it must be cached statically.";
+    private static readonly LocalizableString Description = "SqlBuilder.Template() evaluates the $ string and allocates query segments. To get zero-allocation performance, it must be cached statically.";
 
     private static readonly DiagnosticDescriptor Rule = new(
         DiagnosticId, 

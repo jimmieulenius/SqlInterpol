@@ -14,7 +14,7 @@ public struct SqlStateFrame
 
     /// <summary>
     /// The semantic tag associated with the current clause (e.g., <see cref="SqlSegmentTag.SelectKeyword"/>), 
-    /// used to identify which part of the AST is currently being processed.
+    /// used to identify which part of the query structure is currently being processed.
     /// </summary>
     public string? ClauseTag;
 
