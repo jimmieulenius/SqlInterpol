@@ -1,4 +1,4 @@
-namespace SqlInterpol.Testing.Xunit;
+namespace SqlInterpol.Testing.Specifications;
 
 /// <summary>
 /// The root contract for all SQL test suites. Implementing classes must provide a

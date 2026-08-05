@@ -3,7 +3,6 @@ using Xunit;
 
 namespace SqlInterpol.Testing.Specifications;
 
-[SqlTestSuite(typeof(LockTestSuite))]
 public interface ILockTestSuite : ISqlTestSuiteBase
 {
     static abstract TheoryData<SqlTestCase> SelectWithForShareData { get; }

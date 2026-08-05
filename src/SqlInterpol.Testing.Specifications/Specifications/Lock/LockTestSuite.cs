@@ -3,6 +3,7 @@ using SqlInterpol.Testing.Xunit;
 
 namespace SqlInterpol.Testing.Specifications;
 
+[SqlTestSuite(typeof(ILockTestSuite))]
 public abstract class LockTestSuite
 {
     [SqlIgnoreMember]

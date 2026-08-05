@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -8,10 +10,10 @@ using Microsoft.CodeAnalysis.Text;
 namespace SqlInterpol.Testing.Generators;
 
 /// <summary>
-/// An incremental Roslyn source generator that reads classes implementing an interface
-/// annotated with <c>[SqlTestSuite(typeof(TemplateClass))]</c> and emits a partial class
-/// containing xUnit <c>[Theory]</c> methods for every <c>[SqlTest]</c>-annotated method
-/// in the template.
+/// An incremental Roslyn source generator that reads classes implementing a suite contract interface.
+/// It maps that interface to a template class (via the <c>[SqlTestSuite(typeof(IContract))]</c> attribute 
+/// on the template) and emits a partial class containing xUnit <c>[Theory]</c> methods for every 
+/// <c>[SqlTest]</c>-annotated method in the template.
 /// </summary>
 /// <remarks>
 /// The generation-first paradigm eliminates runtime reflection for test discovery.
@@ -28,24 +30,21 @@ namespace SqlInterpol.Testing.Generators;
 [Generator]
 public sealed class SqlTestSuiteGenerator : IIncrementalGenerator
 {
-    // Delegate to GeneratorConstants so the string is defined in exactly one place.
-    private const string SqlTestSuiteAttributeFullName = GeneratorConstants.SqlTestSuiteAttributeFullName;
-
     /// <inheritdoc/>
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        // Step 1: Find classes whose implemented interfaces carry [SqlTestSuite(typeof(Template))].
-        // The predicate is a cheap syntax-only filter; the semantic transform does the heavy lifting.
+        // Step 1: Find any class in the dialect project that implements at least one interface.
+        // We cast a wide net syntactically and filter against our reverse-lookup map in the Execute phase.
         var classDeclarations = context.SyntaxProvider
             .CreateSyntaxProvider(
                 predicate: static (node, _) => node is ClassDeclarationSyntax c
                                                && c.BaseList?.Types.Count > 0,
                 transform: static (ctx, _) => GetSemanticTarget(ctx))
-            .Where(static target => target is not null);
+            .Where(static target => target.HasValue)
+            .Select(static (target, _) => target!.Value);
 
         // Step 2: Parse AdditionalFiles (.cs) into lightweight, equatable template records.
-        // Parsing is done here (in .Select) so the incremental pipeline can cache the result
-        // and avoid re-parsing unchanged files on every keystroke.
+        // This builds our reverse lookup map: InterfaceName -> TemplateClassName
         var parsedTemplates = context.AdditionalTextsProvider
             .Where(static file => file.Path.EndsWith(".cs"))
             .Select(static (file, ct) => ParseTemplateFile(file, ct))
@@ -55,18 +54,15 @@ public sealed class SqlTestSuiteGenerator : IIncrementalGenerator
         var combined = classDeclarations.Combine(parsedTemplates);
         context.RegisterSourceOutput(
             combined,
-            static (spc, source) => Execute(spc, source.Left!.Value, source.Right));
+            static (spc, source) => Execute(spc, source.Left, source.Right));
     }
 
     // ── Private helpers ────────────────────────────────────────────────────────
 
     /// <summary>
     /// Parses a single additional-file into a lightweight <see cref="ParsedTemplate"/> record.
-    /// Returns <see langword="null"/> when the file contains no class declarations.
+    /// Looks specifically for classes annotated with <c>[SqlTestSuite(typeof(I...))]</c>.
     /// </summary>
-    /// <param name="file">The additional text file to parse.</param>
-    /// <param name="cancellationToken">Cancellation token forwarded from the pipeline.</param>
-    /// <returns>A <see cref="ParsedTemplate"/>, or <see langword="null"/> when nothing is found.</returns>
     private static ParsedTemplate? ParseTemplateFile(AdditionalText file, System.Threading.CancellationToken cancellationToken)
     {
         var text = file.GetText(cancellationToken)?.ToString();
@@ -80,190 +76,220 @@ public sealed class SqlTestSuiteGenerator : IIncrementalGenerator
             .Select(u => u.ToFullString().Trim())
             .ToImmutableArray();
 
-        var classes = root.DescendantNodes()
-            .OfType<ClassDeclarationSyntax>()
-            .Select(c => new ParsedTemplateClass(c.Identifier.Text, c.ToFullString()))
-            .ToImmutableArray();
+        var classes = new List<ParsedTemplateClass>();
 
-        return classes.IsEmpty ? null : new ParsedTemplate(usings, classes);
+        foreach (var c in root.DescendantNodes().OfType<ClassDeclarationSyntax>())
+        {
+            var attr = c.AttributeLists.SelectMany(al => al.Attributes)
+                .FirstOrDefault(a => a.Name.ToString() is "SqlTestSuite" or "SqlTestSuiteAttribute");
+
+            if (attr?.ArgumentList?.Arguments.FirstOrDefault()?.Expression is TypeOfExpressionSyntax typeOfExpr)
+            {
+                // Unpack the interface name from typeof(I...)
+                string interfaceName = typeOfExpr.Type switch
+                {
+                    IdentifierNameSyntax id => id.Identifier.Text,
+                    QualifiedNameSyntax qn => qn.Right.Identifier.Text, // Handles Namespace.ILockTestSuite
+                    _ => typeOfExpr.Type.ToString()
+                };
+
+                classes.Add(new ParsedTemplateClass(c.Identifier.Text, interfaceName, c.ToFullString()));
+            }
+        }
+
+        return classes.Count == 0 ? null : new ParsedTemplate(usings, classes.ToImmutableArray());
     }
 
     /// <summary>
-    /// Inspects a class declaration to determine whether it implements a suite contract interface.
+    /// Filters for valid classes that implement at least one interface.
     /// </summary>
-    /// <param name="context">The generator syntax context for the candidate class.</param>
-    /// <returns>
-    /// A generation target tuple, or <see langword="null"/> when the class does not
-    /// implement any suite contract interface.
-    /// </returns>
-    private static (ClassDeclarationSyntax ClassSyntax, INamedTypeSymbol ClassSymbol, INamedTypeSymbol TemplateSymbol)? GetSemanticTarget(
+    private static (ClassDeclarationSyntax ClassSyntax, INamedTypeSymbol ClassSymbol)? GetSemanticTarget(
         GeneratorSyntaxContext context)
     {
         var classSyntax = (ClassDeclarationSyntax)context.Node;
         if (context.SemanticModel.GetDeclaredSymbol(classSyntax) is not INamedTypeSymbol classSymbol)
             return null;
 
-        foreach (var iface in classSymbol.AllInterfaces)
-        {
-            // Use the fully-qualified attribute name to avoid false matches from other assemblies.
-            var suiteAttr = iface.GetAttributes().FirstOrDefault(
-                a => a.AttributeClass?.ToDisplayString() == SqlTestSuiteAttributeFullName);
+        if (classSymbol.AllInterfaces.Length == 0)
+            return null;
 
-            if (suiteAttr?.ConstructorArguments.FirstOrDefault().Value is not INamedTypeSymbol templateSymbol)
-                continue;
-
-            return (classSyntax, classSymbol, templateSymbol);
-        }
-
-        return null;
+        return (classSyntax, classSymbol);
     }
 
     /// <summary>
-    /// Emits a partial class for the implementing class, wiring each <c>[SqlTest]</c>
-    /// template method to its corresponding xUnit <c>[Theory]</c> and <c>[MemberData]</c>.
+    /// Cross-references candidate classes against the parsed templates, emitting a partial
+    /// class for any matching suite contracts they implement.
     /// </summary>
-    /// <param name="context">The Roslyn source production context.</param>
-    /// <param name="target">The resolved generation target.</param>
-    /// <param name="templates">All parsed template records from AdditionalFiles.</param>
     private static void Execute(
         SourceProductionContext context,
-        (ClassDeclarationSyntax ClassSyntax, INamedTypeSymbol ClassSymbol, INamedTypeSymbol TemplateSymbol) target,
+        (ClassDeclarationSyntax ClassSyntax, INamedTypeSymbol ClassSymbol) target,
         ImmutableArray<ParsedTemplate?> templates)
     {
         var className = target.ClassSymbol.Name;
         var namespaceName = target.ClassSymbol.ContainingNamespace.ToDisplayString();
         var rawFilePath = target.ClassSymbol.Locations.FirstOrDefault()?.SourceTree?.FilePath;
         var normalizedPath = rawFilePath?.Replace('\\', '/');
-        var templateName = target.TemplateSymbol.Name;
 
-        // Locate the pre-parsed template class by name.
-        ParsedTemplateClass? templateClass = null;
-        ImmutableArray<string> templateUsings = ImmutableArray<string>.Empty;
-
-        foreach (var template in templates)
+        // 1. Identify candidate suite interfaces.
+        // An interface is a candidate if it EITHER explicitly inherits the base marker,
+        // OR is targeted by a [SqlTestSuite] attribute on a template class.
+        var candidateInterfaces = new List<INamedTypeSymbol>();
+        
+        foreach (var iface in target.ClassSymbol.AllInterfaces)
         {
-            if (template is null) continue;
-            var found = template.Classes.FirstOrDefault(c => c.Name == templateName);
-            if (found is not null)
+            if (iface.Name == GeneratorConstants.SqlTestSuiteBaseInterfaceName) 
+                continue;
+
+            bool inheritsBase = iface.AllInterfaces.Any(bi => bi.Name == GeneratorConstants.SqlTestSuiteBaseInterfaceName);
+            
+            bool mappedInTemplate = false;
+            foreach (var template in templates)
             {
-                templateClass = found;
-                templateUsings = template.Usings;
-                break;
+                if (template is null) continue;
+                if (template.Classes.Any(tc => tc.InterfaceName == iface.Name))
+                {
+                    mappedInTemplate = true;
+                    break;
+                }
+            }
+
+            if (inheritsBase || mappedInTemplate)
+            {
+                candidateInterfaces.Add(iface);
             }
         }
 
-        if (templateClass is null) return;
+        if (candidateInterfaces.Count == 0) return;
 
-        // Re-parse the pre-extracted class text (cheap: it's already been parsed once in the pipeline).
-        var reparsedTree = CSharpSyntaxTree.ParseText(templateClass.FullText);
-        var classSyntax = reparsedTree.GetRoot().DescendantNodes()
-            .OfType<ClassDeclarationSyntax>()
-            .FirstOrDefault(c => c.Identifier.Text == templateName);
-
-        if (classSyntax is null) return;
-
-        // Validate every [SqlTest("X")] attribute against the suite contract interface using the
-        // semantic model — catches renames and typos at compile time rather than silently dropping tests.
-        ValidateTestDataMembers(context, target);
-
-        var sb = new StringBuilder();
-        sb.AppendLine("// <auto-generated/>");
-
-        // Collect standard and template usings, then deduplicate.
-        var usingsList = new List<string>
+        // 2. Process each candidate
+        foreach (var contract in candidateInterfaces)
         {
-            "using SqlInterpol;",
-            "using SqlInterpol.Schema;",
-            "using SqlInterpol.Testing.Specifications;",
-            "using SqlInterpol.Testing.Xunit;",
-            "using Xunit;"
-        };
+            // --- ENFORCEMENT 1: Must inherit ISqlTestSuiteBase ---
+            bool inheritsBase = contract.AllInterfaces.Any(bi => bi.Name == GeneratorConstants.SqlTestSuiteBaseInterfaceName);
+            if (!inheritsBase)
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    SqlTestingDiagnostics.InvalidSuiteContractDiagnostic,
+                    target.ClassSyntax.GetLocation(),
+                    contract.Name));
+                
+                continue; // Skip generation for this invalid contract
+            }
 
-        usingsList.AddRange(templateUsings);
+            // Find matching template
+            ParsedTemplateClass? templateClass = null;
+            ImmutableArray<string> templateUsings = ImmutableArray<string>.Empty;
 
-        foreach (var usingDirective in usingsList.Distinct())
-            sb.AppendLine(usingDirective);
+            foreach (var template in templates)
+            {
+                if (template is null) continue;
+                foreach (var tc in template.Classes)
+                {
+                    if (contract.Name == tc.InterfaceName)
+                    {
+                        templateClass = tc;
+                        templateUsings = template.Usings;
+                        break;
+                    }
+                }
+                if (templateClass is not null) break;
+            }
 
-        sb.AppendLine();
-        sb.AppendLine($"namespace {namespaceName};");
-        sb.AppendLine();
+            // --- ENFORCEMENT 2: Template must exist ---
+            if (templateClass is null)
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    SqlTestingDiagnostics.MissingTemplateDiagnostic,
+                    target.ClassSyntax.GetLocation(),
+                    className,
+                    contract.Name));
+                
+                continue; // Skip generation for this missing contract
+            }
 
-        // Partial class merges with the user's handwritten test data file.
-        sb.AppendLine($"public partial class {className}");
-        sb.Append("{");
+            // Re-parse the pre-extracted class text.
+            var reparsedTree = CSharpSyntaxTree.ParseText(templateClass.FullText);
+            var templateClassSyntax = reparsedTree.GetRoot().DescendantNodes()
+                .OfType<ClassDeclarationSyntax>()
+                .FirstOrDefault(c => c.Identifier.Text == templateClass.Name);
 
-        // Pre-filter ignored members so our spacing logic is accurate regardless of member order
-        var activeMembers = classSyntax.Members
-            .Where(m => !m.AttributeLists
-                .SelectMany(al => al.Attributes)
-                .Any(a => a.Name.ToString() is "SqlIgnoreMember" or "SqlIgnoreMemberAttribute"))
-            .ToList();
+            if (templateClassSyntax is null) continue;
 
-        for (int i = 0; i < activeMembers.Count; i++)
-        {
+            // Validate the test data members exist
+            ValidateTestDataMembers(context, target.ClassSyntax, contract, templateClassSyntax);
+
+            var sb = new StringBuilder();
+            sb.AppendLine("// <auto-generated/>");
+
+            var usingsList = new List<string>
+            {
+                "using SqlInterpol;",
+                "using SqlInterpol.Schema;",
+                "using SqlInterpol.Testing.Specifications;",
+                "using SqlInterpol.Testing.Xunit;",
+                "using Xunit;"
+            };
+            usingsList.AddRange(templateUsings);
+
+            foreach (var usingDirective in usingsList.Distinct())
+                sb.AppendLine(usingDirective);
+
             sb.AppendLine();
+            sb.AppendLine($"namespace {namespaceName};");
+            sb.AppendLine();
+            sb.AppendLine($"public partial class {className}");
+            sb.Append("{");
 
-            EmitMember(sb, activeMembers[i], target.ClassSymbol, normalizedPath);
+            var activeMembers = templateClassSyntax.Members
+                .Where(m => !m.AttributeLists
+                    .SelectMany(al => al.Attributes)
+                    .Any(a => a.Name.ToString() is "SqlIgnoreMember" or "SqlIgnoreMemberAttribute"))
+                .ToList();
 
-            // Add exact spacing between active members, but not after the last one
-            if (i < activeMembers.Count - 1)
+            for (int i = 0; i < activeMembers.Count; i++)
             {
-                sb.AppendLine(); 
+                sb.AppendLine();
+                EmitMember(sb, activeMembers[i], target.ClassSymbol, normalizedPath);
+                if (i < activeMembers.Count - 1) sb.AppendLine(); 
             }
+
+            sb.AppendLine(); 
+            sb.Append("}");
+
+            // Generate a unique file name in case a class implements multiple suites
+            context.AddSource($"{className}_{contract.Name}.g.cs", SourceText.From(sb.ToString(), Encoding.UTF8));
         }
-
-        sb.AppendLine(); 
-        sb.Append("}");
-
-        context.AddSource($"{className}.g.cs", SourceText.From(sb.ToString(), Encoding.UTF8));
     }
 
     /// <summary>
     /// Validates that every <c>[SqlTest("X")]</c> attribute on a template method references
     /// a property <c>X</c> that is actually declared on the suite contract interface.
-    /// Uses the compiled <see cref="INamedTypeSymbol"/> for the template class, which is more
-    /// reliable than text parsing and catches renames and typos at compile time.
     /// </summary>
-    /// <remarks>
-    /// Without this check a mismatched property name causes the test method to be silently
-    /// dropped from the generated output — the developer sees no error and no test.
-    /// </remarks>
-    /// <param name="context">The Roslyn source production context used to report diagnostics.</param>
-    /// <param name="target">The resolved generation target containing class and template symbols.</param>
     private static void ValidateTestDataMembers(
         SourceProductionContext context,
-        (ClassDeclarationSyntax ClassSyntax, INamedTypeSymbol ClassSymbol, INamedTypeSymbol TemplateSymbol) target)
+        ClassDeclarationSyntax targetClassSyntax,
+        INamedTypeSymbol suiteInterface,
+        ClassDeclarationSyntax templateClassSyntax)
     {
-        // Locate the suite contract interface (the one carrying [SqlTestSuite]).
-        var suiteInterface = target.ClassSymbol.AllInterfaces.FirstOrDefault(
-            i => i.GetAttributes().Any(
-                a => a.AttributeClass?.ToDisplayString() == GeneratorConstants.SqlTestSuiteAttributeFullName));
-
-        if (suiteInterface is null) return;
-
-        // Iterate template methods via the semantic symbol — this reads compiled attribute metadata,
-        // not raw text, so it handles all attribute syntaxes (full name, alias, etc.) correctly.
-        foreach (var templateMethod in target.TemplateSymbol.GetMembers().OfType<IMethodSymbol>())
+        foreach (var templateMethod in templateClassSyntax.Members.OfType<MethodDeclarationSyntax>())
         {
-            var sqlTestAttr = templateMethod.GetAttributes().FirstOrDefault(
-                a => a.AttributeClass?.ToDisplayString() == GeneratorConstants.SqlTestAttributeFullName);
+            var sqlTestAttr = templateMethod.AttributeLists
+                .SelectMany(al => al.Attributes)
+                .FirstOrDefault(a => a.Name.ToString() is "SqlTest" or "SqlTestAttribute");
 
             if (sqlTestAttr is null) continue;
 
-            var dataPropertyName = sqlTestAttr.ConstructorArguments.FirstOrDefault().Value?.ToString();
+            var dataPropertyName = ExtractDataPropertyName(sqlTestAttr);
             if (string.IsNullOrWhiteSpace(dataPropertyName)) continue;
 
             if (!suiteInterface.GetMembers(dataPropertyName!).Any())
             {
-                // Point the diagnostic at the implementing class declaration so the developer
-                // sees it in their own file. The message guides them to fix either the interface
-                // or the [SqlTest] attribute in the template.
                 context.ReportDiagnostic(Diagnostic.Create(
                     SqlTestingDiagnostics.MismatchedTestDataMemberDiagnostic,
-                    target.ClassSyntax.GetLocation(),
+                    targetClassSyntax.GetLocation(),
                     dataPropertyName,
-                    templateMethod.Name,
-                    target.TemplateSymbol.Name,
+                    templateMethod.Identifier.Text,
+                    templateClassSyntax.Identifier.Text,
                     suiteInterface.Name));
             }
         }
@@ -384,5 +410,5 @@ public sealed class SqlTestSuiteGenerator : IIncrementalGenerator
     /// <summary>
     /// Lightweight, equatable snapshot of a single class declaration extracted from an additional file.
     /// </summary>
-    private sealed record ParsedTemplateClass(string Name, string FullText);
+    private sealed record ParsedTemplateClass(string Name, string InterfaceName, string FullText);
 }
