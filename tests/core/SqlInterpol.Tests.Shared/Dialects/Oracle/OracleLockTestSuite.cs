@@ -1,3 +1,4 @@
+using SqlInterpol.Configuration;
 using SqlInterpol.Testing.Specifications;
 using SqlInterpol.Testing.Xunit;
 using Xunit;
@@ -8,7 +9,7 @@ public partial class OracleLockTestSuite : ILockTestSuite
 {
     private static object[] _expectedParameters = [5];
 
-    public SqlBuilder CreateBuilder() => SqlBuilder.Oracle();
+    public SqlBuilder CreateBuilder(SqlInterpolOptions? options = null) => SqlBuilder.Oracle(options);
 
     public static TheoryData<SqlTestCase> SelectWithForUpdateData => 
     [

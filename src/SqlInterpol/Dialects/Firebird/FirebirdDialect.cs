@@ -70,7 +70,7 @@ public partial class FirebirdDialect : SqlDialectBase
             var targetDecl = delete.Target.ToSql(context).Trim();
             var fromClause = AsKeywordRegex().Replace(delete.FromClause.ToSql(context).Trim(), "").Replace("  ", " ");
             var whereClause = delete.WhereClause?.ToSql(context).Trim() ?? "1=1";
-            var indent = new string(' ', context.Options.IndentSize);
+            var indent = new string(' ', context.Options.Value.IndentSize);
 
             return $"DELETE FROM {targetDecl}{Environment.NewLine}WHERE EXISTS ({Environment.NewLine}{indent}SELECT 1{Environment.NewLine}{indent}FROM {fromClause}{Environment.NewLine}{indent}WHERE {whereClause}{Environment.NewLine})";
         }

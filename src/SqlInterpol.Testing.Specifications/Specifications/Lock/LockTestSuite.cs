@@ -1,12 +1,11 @@
-using SqlInterpol.Schema;
 using SqlInterpol.Testing.Xunit;
 
 namespace SqlInterpol.Testing.Specifications;
 
 [SqlTestSuite(typeof(ILockTestSuite))]
-public abstract class LockTestSuite
+public abstract partial class LockTestSuite
 {
-    [SqlIgnoreMember]
+    [SqlGeneratorIgnore]
     public abstract SqlBuilder CreateBuilder();
 
     [SqlTest(nameof(ILockTestSuite.SelectWithForUpdateData))]
@@ -47,16 +46,5 @@ public abstract class LockTestSuite
 
         testCase.Assert();
         db.AssertAotIntercepted();
-    }
-
-    [SqlTable(name: "Products", schema: "dbo")]
-    public class Product
-    {
-        public int Id { get; set; }
-        [SqlColumn("PROD_NAME")]
-        public string Name { get; set; } = null!;
-        public bool IsActive { get; set; }
-        public int CategoryId { get; set; }
-        public decimal Price { get; set; }
     }
 }

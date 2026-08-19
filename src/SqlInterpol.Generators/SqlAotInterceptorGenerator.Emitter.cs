@@ -133,7 +133,10 @@ public partial class SqlAotInterceptorGenerator
 
                     sb.AppendLine("            genDb.IsAotIntercepted = true;");
                     sb.AppendLine("            var ctx = genDb.Context;");
-                    sb.AppendLine("            var options = ctx.Options;");
+                    
+                    // FIX: Unbox the strictly non-nullable options!
+                    sb.AppendLine("            var options = ctx.Options.Value;");
+                    
                     sb.AppendLine("            var dialect = ctx.Dialect;");
                     sb.AppendLine("            string dialectKind = dialect.Kind.Value;");
                     sb.AppendLine("            var layout = options.CollectionLayout;");

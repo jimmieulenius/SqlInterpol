@@ -35,6 +35,7 @@ public abstract class SqlSyntaxRewriterBase : ISqlSegmentRewriter
             if (segment.Type == SqlSegmentType.Literal && segment.Value is string literalValue)
             {
                 var newValue = literalValue;
+
                 if (droppedAs)
                 {
                     if (newValue.StartsWith(" ")) newValue = newValue[1..];
@@ -87,8 +88,10 @@ public abstract class SqlSyntaxRewriterBase : ISqlSegmentRewriter
     protected virtual string TranspileConcatOperator(string value) => value;
     
     protected virtual bool DropTableAliasAsKeyword => false;
+
     protected virtual SqlSegment ProcessRecursiveSegments(SqlSegment segment, ISqlContext context) => segment;
     protected virtual string ProcessLiteral(string literal) => literal;
+
     protected virtual bool TryRewriteLock(SqlLockFragment lockFrag, IReadOnlyList<SqlSegment> segments, List<SqlSegment> rewritten, ref int i) => false;
     protected virtual bool TryRewriteUpsert(SqlSegment segment, IReadOnlyList<SqlSegment> segments, List<SqlSegment> rewritten, ref int i) => false;
     protected virtual bool TryRewriteReturning(SqlSegment segment, IReadOnlyList<SqlSegment> segments, List<SqlSegment> rewritten, ref int i) => false;
@@ -119,17 +122,17 @@ public abstract class SqlSyntaxRewriterBase : ISqlSegmentRewriter
         }
     }
 
-    protected virtual SqlMultiTableUpdateFragment? CreateMultiTableUpdate(SqlUpdateAsFragment upAsFrag, SqlSetFragment setFrag, List<SqlSegment> rewritten, int whereKeywordIdx, ISqlContext context) 
+    protected virtual SqlMultiTableUpdateFragment? CreateMultiTableUpdate(SqlUpdateAsFragment upAsFrag, SqlSetFragment setFrag, List<SqlSegment> rewritten, int whereKeywordIdx, ISqlContext context)
         => null;
 
     // Shared Rewriter Utilities
     protected bool TryRewriteStandardOnConflict(SqlSegment segment, IReadOnlyList<SqlSegment> segments, List<SqlSegment> rewritten, ref int i)
     {
         bool isOnConflict = segment.HasTag(SqlSegmentTag.OnConflictKeyword) || 
-            (segment.Type == SqlSegmentType.Literal && segment.Value is string s1 && SqlRewriterHelpers.ContainsKeyword(s1, SqlKeyword.OnConflict.Value));
+             (segment.Type == SqlSegmentType.Literal && segment.Value is string s1 && SqlRewriterHelpers.ContainsKeyword(s1, SqlKeyword.OnConflict.Value));
 
         if (!isOnConflict) return false;
-
+        
         var conflictCols = new List<ISqlProjection>();
         int doIdx = -1;
         int lookahead = 1;
@@ -138,7 +141,7 @@ public abstract class SqlSyntaxRewriterBase : ISqlSegmentRewriter
         {
             var next = segments[i + lookahead];
             bool isDo = next.HasTag(SqlSegmentTag.DoUpdateSetKeyword) || 
-                        (next.Type == SqlSegmentType.Literal && next.Value is string s2 && SqlRewriterHelpers.ContainsKeyword(s2, SqlKeyword.Do.Value));
+                         (next.Type == SqlSegmentType.Literal && next.Value is string s2 && SqlRewriterHelpers.ContainsKeyword(s2, SqlKeyword.Do.Value));
 
             if (isDo)
             {
@@ -166,10 +169,31 @@ public abstract class SqlSyntaxRewriterBase : ISqlSegmentRewriter
 
             rewritten.Add(new SqlSegment(SqlSegmentType.Literal, "\nON CONFLICT "));
             rewritten.Add(new SqlSegment(SqlSegmentType.Raw, new SqlConflictTargetFragment(conflictCols)));
+            
+            // Revert SqlCoreSyntaxRewriter's parenthesis mutation!
+            var doSegment = segments[doIdx];
+            if (doSegment.Value is string doText)
+            {
+                string cleanDoText = doText.TrimStart();
+                if (cleanDoText.StartsWith(')'))
+                {
+                    cleanDoText = cleanDoText[1..].TrimStart();
+                    rewritten.Add(new SqlSegment(SqlSegmentType.Literal, "\n" + cleanDoText, doSegment.RenderMode, doSegment.Tags));
+                }
+                else
+                {
+                    rewritten.Add(doSegment);
+                }
+            }
+            else
+            {
+                rewritten.Add(doSegment);
+            }
 
-            i = doIdx - 1;
+            i = doIdx; // Set index to doIdx so the loop increments to doIdx + 1, skipping it!
             return true;
         }
+
         return false;
     }
 
@@ -178,14 +202,18 @@ public abstract class SqlSyntaxRewriterBase : ISqlSegmentRewriter
         private readonly string _columnName;
         public ISqlReference Reference => null!; 
         public string PropertyName => _columnName;
+
         public SqlUnqualifiedColumn(string columnName) => _columnName = columnName;
+
         public string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default) => context.Dialect.QuoteIdentifier(_columnName);
     }
 
     protected class SqlConflictTargetFragment : ISqlFragment
     {
         private readonly IReadOnlyList<ISqlProjection> _columns;
+
         public SqlConflictTargetFragment(IReadOnlyList<ISqlProjection> columns) => _columns = columns;
+
         public string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
         {
             var cols = _columns.Select(c => c.ToSql(context, SqlRenderMode.BaseName));

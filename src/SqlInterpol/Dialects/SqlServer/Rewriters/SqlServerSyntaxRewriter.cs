@@ -25,7 +25,12 @@ public class SqlServerSyntaxRewriter : SqlSyntaxRewriterBase
     protected override string ProcessLiteral(string literal)
     {
         if (literal.Contains("WITH RECURSIVE", StringComparison.OrdinalIgnoreCase)) 
-            return SqlSegmentPreprocessor.SafeReplaceKeyword(literal, "WITH RECURSIVE", "WITH");
+            return SqlLexicalHelper.ReplaceKeyword(literal, "WITH RECURSIVE", "WITH");
+
+        // MySQL-specific upsert syntax — SQL Server uses MERGE instead.
+        if (literal.Contains("ON DUPLICATE KEY", StringComparison.OrdinalIgnoreCase))
+            throw new SqlDialectException(SqlDialectKind.SqlServer.ToString(), "ON DUPLICATE KEY UPDATE");
+
         return literal;
     }
 
@@ -105,6 +110,14 @@ public class SqlServerSyntaxRewriter : SqlSyntaxRewriterBase
             i += (lookahead - 1); 
             return true;
         }
+
+        // ON CONFLICT without a DO UPDATE SET clause (e.g. DO NOTHING) cannot be emulated by MERGE.
+        // SQL Server MERGE always requires a matched action; any other ON CONFLICT pattern is unsupported.
+        if (setFrag == null)
+        {
+            throw new SqlDialectException(SqlDialectKind.SqlServer.ToString(), "ON CONFLICT DO NOTHING");
+        }
+
         return false;
     }
 

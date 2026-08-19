@@ -30,7 +30,18 @@ public class SqlServerMergeFragment(
         
         var usingClause = $"USING (VALUES {string.Join(", ", sourceRows)}) AS source({string.Join(", ", insertCols)})";
         var onClause = string.Join(" AND ", conflictColumns.Select(c => $"target.{c.ToSql(context, SqlRenderMode.BaseName)} = source.{c.ToSql(context, SqlRenderMode.BaseName)}"));
-        var updateSets = updateFragment.Assignments.Select(a => $"target.{a.Reference.ToSql(context, SqlRenderMode.BaseName)} = {a.ToSql(context).Split('=').Last().Trim()}");
+
+        // When the update fragment uses SqlExcludedAssignmentFragment (AppendUpsert CRUD case),
+        // reference source.col rather than treating it as a new parameter hole.
+        var updateSets = updateFragment.Assignments.Select(a =>
+        {
+            var colBaseName = a.Reference.ToSql(context, SqlRenderMode.BaseName);
+            string valueExpr = a is SqlExcludedAssignmentFragment
+                ? $"source.{colBaseName}"
+                : a.ToSql(context).Split('=').Last().Trim();
+            return $"target.{colBaseName} = {valueExpr}";
+        });
+
         var insertVals = insertFragment.Assignments[0].Select(a => $"source.{a.Reference.ToSql(context, SqlRenderMode.BaseName)}");
 
         var nl = Environment.NewLine;

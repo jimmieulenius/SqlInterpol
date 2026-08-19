@@ -2,16 +2,17 @@ using SqlInterpol.Testing.Specifications;
 using SqlInterpol.Testing.Xunit;
 using SqlInterpol.Extensibility;
 using Xunit;
+using SqlInterpol.Configuration;
 
 namespace SqlInterpol.Extensibility.Tests.Dialects.CustomDb;
 
 public partial class CustomDbLockTestSuite : ILockTestSuite
 {
-    public SqlBuilder CreateBuilder() => 
+    public SqlBuilder CreateBuilder(SqlInterpolOptions? options = null) => 
 #if CSHARP14_EXTENSION_TYPES
-        SqlBuilder.CustomDb();
+        SqlBuilder.CustomDb(options);
 #else
-        SqlBuilderFactory.CustomDb();
+        SqlBuilderFactory.CustomDb(options);
 #endif
 
     public static TheoryData<SqlTestCase> SelectWithForUpdateData => 

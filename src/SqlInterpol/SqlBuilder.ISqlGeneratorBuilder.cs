@@ -63,7 +63,7 @@ public partial class SqlBuilder : ISqlGeneratorBuilder
                 string? alias = eBase.Reference.Alias;
                 if (!string.IsNullOrEmpty(alias)) return alias;
                 
-                if (wasAutoAliased && Context.Options.EntityAutoAliasing)
+                if (wasAutoAliased && Context.Options.Value.EntityAutoAliasing)
                 {
                     return variableName;
                 }

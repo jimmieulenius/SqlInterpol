@@ -8,10 +8,8 @@
     <Project Path="src/SqlInterpol.Testing.Generators/SqlInterpol.Testing.Generators.csproj" />
     <Project Path="src/SqlInterpol.Testing.Specifications/SqlInterpol.Testing.Specifications.csproj" />
     <Project Path="src/SqlInterpol.Testing.Xunit/SqlInterpol.Testing.Xunit.csproj" />
-
-    <Project Path="src/SqlInterpol.Test/SqlInterpol.Test.csproj" />
-    <Project Path="src/SqlInterpol.Test.Aot/SqlInterpol.Test.Aot.csproj" />
   </Folder>
+  <Folder Name="/tests/" />
 
   <Folder Name="/tests/core/">
     <Project Path="tests/core/SqlInterpol.Tests.Aot/SqlInterpol.Tests.Aot.csproj" />

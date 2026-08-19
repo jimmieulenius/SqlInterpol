@@ -11,7 +11,7 @@ public sealed class SqlRawCollectionFragment(List<string> items) : ISqlCollectio
     /// <inheritdoc />
     public string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
     {
-        var separator = context.Options.CollectionSeparator;
+        var separator = context.Options.Value.CollectionSeparator;
         var list = items.ToList();
         
         if (list.Count == 0) return string.Empty;
@@ -19,7 +19,7 @@ public sealed class SqlRawCollectionFragment(List<string> items) : ISqlCollectio
         if (context.Options.CollectionLayout == SqlCollectionLayout.Vertical)
         {
             separator = separator.TrimEnd();
-            var indent = new string(' ', context.Options.IndentSize);
+            var indent = new string(' ', context.Options.Value.IndentSize);
             return string.Join($"{separator}{Environment.NewLine}{indent}", list);
         }
         return string.Join(separator, list);

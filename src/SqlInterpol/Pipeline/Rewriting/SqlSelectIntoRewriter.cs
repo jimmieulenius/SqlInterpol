@@ -11,7 +11,7 @@ namespace SqlInterpol.Pipeline;
 public class SqlSelectIntoRewriter : ISqlSegmentRewriter
 {
     // Opt-out of transpilation if the user disables Meta-SQL!
-    public bool IsApplicable(ISqlPipelineState state) => state.Context.Options.CrossDialectSqlTranspilation;
+    public bool IsApplicable(ISqlPipelineState state) => state.Context.Options.Value.CrossDialectSqlTranspilation;
 
     public IReadOnlyList<SqlSegment> Rewrite(IReadOnlyList<SqlSegment> segments, ISqlContext context)
     {

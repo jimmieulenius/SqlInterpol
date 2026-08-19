@@ -95,6 +95,43 @@ public static partial class SqlBuilderExtensions
     }
 
     /// <summary>
+    /// Appends a highly-optimized, globally cached UPSERT statement utilizing a key lambda selector.
+    /// </summary>
+    /// <remarks>
+    /// The template is generated once per dialect by running a canonical
+    /// <c>INSERT … ON CONFLICT … DO UPDATE SET</c> segment stream through the dialect's rewriter
+    /// pipeline. Dialect-specific structure (SQL Server MERGE, MySQL ON DUPLICATE KEY UPDATE)
+    /// is produced automatically — no dialect switch required.
+    /// The update portion sets every non-key column to the value that was just inserted.
+    /// </remarks>
+    /// <typeparam name="TEntity">The target table model type.</typeparam>
+    /// <typeparam name="TKey">The type of the selected key structure.</typeparam>
+    /// <typeparam name="TDto">The data transfer object type containing fields to insert/update.</typeparam>
+    /// <param name="builder">The builder instance.</param>
+    /// <param name="entity">The target entity reference.</param>
+    /// <param name="keySelector">A selector designating the key properties (automatically mapped via CallerArgumentExpression).</param>
+    /// <param name="payload">The data payload containing values for the upsert.</param>
+    /// <param name="keyExpression">The compiler-injected string representing the key selection expression.</param>
+    /// <returns>The current builder instance for method chaining.</returns>
+    /// <exception cref="SqlDialectException">
+    /// Thrown when the active dialect does not declare <see cref="SqlFeature.OnConflict"/> support.
+    /// </exception>
+    public static SqlBuilder AppendUpsert<TEntity, TKey, TDto>(
+        this SqlBuilder builder,
+        TEntity entity,
+        TKey keySelector,
+        TDto payload,
+        [CallerArgumentExpression(nameof(keySelector))] string? keyExpression = null)
+    {
+        var keys = ExtractKeyNames<TKey>(keyExpression);
+        var template = SqlCrudTemplateCache.GetUpsertTemplate<TEntity, TDto>(builder.Context.Dialect, keys);
+
+        // Wrap scalars defensively, pass through native enumerables
+        object args = (payload is System.Collections.IEnumerable and not string) ? payload : new[] { payload };
+        return builder.Append(template, args);
+    }
+
+    /// <summary>
     /// Appends a highly-optimized, globally cached DELETE statement utilizing a key lambda selector.
     /// </summary>
     /// <typeparam name="TEntity">The target table model type.</typeparam>

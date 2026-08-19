@@ -1,0 +1,12 @@
+<Project>
+  <!-- .NET 8 Interceptor Opt-In -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net8.0'">
+    <InterceptorsPreviewNamespaces>$(InterceptorsPreviewNamespaces);SqlInterpol.Generators.Generated</InterceptorsPreviewNamespaces>
+  </PropertyGroup>
+
+  <!-- .NET 9+ Interceptor Opt-In -->
+  <PropertyGroup Condition="$([MSBuild]::VersionGreaterThanOrEquals('$(TargetFrameworkVersion)', '9.0'))">
+    <Features>$(Features);InterceptorsPreview</Features>
+    <InterceptorsNamespaces>$(InterceptorsNamespaces);SqlInterpol.Generators.Generated</InterceptorsNamespaces>
+  </PropertyGroup>
+</Project>

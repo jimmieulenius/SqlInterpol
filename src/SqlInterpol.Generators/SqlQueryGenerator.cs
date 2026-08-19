@@ -72,7 +72,12 @@ public class SqlQueryGenerator : IIncrementalGenerator
         sb.AppendLine("");
         sb.AppendLine("using System.Runtime.CompilerServices;");
         sb.AppendLine("using SqlInterpol;");
+        
+        // FIX: Inject the core engine namespaces so the generated code can see db.Entity<T>() and ISqlQuery<T>!
+        sb.AppendLine("using SqlInterpol.Schema;"); 
+        sb.AppendLine("using SqlInterpol.Execution;"); 
         sb.AppendLine("");
+        
         sb.AppendLine($"namespace {namespaceName};");
         sb.AppendLine("");
         sb.AppendLine($"{classAccessibility} static partial class {className}");

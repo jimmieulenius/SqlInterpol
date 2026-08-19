@@ -47,7 +47,7 @@ public class SqlSubqueryDeclarationFragment(ISqlQuery query) : ISqlFragment
             }
         }
 
-        string extraIndent = new string(' ', context.Options.IndentSize);
+        string extraIndent = new string(' ', context.Options.Value.IndentSize);
         string totalBodyIndent = baseIndent + extraIndent;
 
         string[] lines = innerSql.Split(["\r\n", "\r", "\n"], StringSplitOptions.None);

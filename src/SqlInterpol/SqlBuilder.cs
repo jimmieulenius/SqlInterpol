@@ -72,9 +72,8 @@ public partial class SqlBuilder : ISqlEntityRegistry
     /// <param name="options">Optional configuration options. Falls back to dialect defaults if null.</param>
     public SqlBuilder(ISqlDialect dialect, SqlInterpolOptions? options = null)
     {
-        var baseOptions = options ?? SqlInterpolOptions.GetDefault(dialect);
-        var finalOptions = baseOptions with { Dialect = dialect.Kind };
-        var renderer = options?.Renderer ?? SqlSegmentRenderer.Instance;
+        var finalOptions = SqlInterpolOptions.GetOptions(dialect, options);
+        var renderer = finalOptions.Renderer ?? SqlSegmentRenderer.Instance;
         
         Context = new SqlContext(this, dialect, renderer, finalOptions);
     }

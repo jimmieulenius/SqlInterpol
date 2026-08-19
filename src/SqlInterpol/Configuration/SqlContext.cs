@@ -38,7 +38,7 @@ public class SqlContext(SqlBuilder builder, ISqlDialect dialect, ISqlSegmentRend
             throw new SqlParameterLimitException(maxParams, currentCount + 1);
         }
 
-        int index = Options.ParameterIndexStart + currentCount;
+        int index = Options.Value.ParameterIndexStart + currentCount;
         string prefix = Options.ParameterPrefixOverride ?? Dialect.ParameterPrefix;
         string paramKey = $"{prefix}{index}";
         

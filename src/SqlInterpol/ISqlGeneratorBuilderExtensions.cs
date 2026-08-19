@@ -28,7 +28,7 @@ public static class ISqlGeneratorBuilderExtensions
                 builder.AppendRaw("\n");
                 
             if (indentLevel > 0) 
-                builder.AppendRaw(new string(' ', options.IndentSize * indentLevel));
+                builder.AppendRaw(new string(' ', options.Value.IndentSize * indentLevel));
         }
         else if (isNewLine)
         {

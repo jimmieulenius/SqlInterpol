@@ -50,8 +50,8 @@ public class OracleSyntaxRewriter : SqlSyntaxRewriterBase
     protected override string ProcessLiteral(string literal)
     {
         var newValue = literal;
-        if (newValue.Contains("WITH RECURSIVE", StringComparison.OrdinalIgnoreCase)) newValue = SqlSegmentPreprocessor.SafeReplaceKeyword(newValue, "WITH RECURSIVE", "WITH");
-        if (newValue.Contains(SqlKeyword.Except.Value, StringComparison.OrdinalIgnoreCase)) newValue = SqlSegmentPreprocessor.SafeReplaceKeyword(newValue, SqlKeyword.Except.Value, "MINUS");
+        if (newValue.Contains("WITH RECURSIVE", StringComparison.OrdinalIgnoreCase)) newValue = SqlLexicalHelper.ReplaceKeyword(newValue, "WITH RECURSIVE", "WITH");
+        if (newValue.Contains(SqlKeyword.Except.Value, StringComparison.OrdinalIgnoreCase)) newValue = SqlLexicalHelper.ReplaceKeyword(newValue, SqlKeyword.Except.Value, "MINUS");
         return newValue;
     }
 

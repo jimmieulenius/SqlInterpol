@@ -47,7 +47,7 @@ public static partial class SqlBuilderExtensions
         else dummyPoco = (T)RuntimeHelpers.GetUninitializedObject(typeof(T));
         
         string? cleanVarName = ExtractVariableName(varName);
-        string? sqlAlias = alias ?? (builder.Context.Options.EntityAutoAliasing ? cleanVarName : null);
+        string? sqlAlias = alias ?? (builder.Context.Options.Value.EntityAutoAliasing ? cleanVarName : null);
         
         var entity = ((ISqlEntityRegistry)builder).RegisterEntity<T>(name: name, schema: schema, alias: sqlAlias);
         if (!string.IsNullOrEmpty(cleanVarName)) builder.ScopedVariables[cleanVarName] = entity;
@@ -135,7 +135,7 @@ public static partial class SqlBuilderExtensions
     {
         var innerQuery = builder.Query(action);
         string? cleanVarName = ExtractVariableName(varName);
-        string? sqlAlias = alias ?? GetExistingAlias(builder, cleanVarName) ?? (builder.Context.Options.EntityAutoAliasing ? cleanVarName : null);
+        string? sqlAlias = alias ?? GetExistingAlias(builder, cleanVarName) ?? (builder.Context.Options.Value.EntityAutoAliasing ? cleanVarName : null);
         
         var typedQuery = new SqlQuery<T>(innerQuery, sqlAlias);
         if (!string.IsNullOrEmpty(cleanVarName)) builder.ScopedVariables[cleanVarName] = typedQuery;
@@ -161,7 +161,7 @@ public static partial class SqlBuilderExtensions
         [CallerArgumentExpression(nameof(dummyPoco))] string? varName = null)
     {
         string? cleanVarName = ExtractVariableName(varName);
-        string? sqlAlias = alias ?? GetExistingAlias(builder, cleanVarName) ?? (builder.Context.Options.EntityAutoAliasing ? cleanVarName : null);
+        string? sqlAlias = alias ?? GetExistingAlias(builder, cleanVarName) ?? (builder.Context.Options.Value.EntityAutoAliasing ? cleanVarName : null);
         
         var typedQuery = new SqlQuery<T>(existingQuery, sqlAlias);
         if (!string.IsNullOrEmpty(cleanVarName)) builder.ScopedVariables[cleanVarName] = typedQuery;
@@ -190,7 +190,7 @@ public static partial class SqlBuilderExtensions
     {
         var innerQuery = builder.Query(action);
         string? cleanVarName = ExtractVariableName(varName);
-        string? sqlAlias = alias ?? GetExistingAlias(builder, cleanVarName) ?? (builder.Context.Options.EntityAutoAliasing ? cleanVarName : null);
+        string? sqlAlias = alias ?? GetExistingAlias(builder, cleanVarName) ?? (builder.Context.Options.Value.EntityAutoAliasing ? cleanVarName : null);
         
         var typedQuery = new SqlQuery<T>(innerQuery, sqlAlias);
         capturedSubquery = typedQuery;
@@ -221,7 +221,7 @@ public static partial class SqlBuilderExtensions
         else dummyPoco = (T)RuntimeHelpers.GetUninitializedObject(typeof(T));
 
         string? cleanVarName = ExtractVariableName(varName);
-        string? sqlAlias = alias ?? (builder.Context.Options.EntityAutoAliasing ? cleanVarName : null);
+        string? sqlAlias = alias ?? (builder.Context.Options.Value.EntityAutoAliasing ? cleanVarName : null);
         
         _ = ((ISqlEntityRegistry)builder).RegisterEntity<T>(alias: sqlAlias);
         var typedQuery = new SqlQuery<T>(existingQuery, sqlAlias);

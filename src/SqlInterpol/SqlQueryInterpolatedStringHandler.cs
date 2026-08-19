@@ -249,7 +249,7 @@ public ref struct SqlQueryInterpolatedStringHandler
                             var refSegment = _builder.ProcessValue(queryEntityBase.Reference);
                             return new SqlSegment(refSegment.Type, refSegment.Value, resolvedMode, refSegment.Tags);
                         }
-                        else if (resolvedMode == SqlRenderMode.Declaration || (resolvedMode == null && _builder.Context.Options.EntityAutoAliasing))
+                        else if (resolvedMode == SqlRenderMode.Declaration || (resolvedMode == null && _builder.Context.Options.Value.EntityAutoAliasing))
                         {
                             if (string.IsNullOrEmpty(queryEntityBase.Reference.Alias) && queryEntityBase.Reference is ISqlAliasable aliasable)
                             {
@@ -279,7 +279,7 @@ public ref struct SqlQueryInterpolatedStringHandler
                             _       => null
                         };
                         
-                        if (mode == SqlRenderMode.Declaration || (mode == null && format == null && _builder.Context.Options.EntityAutoAliasing))
+                        if (mode == SqlRenderMode.Declaration || (mode == null && format == null && _builder.Context.Options.Value.EntityAutoAliasing))
                         {
                             mode = SqlRenderMode.Declaration;
                             if (string.IsNullOrEmpty(standardEntityBase.Reference.Alias) && standardEntityBase.Reference is ISqlAliasable aliasable)

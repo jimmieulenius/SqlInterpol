@@ -39,7 +39,6 @@ public abstract class SqlDialectBase : ISqlDialect
     /// <inheritdoc />
     public virtual int QueryParametersMaxCount => 999;
 
-
     /// <inheritdoc />
     public virtual SqlInterpolOptions GetDefaultOptions() => (SqlInterpolOptions.DefaultFactory?.Invoke() ?? new SqlInterpolOptions()) with { Dialect = Kind };
 
@@ -201,7 +200,7 @@ public abstract class SqlDialectBase : ISqlDialect
     protected virtual string RenderUpdateCte(SqlUpdateCteFragment fragment, ISqlContext context)
     {
         var quotedAlias = QuoteIdentifier(fragment.Alias);
-        var indent = new string(' ', context.Options.IndentSize);
+        var indent = new string(' ', context.Options.Value.IndentSize);
         var subquerySql = fragment.Subquery.ToSql(context).Trim();
         
         var indentedSubquery = indent + subquerySql.Replace("\n", $"\n{indent}");

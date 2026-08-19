@@ -44,7 +44,7 @@ public sealed class SqlTestSuiteGenerator : IIncrementalGenerator
             .Select(static (target, _) => target!.Value);
 
         // Step 2: Parse AdditionalFiles (.cs) into lightweight, equatable template records.
-        // This builds our reverse lookup map: InterfaceName -> TemplateClassName
+        // We now parse EVERY class declaration (even partials without attributes) so we can merge them later.
         var parsedTemplates = context.AdditionalTextsProvider
             .Where(static file => file.Path.EndsWith(".cs"))
             .Select(static (file, ct) => ParseTemplateFile(file, ct))
@@ -60,10 +60,11 @@ public sealed class SqlTestSuiteGenerator : IIncrementalGenerator
     // ── Private helpers ────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Parses a single additional-file into a lightweight <see cref="ParsedTemplate"/> record.
-    /// Looks specifically for classes annotated with <c>[SqlTestSuite(typeof(I...))]</c>.
+    /// Parses a single additional-file into a lightweight <see cref="ParsedFile"/> record.
+    /// Extracts all class declarations and their members as strings so partial classes can be
+    /// merged during the execution phase.
     /// </summary>
-    private static ParsedTemplate? ParseTemplateFile(AdditionalText file, System.Threading.CancellationToken cancellationToken)
+    private static ParsedFile? ParseTemplateFile(AdditionalText file, System.Threading.CancellationToken cancellationToken)
     {
         var text = file.GetText(cancellationToken)?.ToString();
         if (string.IsNullOrEmpty(text)) return null;
@@ -76,28 +77,31 @@ public sealed class SqlTestSuiteGenerator : IIncrementalGenerator
             .Select(u => u.ToFullString().Trim())
             .ToImmutableArray();
 
-        var classes = new List<ParsedTemplateClass>();
+        var partials = new List<ParsedPartialClass>();
 
         foreach (var c in root.DescendantNodes().OfType<ClassDeclarationSyntax>())
         {
             var attr = c.AttributeLists.SelectMany(al => al.Attributes)
                 .FirstOrDefault(a => a.Name.ToString() is "SqlTestSuite" or "SqlTestSuiteAttribute");
 
+            string? interfaceName = null;
             if (attr?.ArgumentList?.Arguments.FirstOrDefault()?.Expression is TypeOfExpressionSyntax typeOfExpr)
             {
                 // Unpack the interface name from typeof(I...)
-                string interfaceName = typeOfExpr.Type switch
+                interfaceName = typeOfExpr.Type switch
                 {
                     IdentifierNameSyntax id => id.Identifier.Text,
-                    QualifiedNameSyntax qn => qn.Right.Identifier.Text, // Handles Namespace.ILockTestSuite
+                    QualifiedNameSyntax qn => qn.Right.Identifier.Text,
                     _ => typeOfExpr.Type.ToString()
                 };
-
-                classes.Add(new ParsedTemplateClass(c.Identifier.Text, interfaceName, c.ToFullString()));
             }
+
+            // Capture the full raw text of every member inside this partial class declaration
+            var members = c.Members.Select(m => m.ToFullString()).ToImmutableArray();
+            partials.Add(new ParsedPartialClass(c.Identifier.Text, interfaceName, members));
         }
 
-        return classes.Count == 0 ? null : new ParsedTemplate(usings, classes.ToImmutableArray());
+        return partials.Count == 0 ? null : new ParsedFile(usings, partials.ToImmutableArray());
     }
 
     /// <summary>
@@ -117,13 +121,13 @@ public sealed class SqlTestSuiteGenerator : IIncrementalGenerator
     }
 
     /// <summary>
-    /// Cross-references candidate classes against the parsed templates, emitting a partial
-    /// class for any matching suite contracts they implement.
+    /// Cross-references candidate classes against the parsed templates, merging partial templates
+    /// across files and emitting a partial class for any matching suite contracts they implement.
     /// </summary>
     private static void Execute(
         SourceProductionContext context,
         (ClassDeclarationSyntax ClassSyntax, INamedTypeSymbol ClassSymbol) target,
-        ImmutableArray<ParsedTemplate?> templates)
+        ImmutableArray<ParsedFile?> templates)
     {
         var className = target.ClassSymbol.Name;
         var namespaceName = target.ClassSymbol.ContainingNamespace.ToDisplayString();
@@ -131,8 +135,6 @@ public sealed class SqlTestSuiteGenerator : IIncrementalGenerator
         var normalizedPath = rawFilePath?.Replace('\\', '/');
 
         // 1. Identify candidate suite interfaces.
-        // An interface is a candidate if it EITHER explicitly inherits the base marker,
-        // OR is targeted by a [SqlTestSuite] attribute on a template class.
         var candidateInterfaces = new List<INamedTypeSymbol>();
         
         foreach (var iface in target.ClassSymbol.AllInterfaces)
@@ -146,7 +148,7 @@ public sealed class SqlTestSuiteGenerator : IIncrementalGenerator
             foreach (var template in templates)
             {
                 if (template is null) continue;
-                if (template.Classes.Any(tc => tc.InterfaceName == iface.Name))
+                if (template.Partials.Any(tc => tc.InterfaceName == iface.Name))
                 {
                     mappedInTemplate = true;
                     break;
@@ -173,30 +175,24 @@ public sealed class SqlTestSuiteGenerator : IIncrementalGenerator
                     target.ClassSyntax.GetLocation(),
                     contract.Name));
                 
-                continue; // Skip generation for this invalid contract
+                continue; 
             }
 
-            // Find matching template
-            ParsedTemplateClass? templateClass = null;
-            ImmutableArray<string> templateUsings = ImmutableArray<string>.Empty;
-
+            // Find the name of the template class mapping to this contract
+            string? templateClassName = null;
             foreach (var template in templates)
             {
                 if (template is null) continue;
-                foreach (var tc in template.Classes)
+                var match = template.Partials.FirstOrDefault(p => p.InterfaceName == contract.Name);
+                if (match is not null)
                 {
-                    if (contract.Name == tc.InterfaceName)
-                    {
-                        templateClass = tc;
-                        templateUsings = template.Usings;
-                        break;
-                    }
+                    templateClassName = match.Name;
+                    break;
                 }
-                if (templateClass is not null) break;
             }
 
             // --- ENFORCEMENT 2: Template must exist ---
-            if (templateClass is null)
+            if (templateClassName is null)
             {
                 context.ReportDiagnostic(Diagnostic.Create(
                     SqlTestingDiagnostics.MissingTemplateDiagnostic,
@@ -204,14 +200,41 @@ public sealed class SqlTestSuiteGenerator : IIncrementalGenerator
                     className,
                     contract.Name));
                 
-                continue; // Skip generation for this missing contract
+                continue; 
             }
 
-            // Re-parse the pre-extracted class text.
-            var reparsedTree = CSharpSyntaxTree.ParseText(templateClass.FullText);
+            // 3. Aggregate all partial declarations of this template class across all files
+            var allMemberTexts = new List<string>();
+            var templateUsings = new List<string>();
+
+            foreach (var template in templates)
+            {
+                if (template is null) continue;
+                
+                var partialsForClass = template.Partials.Where(p => p.Name == templateClassName).ToList();
+                if (partialsForClass.Count > 0)
+                {
+                    templateUsings.AddRange(template.Usings);
+                    foreach (var pc in partialsForClass)
+                    {
+                        allMemberTexts.AddRange(pc.MemberTexts);
+                    }
+                }
+            }
+
+            // 4. Reconstruct a single unified class for Roslyn to parse so we can easily iterate its members
+            var mergedSource = new StringBuilder();
+            mergedSource.AppendLine($"class {templateClassName} {{");
+            foreach(var m in allMemberTexts) 
+            {
+                mergedSource.AppendLine(m);
+            }
+            mergedSource.AppendLine("}");
+
+            var reparsedTree = CSharpSyntaxTree.ParseText(mergedSource.ToString());
             var templateClassSyntax = reparsedTree.GetRoot().DescendantNodes()
                 .OfType<ClassDeclarationSyntax>()
-                .FirstOrDefault(c => c.Identifier.Text == templateClass.Name);
+                .FirstOrDefault(c => c.Identifier.Text == templateClassName);
 
             if (templateClassSyntax is null) continue;
 
@@ -220,6 +243,7 @@ public sealed class SqlTestSuiteGenerator : IIncrementalGenerator
 
             var sb = new StringBuilder();
             sb.AppendLine("// <auto-generated/>");
+            sb.AppendLine("#nullable enable"); // FIX: Inject nullable context for the generated code!
 
             var usingsList = new List<string>
             {
@@ -243,7 +267,7 @@ public sealed class SqlTestSuiteGenerator : IIncrementalGenerator
             var activeMembers = templateClassSyntax.Members
                 .Where(m => !m.AttributeLists
                     .SelectMany(al => al.Attributes)
-                    .Any(a => a.Name.ToString() is "SqlIgnoreMember" or "SqlIgnoreMemberAttribute"))
+                    .Any(a => a.Name.ToString() is "SqlGeneratorIgnore" or "SqlGeneratorIgnoreAttribute"))
                 .ToList();
 
             for (int i = 0; i < activeMembers.Count; i++)
@@ -403,12 +427,15 @@ public sealed class SqlTestSuiteGenerator : IIncrementalGenerator
     /// Lightweight, equatable snapshot of a single parsed additional-file's content.
     /// Stored in the incremental pipeline to avoid re-parsing unchanged files.
     /// </summary>
-    private sealed record ParsedTemplate(
+    private sealed record ParsedFile(
         ImmutableArray<string> Usings,
-        ImmutableArray<ParsedTemplateClass> Classes);
+        ImmutableArray<ParsedPartialClass> Partials);
 
     /// <summary>
-    /// Lightweight, equatable snapshot of a single class declaration extracted from an additional file.
+    /// Lightweight, equatable snapshot of a single partial class declaration extracted from an additional file.
     /// </summary>
-    private sealed record ParsedTemplateClass(string Name, string InterfaceName, string FullText);
+    private sealed record ParsedPartialClass(
+        string Name, 
+        string? InterfaceName, 
+        ImmutableArray<string> MemberTexts);
 }

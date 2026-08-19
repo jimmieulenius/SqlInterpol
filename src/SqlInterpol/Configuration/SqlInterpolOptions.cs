@@ -16,15 +16,15 @@ public record SqlInterpolOptions
     /// <summary>
     /// A factory method used to generate the default options for every newly created SqlBuilder.
     /// Configure this once at application startup.
-    /// Example: SqlInterpolOptions.DefaultFactory = () => new SqlInterpolOptions { CrossVendorSqlTranspilation = false };
+    /// Example: SqlInterpolOptions.DefaultFactory = () => new SqlInterpolOptions { CrossDialectSqlTranspilation = false };
     /// </summary>
     public static Func<SqlInterpolOptions>? DefaultFactory { get; set; }
 
     /// <summary>
     /// Gets the starting index used when generating parameter names (e.g. <c>0</c> → <c>@p0</c>, <c>1</c> → <c>@p1</c>).
-    /// Defaults to <c>0</c>.
+    /// When <see langword="null"/>, the active dialect's default starting index is used.
     /// </summary>
-    public int ParameterIndexStart { get; init; } = 0;
+    public int? ParameterIndexStart { get; init; }
 
     /// <summary>
     /// Gets an override for the dialect's default parameter prefix (e.g. <c>"@"</c>, <c>":"</c>).
@@ -34,27 +34,27 @@ public record SqlInterpolOptions
 
     /// <summary>
     /// Gets or sets the separator inserted between collection elements.
-    /// Defaults to <c>", "</c>.
+    /// When <see langword="null"/>, defaults to <c>", "</c>.
     /// </summary>
-    public string CollectionSeparator { get; set; } = ", ";
+    public string? CollectionSeparator { get; set; }
 
     /// <summary>
     /// Gets or sets how collection values are laid out in the SQL output.
-    /// Defaults to <see cref="SqlCollectionLayout.Horizontal"/>.
+    /// When <see langword="null"/>, defaults to <see cref="SqlCollectionLayout.Horizontal"/>.
     /// </summary>
-    public SqlCollectionLayout CollectionLayout { get; set; } = SqlCollectionLayout.Horizontal;
+    public SqlCollectionLayout? CollectionLayout { get; set; }
 
     /// <summary>
     /// Gets or sets the number of spaces used for vertical collection indentation.
-    /// Defaults to <c>4</c>.
+    /// When <see langword="null"/>, defaults to <c>4</c>.
     /// </summary>
-    public int IndentSize { get; set; } = 4;
+    public int? IndentSize { get; set; }
 
     /// <summary>
     /// Gets or sets how enum values are rendered in SQL output.
-    /// Defaults to <see cref="SqlEnumFormat.Integer"/>.
+    /// When <see langword="null"/>, defaults to <see cref="SqlEnumFormat.Integer"/>.
     /// </summary>
-    public SqlEnumFormat EnumFormat { get; set; } = SqlEnumFormat.Integer;
+    public SqlEnumFormat? EnumFormat { get; set; }
 
     /// <summary>
     /// Gets or sets a global override for the maximum number of parameters allowed per query.
@@ -65,16 +65,16 @@ public record SqlInterpolOptions
     /// <summary>
     /// Gets or sets a value indicating whether [CallerArgumentExpression] variable names 
     /// (e.g., `out var p`) should automatically be applied as SQL aliases for the generated entities.
-    /// Defaults to false to ensure backward compatibility.
+    /// When <see langword="null"/>, defaults to <see langword="false"/> to ensure backward compatibility.
     /// </summary>
-    public bool EntityAutoAliasing { get; set; } = false;
+    public bool? EntityAutoAliasing { get; set; }
 
     /// <summary>
     /// When true, the engine will structurally transpile known Meta-SQL keywords 
     /// (like LIMIT / OFFSET) into the syntax required by the active database dialect.
-    /// Default is true.
+    /// When <see langword="null"/>, defaults to <see langword="true"/>.
     /// </summary>
-    public bool CrossDialectSqlTranspilation { get; set; } = true;
+    public bool? CrossDialectSqlTranspilation { get; set; }
 
     /// <summary>
     /// Gets the active dialect kind. Set automatically by <see cref="SqlBuilder"/> when constructing the context.
@@ -121,6 +121,11 @@ public record SqlInterpolOptions
     /// If null, telemetry allocation and timing are completely bypassed.
     /// </summary>
     public Action<SqlQueryTelemetry>? OnQueryBuilt { get; set; }
+    
+    /// <summary>
+    /// Provides a resolved, strictly non-nullable view of the configuration options.
+    /// </summary>
+    public SqlInterpolOptionsValue Value => new SqlInterpolOptionsValue(this);
 
     /// <summary>
     /// Creates a new instance of options and automatically applies any globally registered extensions.
@@ -136,13 +141,55 @@ public record SqlInterpolOptions
     }
 
     /// <summary>
-    /// Returns the default <see cref="SqlInterpolOptions"/> for the specified dialect
-    /// by delegating to <see cref="ISqlDialect.GetDefaultOptions"/>.
+    /// Resolves the final options by coalescing the user's explicit overrides safely on top of the dialect's baseline defaults.
     /// </summary>
-    /// <param name="dialect">The dialect whose defaults to retrieve.</param>
-    /// <returns>A new <see cref="SqlInterpolOptions"/> with dialect-appropriate defaults.</returns>
-    public static SqlInterpolOptions GetDefault(ISqlDialect dialect)
+    /// <param name="dialect">The dialect whose defaults provide the baseline.</param>
+    /// <param name="overrides">The optional user-provided overrides.</param>
+    /// <returns>A new <see cref="SqlInterpolOptions"/> combining the dialect's defaults and user overrides.</returns>
+    public static SqlInterpolOptions GetOptions(ISqlDialect dialect, SqlInterpolOptions? overrides = null)
     {
-        return dialect.GetDefaultOptions();
+        var defaultOptions = dialect.GetDefaultOptions();
+        
+        if (overrides == null) 
+        {
+            return defaultOptions with { Dialect = dialect.Kind };
+        }
+
+        // Coalesce the user's explicit overrides safely on top of the defaults.
+        // By using `overrides with { ... }`, we also preserve any lists (Rewriters, Rules) they modified!
+        return overrides with 
+        { 
+            Dialect = dialect.Kind,
+            ParameterIndexStart = overrides.ParameterIndexStart ?? defaultOptions.ParameterIndexStart,
+            ParameterPrefixOverride = overrides.ParameterPrefixOverride ?? defaultOptions.ParameterPrefixOverride,
+            CollectionSeparator = overrides.CollectionSeparator ?? defaultOptions.CollectionSeparator,
+            CollectionLayout = overrides.CollectionLayout ?? defaultOptions.CollectionLayout,
+            IndentSize = overrides.IndentSize ?? defaultOptions.IndentSize,
+            EnumFormat = overrides.EnumFormat ?? defaultOptions.EnumFormat,
+            QueryParametersMaxCount = overrides.QueryParametersMaxCount ?? defaultOptions.QueryParametersMaxCount,
+            EntityAutoAliasing = overrides.EntityAutoAliasing ?? defaultOptions.EntityAutoAliasing,
+            CrossDialectSqlTranspilation = overrides.CrossDialectSqlTranspilation ?? defaultOptions.CrossDialectSqlTranspilation,
+            Preprocessor = overrides.Preprocessor ?? defaultOptions.Preprocessor,
+            Renderer = overrides.Renderer ?? defaultOptions.Renderer,
+            OnQueryBuilt = overrides.OnQueryBuilt ?? defaultOptions.OnQueryBuilt
+        };
     }
+}
+
+/// <summary>
+/// A lightweight wrapper providing non-nullable access to SQL options, returning safe 
+/// defaults to satisfy the type system. (Note: Inside the engine, dialect defaults are 
+/// already merged by GetOptions() before accessing this, so these defaults are purely fallback guarantees).
+/// </summary>
+public readonly struct SqlInterpolOptionsValue(SqlInterpolOptions opt)
+{
+    public int ParameterIndexStart => opt.ParameterIndexStart ?? 0;
+    public string? ParameterPrefixOverride => opt.ParameterPrefixOverride;
+    public string CollectionSeparator => opt.CollectionSeparator ?? ", ";
+    public SqlCollectionLayout CollectionLayout => opt.CollectionLayout ?? SqlCollectionLayout.Horizontal;
+    public int IndentSize => opt.IndentSize ?? 4;
+    public SqlEnumFormat EnumFormat => opt.EnumFormat ?? SqlEnumFormat.Integer;
+    public int QueryParametersMaxCount => opt.QueryParametersMaxCount ?? 999;
+    public bool EntityAutoAliasing => opt.EntityAutoAliasing ?? false;
+    public bool CrossDialectSqlTranspilation => opt.CrossDialectSqlTranspilation ?? true;
 }

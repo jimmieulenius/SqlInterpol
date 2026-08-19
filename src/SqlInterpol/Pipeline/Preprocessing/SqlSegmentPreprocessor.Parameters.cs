@@ -1,8 +1,4 @@
-using System;
 using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
 using SqlInterpol.Schema;
 using SqlInterpol.Segments;
 
@@ -15,7 +11,6 @@ public partial class SqlSegmentPreprocessor
         if (segment.Type != SqlSegmentType.Unresolved) return false;
         var value = segment.Value;
         
-        // 1. FIX: Safely unwrap ISqlDeclaration to prevent it from triggering the DTO class check!
         ISqlEntityBase? entity = value as ISqlEntityBase;
         if (value is ISqlDeclaration declaration)
         {

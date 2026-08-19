@@ -21,14 +21,14 @@ public class SqlCollectionFragmentBase<T>(IEnumerable<T> items, string? separato
     /// <inheritdoc />
     public string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
     {
-        string currentSeparator = Separator ?? context.Options.CollectionSeparator;
+        string currentSeparator = Separator ?? context.Options.Value.CollectionSeparator;
         var list = Items.Select(i => i.ToSql(context, mode)).ToList();
         
         if (list.Count == 0) return string.Empty;
 
-        if (context.Options.CollectionLayout == SqlCollectionLayout.Vertical)
+        if (context.Options.Value.CollectionLayout == SqlCollectionLayout.Vertical)
         {
-            var indent = new string(' ', context.Options.IndentSize);
+            var indent = new string(' ', context.Options.Value.IndentSize);
             return $"{Environment.NewLine}{indent}{string.Join($"{currentSeparator.TrimEnd()}{Environment.NewLine}{indent}", list)}";
         }
         return string.Join(currentSeparator, list);

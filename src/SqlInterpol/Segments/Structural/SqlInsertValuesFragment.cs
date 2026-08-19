@@ -53,7 +53,7 @@ public class SqlInsertValuesFragment : ISqlFragment, ISqlParameterGenerator
 
         var firstRow = _bulkAssignments[0];
         var columnNames = new SqlCollectionFragment([.. firstRow.Select(a => new SqlRawFragment(a.Reference.ToSql(context, SqlRenderMode.BaseName)))]);
-        var separator = context.Options.CollectionSeparator;
+        var separator = context.Options.Value.CollectionSeparator;
         var valuesBlocks = new List<string>();
 
         foreach (var row in _bulkAssignments)

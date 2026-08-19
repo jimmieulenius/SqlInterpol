@@ -24,7 +24,7 @@ public class SqlUpdateFragment(ISqlEntityBase entity, IEnumerable<SqlAssignmentF
     /// <inheritdoc />
     public string ToSql(ISqlContext context, SqlRenderMode mode = SqlRenderMode.Default)
     {
-        var separator = context.Options.CollectionSeparator;
+        var separator = context.Options.Value.CollectionSeparator;
         string updateSql = $"{SqlKeyword.Update} {entity.Declaration.ToSql(context)}";
         
         var list = assignments.Select(a => a.ToSql(context)).ToList();
@@ -33,7 +33,7 @@ public class SqlUpdateFragment(ISqlEntityBase entity, IEnumerable<SqlAssignmentF
         if (context.Options.CollectionLayout == SqlCollectionLayout.Vertical)
         {
             separator = separator.TrimEnd();
-            var indent = new string(' ', context.Options.IndentSize);
+            var indent = new string(' ', context.Options.Value.IndentSize);
             setClause = $"{Environment.NewLine}{indent}{string.Join($"{separator}{Environment.NewLine}{indent}", list)}";
         }
         else

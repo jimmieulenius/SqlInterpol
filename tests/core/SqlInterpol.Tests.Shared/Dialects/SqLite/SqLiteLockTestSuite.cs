@@ -1,3 +1,4 @@
+using SqlInterpol.Configuration;
 using SqlInterpol.Testing.Specifications;
 using SqlInterpol.Testing.Xunit;
 using Xunit;
@@ -6,7 +7,7 @@ namespace SqlInterpol.Tests.Dialects.SqLite;
 
 public partial class SqLiteLockTestSuite : ILockTestSuite
 {
-    public SqlBuilder CreateBuilder() => SqlBuilder.SqLite();
+    public SqlBuilder CreateBuilder(SqlInterpolOptions? options = null) => SqlBuilder.SqLite(options);
 
     public static TheoryData<SqlTestCase> SelectWithForUpdateData => 
     [

@@ -1,3 +1,5 @@
+using SqlInterpol.Configuration;
+
 namespace SqlInterpol.Testing.Specifications;
 
 /// <summary>
@@ -17,6 +19,7 @@ public interface ISqlTestSuiteBase
     /// Creates a fresh <see cref="SqlBuilder"/> for the dialect under test.
     /// Called once per test method invocation by the generated partial class.
     /// </summary>
+    /// <param name="options">Optional configuration settings to customize the builder, such as registering custom preprocessors or formatters.</param>
     /// <returns>A configured <see cref="SqlBuilder"/> ready for SQL generation.</returns>
-    SqlBuilder CreateBuilder();
+    SqlBuilder CreateBuilder(SqlInterpolOptions? options = null);
 }

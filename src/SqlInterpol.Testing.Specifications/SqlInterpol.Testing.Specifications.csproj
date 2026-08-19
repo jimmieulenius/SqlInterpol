@@ -16,6 +16,8 @@
     <ProjectReference Include="..\SqlInterpol.Testing.Generators\SqlInterpol.Testing.Generators.csproj" 
                       OutputItemType="Analyzer" 
                       ReferenceOutputAssembly="false" />
+
+    <ProjectReference Include="..\SqlInterpol.Generators\SqlInterpol.Generators.csproj" OutputItemType="Analyzer"/>
     
     <ProjectReference Include="..\SqlInterpol.Testing.Xunit\SqlInterpol.Testing.Xunit.csproj" />
                       
@@ -38,6 +40,16 @@
   <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0'">
     <Features>InterceptorsPreview</Features>
     <InterceptorsNamespaces>$(InterceptorsNamespaces);SqlInterpol.Testing.Generators.Generated</InterceptorsNamespaces>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net8.0'">
+    <LangVersion>preview</LangVersion>
+    <InterceptorsPreviewNamespaces>$(InterceptorsPreviewNamespaces);SqlInterpol.Testing.Generators.Generated;SqlInterpol.Generators.Generated</InterceptorsPreviewNamespaces>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <Features>InterceptorsPreview</Features>
+    <InterceptorsNamespaces>$(InterceptorsNamespaces);SqlInterpol.Testing.Generators.Generated;SqlInterpol.Generators.Generated</InterceptorsNamespaces>
   </PropertyGroup>
 
 </Project>

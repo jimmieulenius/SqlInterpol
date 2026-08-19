@@ -29,4 +29,8 @@
     <InternalsVisibleTo Include="SqlInterpol.Testing.Xunit" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="SqlInterpol.targets" Pack="true" PackagePath="build\;buildTransitive\" />
+  </ItemGroup>
+
 </Project>

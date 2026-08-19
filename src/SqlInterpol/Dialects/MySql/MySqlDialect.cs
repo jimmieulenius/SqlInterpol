@@ -38,7 +38,8 @@ public class MySqlDialect : SqlDialectBase
             SqlFeature.UpdateAs,
             SqlFeature.UpdatableInlineViews,
             SqlFeature.CreateTableAsSelect,
-            SqlFeature.DeleteAs
+            SqlFeature.DeleteAs,
+            SqlFeature.OnConflict
         };
     
     /// <inheritdoc />

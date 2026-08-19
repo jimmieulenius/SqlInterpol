@@ -8,12 +8,12 @@ namespace SqlInterpol.Pipeline;
 /// The default semantic preprocessor that normalizes text, isolates core DML keywords, 
 /// handles target entity aliases (both hole-bound and plain text), and routes projection mapping.
 /// </summary>
-public partial class SqlSegmentPreprocessor : ISqlSegmentPreprocessor
+public partial class SqlSegmentPreprocessor : SqlSegmentPreprocessorBase
 {
     public static readonly SqlSegmentPreprocessor Instance = new();
 
     /// <inheritdoc />
-    public IReadOnlyList<SqlSegment> Process(IReadOnlyList<SqlSegment> segments, ISqlContext context)
+    public override IReadOnlyList<SqlSegment> Process(IReadOnlyList<SqlSegment> segments, ISqlContext context)
     {
         var state = new SqlPreprocessorState(context, segments.Count + 10);
         
