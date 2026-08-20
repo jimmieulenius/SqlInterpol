@@ -32,7 +32,7 @@ public static class SqlAssert
     /// <param name="expected">The expected array of parameter values.</param>
     /// <param name="actual">The actual array of parameter values extracted from the builder.</param>
     /// <exception cref="EqualException">Thrown when the parameters do not match.</exception>
-    public static void MatchesParameters(object[] expected, object[] actual)
+    public static void MatchesParameters(object?[] expected, object?[] actual)
     {
         Assert.Equal(expected.Length, actual.Length);
 

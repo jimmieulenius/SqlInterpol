@@ -48,8 +48,13 @@ public abstract partial class ParametersTestSuite
         var db = CreateBuilder();
         string name = "Alice";
 
-        // FIX: Sql.Arg("paramName") binds the hole to an argument passed into Build()!
-        testCase.Act(() => db.Append($"SELECT * FROM Users WHERE Name = {Sql.Arg("userName")}").Build(new { userName = name }));
+        testCase.Act(() => 
+        {
+#pragma warning disable SQLIG10
+            return db.Append($"SELECT * FROM Users WHERE Name = {Sql.Arg("userName")}").Build(new { userName = name });
+#pragma warning restore SQLIG10
+        });
+        
         testCase.Assert();
     }
 }
