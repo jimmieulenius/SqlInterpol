@@ -7,6 +7,11 @@ namespace SqlInterpol.Dapper;
 
 public static class SqlInterpolDapperExtensions
 {
+    /// <summary>
+    /// Resolvers for mapping DbConnection Types to a SQL Dialect.
+    /// </summary>
+    public static IList<Func<Type, ISqlDialect?>> ConnectionResolvers { get; } = new List<Func<Type, ISqlDialect?>>();
+
     public static SqlBuilder CreateSqlBuilder(this IDbConnection connection, SqlInterpolOptions? options = null)
         => new(DetectDialect(connection), options);
 
@@ -14,16 +19,26 @@ public static class SqlInterpolDapperExtensions
     private static ISqlDialect DetectDialect(IDbConnection connection)
     {
         var type = connection.GetType();
+        var originalType = type;
+
         while (type != null && type != typeof(object))
         {
+            // 1. Check registered resolvers first
+            foreach (var resolver in ConnectionResolvers)
+            {
+                if (resolver(type) is ISqlDialect customDialect) return customDialect;
+            }
+
+            // 2. Check built-in resolvers
             var dialect = TryMatchType(type);
             if (dialect != null) return dialect;
+            
             type = type.BaseType;
         }
 
         throw new NotSupportedException(
-            $"The connection type '{connection.GetType().Name}' is not automatically mapped to a known SQL dialect. " +
-            "Instantiate SqlBuilder manually and provide a custom ISqlDialect.");
+            $"The connection type '{originalType.Name}' is not automatically mapped to a known SQL dialect. " +
+            "Instantiate SqlBuilder manually and provide a custom ISqlDialect, or register a custom resolver using SqlInterpolDapperExtensions.ConnectionResolvers.Add().");
     }
 
     // Namespace-guarded for SqlConnection: both Microsoft.Data.SqlClient and System.Data.SqlClient use that name.
@@ -129,6 +144,7 @@ public static class SqlInterpolDapperExtensions
             commandTimeout,
             commandType);
     }
+
     public static SqlMapper.GridReader QueryMultiple(
         this IDbConnection connection,
         SqlQueryResult result,
@@ -158,6 +174,7 @@ public static class SqlInterpolDapperExtensions
             commandTimeout,
             commandType);
     }
+
     public static IEnumerable<T> Query<T>(
         this IDbConnection connection,
         SqlQueryResult result,

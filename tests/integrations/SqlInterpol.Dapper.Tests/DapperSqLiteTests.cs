@@ -1,7 +1,4 @@
-﻿using Dapper;
-using Microsoft.Data.Sqlite;
-using SqlInterpol;
-using SqlInterpol.Dapper;
+﻿using Microsoft.Data.Sqlite;
 using SqlInterpol.Schema;
 
 namespace SqlInterpol.Dapper.Tests;

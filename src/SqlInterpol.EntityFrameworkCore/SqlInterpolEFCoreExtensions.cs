@@ -16,6 +16,16 @@ namespace SqlInterpol.EFCore;
 public static class SqlInterpolEFCoreExtensions
 {
     /// <summary>
+    /// Resolvers for mapping EF Core Provider Names to a SQL Dialect.
+    /// </summary>
+    public static IList<Func<string, ISqlDialect?>> ProviderResolvers { get; } = new List<Func<string, ISqlDialect?>>();
+
+    /// <summary>
+    /// Resolvers for mapping DbConnection Types to a SQL Dialect.
+    /// </summary>
+    public static IList<Func<Type, ISqlDialect?>> ConnectionResolvers { get; } = new List<Func<Type, ISqlDialect?>>();
+
+    /// <summary>
     /// Creates a <see cref="SqlBuilder"/> whose dialect is automatically resolved from
     /// the EF Core provider configured on <paramref name="context"/>.
     /// </summary>
@@ -155,12 +165,43 @@ public static class SqlInterpolEFCoreExtensions
     // then falls back to walking the connection's type hierarchy for non-standard providers.
     private static ISqlDialect DetectDialect(DbContext context)
     {
-        var dialect = TryMatchProviderName(context.Database.ProviderName)
-                   ?? TryMatchConnectionHierarchy(context.Database.GetDbConnection());
+        var providerName = context.Database.ProviderName;
+
+        // 1. Check registered provider resolvers first
+        if (providerName != null)
+        {
+            foreach (var resolver in ProviderResolvers)
+            {
+                if (resolver(providerName) is ISqlDialect customDialect) return customDialect;
+            }
+        }
+
+        // 2. Check built-in provider names
+        var dialect = TryMatchProviderName(providerName);
+        if (dialect != null) return dialect;
+
+        // 3. Defer grabbing the relational connection until we actually need it!
+        // (This prevents InvalidOperationExceptions when using non-relational providers like InMemory)
+        var connection = context.Database.GetDbConnection();
+
+        // 4. Check registered connection hierarchy resolvers
+        var type = connection.GetType();
+        var currentType = type;
+        while (currentType != null && currentType != typeof(object))
+        {
+            foreach (var resolver in ConnectionResolvers)
+            {
+                if (resolver(currentType) is ISqlDialect customDialect) return customDialect;
+            }
+            currentType = currentType.BaseType;
+        }
+
+        // 5. Check built-in connection hierarchy
+        dialect = TryMatchConnectionHierarchy(connection);
 
         return dialect ?? throw new NotSupportedException(
-            $"The EF Core provider '{context.Database.ProviderName}' is not automatically mapped to a known SQL dialect. " +
-            "Instantiate SqlBuilder manually and provide a custom ISqlDialect.");
+            $"The EF Core provider '{providerName}' is not automatically mapped to a known SQL dialect. " +
+            "Instantiate SqlBuilder manually and provide a custom ISqlDialect, or register a resolver via SqlInterpolEFCoreExtensions.ProviderResolvers.");
     }
 
     // EF Core provider names are stable, versioned package identifiers — the most reliable signal.

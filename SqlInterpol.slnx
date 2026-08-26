@@ -27,6 +27,7 @@
   <Folder Name="/tests/integrations/">
     <Project Path="tests/integrations/SqlInterpol.Dapper.Tests/SqlInterpol.Dapper.Tests.csproj" />
     <Project Path="tests/integrations/SqlInterpol.EntityFrameworkCore.Tests/SqlInterpol.EntityFrameworkCore.Tests.csproj" />
+    <Project Path="tests/integrations/SqlInterpol.Extensibility.Integrations.Tests/SqlInterpol.Extensibility.Integrations.Tests.csproj" />
   </Folder>
 
   <Folder Name="/benchmarks/">
