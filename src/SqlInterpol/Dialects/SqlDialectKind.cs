@@ -1,4 +1,4 @@
-namespace SqlInterpol.Configuration;
+namespace SqlInterpol.Dialects;
 
 /// <summary>
 /// A strongly-typed identifier for a SQL dialect vendor, used to select dialect-specific

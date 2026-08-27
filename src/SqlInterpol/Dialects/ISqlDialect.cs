@@ -1,6 +1,7 @@
+using SqlInterpol.Configuration;
 using SqlInterpol.Segments;
 
-namespace SqlInterpol.Configuration;
+namespace SqlInterpol.Dialects;
 
 /// <summary>
 /// Defines the dialect-specific behavior for a SQL vendor: identifier quoting, parameter naming,

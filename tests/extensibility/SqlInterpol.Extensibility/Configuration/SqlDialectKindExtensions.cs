@@ -1,7 +1,7 @@
 #if CSHARP14_EXTENSION_TYPES
-using SqlInterpol.Configuration;
+using SqlInterpol.Dialects;
 
-namespace SqlInterpol.Extensibility.Configuration;
+namespace SqlInterpol.Extensibility.Dialects;
 
 public static class SqlDialectKindExtensions
 {

@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using SqlInterpol.Configuration;
+using SqlInterpol.Dialects;
 using SqlInterpol.Execution;
 using SqlInterpol.Pipeline;
 using SqlInterpol.Schema;

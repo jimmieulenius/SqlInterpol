@@ -1,5 +1,6 @@
 using SqlInterpol.Configuration;
 using SqlInterpol.Dapper;
+using SqlInterpol.Dialects;
 using SqlInterpol.Extensibility.Dialects;
 using SqlInterpol.Testing.Xunit;
 using Xunit;

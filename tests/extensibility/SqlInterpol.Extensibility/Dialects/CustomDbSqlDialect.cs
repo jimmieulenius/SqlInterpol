@@ -1,6 +1,5 @@
 using SqlInterpol.Configuration;
 using SqlInterpol.Dialects;
-using SqlInterpol.Extensibility.Configuration;
 
 namespace SqlInterpol.Extensibility.Dialects;
 
@@ -14,11 +13,11 @@ public class CustomDbSqlDialect : SqlDialectBase
     public override string OpenQuote => _openQuote; 
     public override string CloseQuote => _closeQuote;
     
-    public override SqlInterpol.Configuration.SqlDialectKind Kind => 
+    public override SqlInterpol.Dialects.SqlDialectKind Kind => 
 #if CSHARP14_EXTENSION_TYPES
         SqlDialectKind.CustomDb;
 #else
-        Configuration.SqlDialectKind.CustomDb;
+        Dialects.SqlDialectKind.CustomDb;
 #endif
 
     public override IReadOnlySet<SqlFeature> SupportedFeatures { get; } = new HashSet<SqlFeature>

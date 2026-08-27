@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using SqlInterpol.Configuration;
+using SqlInterpol.Dialects;
 using SqlInterpol.EFCore;
 using SqlInterpol.Extensibility.Dialects;
 using SqlInterpol.Testing.Xunit;

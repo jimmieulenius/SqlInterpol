@@ -4,6 +4,7 @@ using System.Data.Common;
 using System.Diagnostics.CodeAnalysis;
 using SqlInterpol.AdoNet;
 using SqlInterpol.Configuration;
+using SqlInterpol.Dialects;
 using SqlInterpol.Extensibility.Dialects;
 using SqlInterpol.Testing.Xunit;
 using Xunit;

@@ -1,3 +1,4 @@
+using SqlInterpol.Dialects;
 using SqlInterpol.Pipeline;
 
 namespace SqlInterpol.Configuration;

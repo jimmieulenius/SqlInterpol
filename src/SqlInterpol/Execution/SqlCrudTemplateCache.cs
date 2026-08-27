@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text;
 using SqlInterpol.Configuration;
+using SqlInterpol.Dialects;
 using SqlInterpol.Pipeline;
 using SqlInterpol.Schema;
 using SqlInterpol.Segments;

@@ -1,4 +1,5 @@
 using SqlInterpol.Configuration;
+using SqlInterpol.Dialects;
 using SqlInterpol.Segments; 
 
 namespace SqlInterpol.Testing.Xunit.Dialects;
