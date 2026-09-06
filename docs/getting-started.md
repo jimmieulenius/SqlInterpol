@@ -10,6 +10,8 @@ Install the core package and the specific integration package for your preferred
 *   **Dapper Integration:** `dotnet add package SqlInterpol.Dapper`
 *   **EF Core Integration:** `dotnet add package SqlInterpol.EntityFrameworkCore`
 
+The core package bundles the Roslyn Analyzer package automatically. See the full **[Analyzer Reference](analyzers.md)** for diagnostics, severity levels, and `.editorconfig` overrides.
+
 ## 2. Global Configuration (Optional)
 
 If you need to configure global options (like vertical collection layouts or default enum formatting), register the engine in your dependency injection container at startup.
@@ -70,7 +72,7 @@ public async Task<List<Product>> GetActiveProductsAsync(AppDbContext context)
     return await context.FromSql<Product>(query).ToListAsync();
 }
 ```
-👉 **Read the full [EF Core Integration Guide](integration-efcore.md)**
+👉 **Read the full [EF Core Integration Guide](integration-entityframeworkcore.md)**
 
 ---
 

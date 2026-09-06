@@ -64,8 +64,8 @@ Controls how collections and arrays in interpolated parameters are formatted wit
 
 | Value | Description | Rendered SQL Example |
 | :--- | :--- | :--- |
-| `SqlCollectionLayout.Horizontal` | Renders elements on a single inline line. | `WHERE id IN (@p0, @p1, @p2)` |
-| `SqlCollectionLayout.Vertical` | Formats elements vertically with indentations for readable logs. | `WHERE id IN (`<br>&nbsp;&nbsp;&nbsp;&nbsp;`@p0,`<br>&nbsp;&nbsp;&nbsp;&nbsp;`@p1`<br>`)` |
+| `SqlCollectionLayout.Horizontal` | Renders elements on a single inline line. | `WHERE id IN ($1, $2, $3)` |
+| `SqlCollectionLayout.Vertical` | Formats elements vertically with indentations for readable logs. | `WHERE id IN (`<br>&nbsp;&nbsp;&nbsp;&nbsp;`$1,`<br>&nbsp;&nbsp;&nbsp;&nbsp;`$2`<br>`)` |
 
 ---
 
@@ -176,10 +176,40 @@ Sets a global ceiling on the maximum number of parameters permitted in a single 
 
 Provides an optional callback invoked whenever a query is compiled. When set to `null`, allocation and timing overhead for telemetry collection are completely bypassed.
 
+The `SqlQueryTelemetry` struct exposes:
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| `CallerMemberName` | `string` | The name of the method that called `Build()`. |
+| `FilePath` | `string` | The source file path of the `Build()` call site. |
+| `LineNumber` | `int` | The line number of the `Build()` call site. |
+| `WasAotIntercepted` | `bool` | Whether the interpolated string was routed through the AOT source generator. |
+| `ParameterCount` | `int` | Number of parameters extracted during this build. |
+| `BuildDuration` | `TimeSpan` | Total wall-clock time for the build pass. |
+
 ```csharp
 options.OnQueryBuilt = telemetry =>
 {
-    Console.WriteLine($"Compiled SQL in {telemetry.ElapsedMilliseconds}ms:");
-    Console.WriteLine(telemetry.Sql);
+    logger.LogDebug(
+        "[{Member} L{Line}] Built {Count} params in {Ms}ms (AOT={Aot})",
+        telemetry.CallerMemberName,
+        telemetry.LineNumber,
+        telemetry.ParameterCount,
+        telemetry.BuildDuration.TotalMilliseconds,
+        telemetry.WasAotIntercepted);
 };
+```
+
+---
+
+## `SqlInterpolOptionsValue` — Resolved Option Access
+
+The `options.Value` property returns a `SqlInterpolOptionsValue` readonly struct that provides non-nullable access to all resolved option values (i.e., after dialect defaults have been applied). Dialect authors and custom renderer implementations should read options through `context.Options.Value` rather than the nullable `context.Options` properties directly.
+
+```csharp
+// Inside a custom ISqlSegmentRenderer.Render() implementation:
+var layout   = context.Options.Value.CollectionLayout;   // SqlCollectionLayout (never null)
+var indent   = context.Options.Value.IndentSize;          // int
+var enumFmt  = context.Options.Value.EnumFormat;          // SqlEnumFormat
+var maxCount = context.Options.Value.QueryParametersMaxCount; // int
 ```

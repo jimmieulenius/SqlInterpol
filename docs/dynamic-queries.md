@@ -63,32 +63,42 @@ public void ApplyCategoryFilter(SqlBuilder db, Product p, int[]? categoryIds)
 {
     if (categoryIds is { Length: > 0 })
     {
-        // Expands to: AND [p].[CategoryId] IN (@p0, @p1, @p2)
+        // Expands to: AND p."CategoryId" IN ($1, $2, $3)
         db.AppendLine($"AND {p.CategoryId} IN {categoryIds}");
     }
 }
 ```
 
-## Dynamic Ordering
+## Dynamic Column References
 
-You can securely alter the `ORDER BY` clause by interpolating the strongly-typed property references dynamically. Never interpolate raw strings for column names to avoid injection risks.
+When column selection is driven by user input or configuration, use the `entity.Column(propertyName)` extension method. It resolves the physical column name from the entity's attribute mapping and emits a properly quoted reference — no `Sql.Raw()` required.
+
+```csharp
+// Validate against an allowlist first, then use .Column() for safe projection
+string[] allowed = ["Name", "Price", "CreatedAt"];
+if (!allowed.Contains(userColumn)) throw new ArgumentException("Invalid column.");
+
+db.AppendLine($"SELECT {p.Column(userColumn)} FROM {p}");
+```
+
+The companion `entity.OrderBy(propertyName, SqlOrderDirection)` builds a type-safe `ORDER BY` fragment from a string name:
 
 ```csharp
 public void ApplySorting(SqlBuilder db, Product p, string sortColumn, bool descending)
 {
-    // Map raw string input to the safe, schema-aware property reference
-    object sortRef = sortColumn.ToLower() switch
-    {
-        "price" => p.Price,
-        "name" => p.Name,
-        _ => p.CreatedAt // Default fallback
-    };
+    string[] allowed = ["Name", "Price", "CreatedAt"];
+    if (!allowed.Contains(sortColumn)) sortColumn = "CreatedAt";
 
-    var direction = descending ? "DESC" : "ASC";
-
-    // Interpolating sortRef guarantees the column is properly quoted
-    db.AppendLine($"ORDER BY {sortRef} {direction}");
+    var direction = descending ? SqlOrderDirection.Descending : SqlOrderDirection.Ascending;
+    db.AppendLine($"ORDER BY {p.OrderBy(sortColumn, direction)}");
 }
+```
+
+For cases where you need to combine a strongly-typed column reference with a direction string (e.g., a switch-mapped property), `Sql.Raw()` is the correct tool for the keyword itself:
+
+```csharp
+object sortRef = sortColumn switch { "price" => p.Price, _ => p.CreatedAt };
+db.AppendLine($"ORDER BY {sortRef} {Sql.Raw(descending ? "DESC" : "ASC")}");
 ```
 
 ## Composable Subqueries
@@ -96,6 +106,9 @@ public void ApplySorting(SqlBuilder db, Product p, string sortColumn, bool desce
 For complex logic, you can capture isolated query blocks and embed them as subqueries within your main statement. The `Query` extension isolates the builder logic into a temporary scope, freezing the result into a strongly-typed `ISqlQuery<T>` that can be interpolated directly into the parent timeline.
 
 Because the subquery natively shares the parent builder's entity registry and variable scope, you can reference outer entities directly inside the `Query` block to effortlessly construct correlated subqueries.
+
+> ℹ️ **Schema attributes and entity mapping**  
+> For information about `[SqlTable]`, `[SqlColumn]`, `[SqlIgnore]`, and `[SqlQueryAttribute]`, see [Schema & Entity Mapping](schema-mapping.md).
 
 ### Inline Subqueries
 
@@ -145,7 +158,7 @@ public static class QueryHelpers
                 SELECT
                     {{c.Name}}
                 FROM {{c}}
-                WHERE {{c.Id}} = {{db.Column(p, nameof(p.CategoryId))}} AND {{c.IsActive}} = {{activeStatus}}
+                WHERE {{c.Id}} = {{p.Column(nameof(p.CategoryId))}} AND {{c.IsActive}} = {{activeStatus}}
                 """));
     }
 }

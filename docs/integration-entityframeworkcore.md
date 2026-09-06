@@ -2,6 +2,17 @@
 
 The `SqlInterpol.EntityFrameworkCore` package bridges type-safe AST generation with EF Core's execution pipeline. It automatically handles dialect resolution via provider names and materializes native `DbParameter` instances for your active database connection.
 
+## When to Use SqlInterpol with EF Core
+
+| Use case | Recommended approach |
+| :--- | :--- |
+| Simple CRUD on a single entity | EF Core LINQ |
+| Complex multi-table queries with filtering, paging, aggregates | SqlInterpol + `FromSql` |
+| Bulk INSERT / UPDATE / DELETE without loading entities | SqlInterpol standalone |
+| Raw SQL with entity tracking and `Include()` | SqlInterpol + `FromSql` |
+
+---
+
 ## Installation
 
 ```bash

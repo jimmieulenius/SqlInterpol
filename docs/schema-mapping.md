@@ -3,8 +3,8 @@
 `SqlInterpol` allows you to bind C# classes and properties directly to database tables, views, and columns using lightweight schema attributes. This provides compile-time safety, automatic column escaping, and context-aware aliasing without requiring verbose fluent mapping definitions.
 
 > ℹ️ **Attribute-Free Mapping (Clean POCOs)**  
-> You do **not** need to use schema attributes if you prefer to keep your domain models strictly decoupled from your database schema. By default, `SqlInterpol` uses the exact C# class and property names. 
-> 
+> You do **not** need to use schema attributes if you prefer to keep your domain models strictly decoupled from your database schema. By default, `SqlInterpol` uses the exact C# class and property names.
+>
 > If your database tables or columns differ from your C# models, you can bridge the gap directly in your SQL text using standard `AS` aliasing:
 > ```csharp
 > // Clean POCO with no SqlInterpol attributes
@@ -295,3 +295,79 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
 
 > ⚠️ **Reflection & Native AOT**  
 > Reading schema attributes via `modelBuilder.MapSqlEntity<T>()` uses runtime reflection marked with `[RequiresUnreferencedCode]`. For full Native AOT applications, use standard EF Core fluent API definitions instead.
+
+---
+
+## Runtime Name Overrides
+
+You can override the physical table name and schema for a specific query call without touching the class attributes. This is useful for querying archive tables, partitioned tables, or temp tables that share the same column shape as a mapped model.
+
+```csharp
+// Queries "history"."products_archive" but column references use the Product attribute mapping
+db.Entity<Product>(out var p, name: "products_archive", schema: "history");
+
+var result = db.Append($"""
+    SELECT {p.Id}, {p.Name}
+    FROM {p}
+    WHERE {p.Price} < {100m}
+    """).Build();
+```
+
+**PostgreSQL:**
+```sql
+SELECT "products_archive"."Id", "products_archive"."prod_name"
+FROM "history"."products_archive"
+WHERE "products_archive"."Price" < $1
+```
+
+The `alias` parameter can be combined with name/schema overrides:
+```csharp
+db.Entity<Product>(out var p, alias: "arch", name: "products_archive", schema: "history");
+```
+
+---
+
+## Dynamic Column References — `entity.Column()`
+
+When column selection is data-driven (e.g., from a user report configuration), use the `Column(string propertyName)` extension method on any entity variable. It resolves the physical column name from the entity's mapping and emits a properly quoted reference.
+
+```csharp
+db.Entity<Product>(out var p);
+
+// Safe dynamic column reference — no Sql.Raw() required
+string userColumn = "Price"; // from a validated allowlist
+db.Append($"SELECT {p.Column(userColumn)} FROM {p}");
+```
+
+> ⚠️ **Input Validation Required**  
+> Always validate `userColumn` against a known allowlist before passing it to `Column()`. The method resolves against the entity's mapped properties; an unrecognised name throws `ArgumentException`.
+
+The companion `OrderBy(string propertyName, SqlOrderDirection direction)` extension constructs a safe `ORDER BY` fragment from a string property name:
+
+```csharp
+db.AppendLine($"ORDER BY {p.OrderBy("Price", SqlOrderDirection.Descending)}");
+// PostgreSQL: ORDER BY "Products"."Price" DESC
+```
+
+---
+
+## `[SqlQueryAttribute]` — Subquery Helper Methods
+
+Apply `[SqlQuery]` to a `static` method that returns `ISqlQuery<T>`. This signals the Roslyn analyzer that the method builds a correlated subquery and should be held to the same safety constraints as inline query construction.
+
+```csharp
+[SqlQuery]
+public static ISqlQuery<Category> GetCategorySubquery(this SqlBuilder db, Product p, int activeStatus)
+{
+    return db
+        .Entity<Category>(out var c)
+        .Query(c, () => db.Append($"""
+            SELECT {c.Name}
+            FROM {c}
+            WHERE {c.Id} = {p.Column(nameof(p.CategoryId))} AND {c.IsActive} = {activeStatus}
+            """));
+}
+```
+
+> ℹ️ **Method Requirements**  
+> The method must be `static`. The first parameter must be `SqlBuilder` (the extension receiver). See [Dynamic Queries](dynamic-queries.md) for complete usage examples.

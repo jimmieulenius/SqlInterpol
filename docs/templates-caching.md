@@ -144,20 +144,53 @@ db.Append(updateTemplate, new OrderUpdatePayload { Id = 101, CustomerId = 500 })
 
 ## Built-In Bulk Operations
 
-For bulk array operations, manual template construction is unnecessary. `SqlInterpol` provides built-in extensions that manage dialect-specific template compilation and caching under the hood:
+For bulk array operations, manual template construction is unnecessary. `SqlInterpol` provides built-in extensions that manage dialect-specific template compilation and caching under the hood. The key selectors are resolved at compile time via `[CallerArgumentExpression]`, so no string literals are needed.
 
-* **Bulk Insert:** `db.AppendInsert(entity, payloads)`
-* **Bulk Update:** `db.AppendUpdate(entity, entity.Id, payloads)`
-* **Bulk Upsert:** `db.AppendUpsert(entity, entity.Id, payloads)`
-* **Bulk Delete:** `db.AppendDelete(entity, entity.Id, payloads)`
+| Method | Full Signature |
+| :--- | :--- |
+| `AppendInsert` | `AppendInsert<TEntity, TDto>(builder, entity, params TDto[] payloads)` |
+| `AppendInsert` | `AppendInsert<TEntity, TDto>(builder, entity, IEnumerable<TDto> payloads)` |
+| `AppendUpdate` | `AppendUpdate<TEntity, TKey, TDto>(builder, entity, TKey keySelector, TDto payload)` |
+| `AppendUpsert` | `AppendUpsert<TEntity, TKey, TDto>(builder, entity, TKey keySelector, TDto payload)` |
+| `AppendDelete` | `AppendDelete<TEntity, TKey, TDto>(builder, entity, TKey keySelector, TDto payload)` |
+
+The `keySelector` parameter is read via `[CallerArgumentExpression]` — pass the actual property reference (or a tuple of references for composite keys) and the engine extracts the column name automatically:
 
 ```csharp
-var payloads = new[]
+using var db = SqlBuilder.PostgreSql();
+db.Entity<Product>(out var p);
+
+// Single-key INSERT
+db.AppendInsert(p, new ProductDto { Name = "Widget", Price = 9.99m });
+
+// Single-key UPDATE — key column excluded from SET list automatically
+db.AppendUpdate(p, p.Id, new ProductDto { Name = "Widget", Price = 9.99m });
+
+// Upsert — dialect-specific (MERGE on SQL Server, ON CONFLICT on PostgreSQL)
+db.AppendUpsert(p, p.Id, new ProductDto { Id = 42, Name = "Widget", Price = 9.99m });
+
+// Composite key — pass a tuple expression
+db.AppendUpsert(p, (p.TenantId, p.Id), new ProductDto { TenantId = 1, Id = 42, Name = "Widget" });
+
+var result = db.Build();
+```
+
+### Multi-Row INSERT Without Templates
+
+For one-shot multi-row inserts where you do not need template caching, pass a collection directly to `AppendInsert`. The engine generates a single `VALUES (…), (…)` statement:
+
+```csharp
+var rows = new[]
 {
-    new OrderUpdatePayload { Id = 101, CustomerId = 500 },
-    new OrderUpdatePayload { Id = 102, CustomerId = 501 }
+    new ProductDto { Name = "Widget A", Price = 9.99m },
+    new ProductDto { Name = "Widget B", Price = 14.99m },
 };
 
-// Automatically utilizes internal cached templates for batch execution
-var query = db.AppendUpsert(o, o.Id, payloads).Build();
+db.AppendInsert(p, rows);
+```
+
+**PostgreSQL:**
+```sql
+INSERT INTO "Products" ("Name", "Price")
+VALUES ($1, $2), ($3, $4)
 ```

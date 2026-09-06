@@ -13,7 +13,7 @@ namespace SqlInterpol.Analyzers;
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public class UnsupportedDialectFeatureAnalyzer : DiagnosticAnalyzer
 {
-    public const string DiagnosticId = "SQLI005";
+    public const string DiagnosticId = "SQLIA05";
 
     private static readonly DiagnosticDescriptor Rule = new(
         DiagnosticId,

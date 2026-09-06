@@ -10,18 +10,16 @@ For applications running on .NET 8 and .NET 9+, `SqlInterpol` automatically opts
 
 *   **Zero-Allocation Handlers:** The `SqlQueryInterpolatedStringHandler` uses an `ArrayPool<PendingHole>` to capture SQL text literals and typed interpolation holes without triggering per-hole heap allocations.
 *   **Compile-Time Routing:** The source generator maps your C# interpolated strings directly to highly optimized structural segments. The query bypasses the JIT-evaluation path entirely.
-*   **Telemetry & Validation:** The `SqlBuilder` exposes an `IsAotIntercepted` flag to verify successful compile-time routing. 
+*   **Telemetry & Validation:** The `SqlBuilder` exposes an `IsAotIntercepted` flag to verify successful compile-time routing. The `SQLIA07` analyzer (see [Analyzer Reference](analyzers.md)) warns when `Template()` is called on a non-static path. 
 
-You can strictly enforce AOT compilation globally to prevent hidden performance regressions:
+To detect whether a specific build was intercepted, read `db.LastBuildWasAotIntercepted` after calling `Build()`, or call `db.AssertAotIntercepted()` from the `SqlInterpol.Testing.Xunit` package in test code.
 
 ```csharp
-using SqlInterpol.Configuration;
-
-SqlInterpolOptions.Default = new SqlInterpolOptions
+var result = db.Append($"SELECT {p.Id} FROM {p}").Build();
+if (!db.LastBuildWasAotIntercepted)
 {
-    // Throws an exception if a query falls back to dynamic JIT compilation
-    RequireAotCompilation = true 
-};
+    // Log a warning — the interpolated string was not recognized by the generator
+}
 ```
 
 ---
@@ -72,3 +70,64 @@ var result = db.Build();
 ```
 
 For UPSERT operations, the caching engine natively handles the dialect-specific transpilation (e.g., rendering a SQL Server `MERGE` statement versus a PostgreSQL `INSERT ... ON CONFLICT DO UPDATE`) before caching the template, ensuring cross-database compatibility with zero runtime penalty.
+
+---
+
+## Expected Throughput
+
+All benchmarks measured on Windows 11 (.NET 8, X64 RyuJIT AVX2). Run them yourself:
+```bash
+dotnet run --project benchmarks/SqlInterpol.Benchmarks -c Release
+```
+
+### Query Building (PostgreSQL)
+
+| Method | Mean | Ratio | Allocated |
+| :--- | ---: | ---: | ---: |
+| `SimpleSelect` | 4.742 μs | 1.00× | 7.71 KB |
+| `FilteredSelect` | 7.704 μs | 1.62× | 10.79 KB |
+| `JoinQuery` | 8.621 μs | 1.82× | 12.71 KB |
+| `ComplexJoinWithPaging` | 19.841 μs | 4.18× | 28.25 KB |
+
+### Same JOIN Query Across All Dialects
+
+| Dialect | Mean | Ratio | Allocated |
+| :--- | ---: | ---: | ---: |
+| PostgreSQL | 11.78 μs | 1.00× | 16.86 KB |
+| MySQL | 11.92 μs | 1.01× | 17.12 KB |
+| SQLite | 11.98 μs | 1.02× | 16.97 KB |
+| Oracle | 11.90 μs | 1.01× | 17.12 KB |
+| SQL Server | 12.64 μs | 1.07× | 17.12 KB |
+
+Cross-dialect rendering overhead is negligible — all dialects are within 7% of each other.
+
+### Entity Metadata Lookup
+
+| Method | Mean | Allocated |
+| :--- | ---: | ---: |
+| Generic lookup (`Cache<T>.Metadata`) | 0.706 ns | 0 B |
+| Runtime lookup (`ConcurrentDictionary`) | 5.326 ns | 0 B |
+| `AddEntityAndBuild` (full round-trip) | 3.478 μs | 5.38 KB |
+
+Metadata is zero-allocation once warm. The generic CLR-static path is 7.5× faster than the `Type`-keyed dictionary path.
+
+### `IN (...)` Clause — Varying Collection Size
+
+| Count | PostgreSQL | SQL Server | MySQL |
+| ---: | ---: | ---: | ---: |
+| 5 | 5.73 μs | 5.52 μs | 5.76 μs |
+| 25 | 7.35 μs | 7.47 μs | 7.34 μs |
+| 100 | 12.47 μs | 12.34 μs | 12.44 μs |
+
+Going from 5 to 100 items adds only ~6.7 μs — collection expansion scales sub-linearly.
+
+### Comparison vs Raw Strings and Dapper.SqlBuilder
+
+| Method | Mean | Allocated | Notes |
+| :--- | ---: | ---: | :--- |
+| Raw string literal | ~0 ns | 0 B | JIT constant-folds it. No quoting, no params, no dialect. |
+| `DapperSqlBuilder` | 260 ns | 1.6 KB | Template substitution only — quoting/params are manual. |
+| `SqlInterpol` (PostgreSQL) | 7.58 μs | 10.8 KB | Typed columns + auto-quoting + auto-params + dialect. |
+| `SqlInterpol` (SQL Server) | 7.62 μs | 11.0 KB | Same source — dialect switched at builder creation. |
+
+`SqlInterpol`'s overhead is consistent at ~7–8 μs regardless of query shape, dominated by the SQL string rendering pass, not by entity resolution or parameterization.

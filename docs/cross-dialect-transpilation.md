@@ -22,23 +22,32 @@ Transpilation can be toggled globally or per-instance via the `CrossDialectSqlTr
 
 | Dialect | Style | Example Output |
 | :--- | :--- | :--- |
+| **ANSI** | Double quotes | `"Products"` |
 | **Firebird** | Double quotes | `"Products"` |
+| **GenericBacktick** | Backticks | `` `Products` `` |
+| **GenericBracket** | Square brackets | `[Products]` |
 | **MySQL** | Backticks | `` `Products` `` |
 | **Oracle** | Double quotes | `"Products"` |
 | **PostgreSQL** | Double quotes | `"Products"` |
 | **SQL Server** | Square brackets | `[Products]` |
 | **SQLite** | Double quotes | `"Products"` |
 
+> ℹ️ **Generic & Utility Dialects**  
+> `AnsiDialect`, `GenericBacktickSqlDialect`, and `GenericBracketSqlDialect` are useful as base classes for custom dialects or as a fallback for unknown providers (e.g. BigQuery, Presto). Use `SqlBuilder.Dialect<GenericBacktickSqlDialect>()` to target them directly.
+
 ### Parameter Placeholders
 
 | Dialect | Style | Example Output |
 | :--- | :--- | :--- |
+| **ANSI** | Named `@` | `@p0, @p1, @p2` |
 | **Firebird** | Named `@p` | `@p0, @p1, @p2` |
+| **GenericBacktick** | Named `@p` | `@p0, @p1, @p2` |
+| **GenericBracket** | Named `@p` | `@p0, @p1, @p2` |
 | **MySQL** | Named `@p` | `@p0, @p1, @p2` |
 | **Oracle** | Named `:` | `:p0, :p1, :p2` |
 | **PostgreSQL** | Positional `$` | `$1, $2, $3` |
 | **SQL Server** | Named `@p` | `@p0, @p1, @p2` |
-| **SQLite** | Positional `?` | `?0, ?1, ?2` |
+| **SQLite** | Named `@p` (1-based) | `@p1, @p2, @p3` |
 
 ---
 
@@ -59,12 +68,12 @@ db.Append($"""
 
 #### Transpiled Outputs
 
-*   **Firebird (3.0+):**
+*   **Firebird:**
     ```sql
     SELECT "p"."Id", "p"."Name"
     FROM "Products" "p"
     ORDER BY "p"."CreatedAt" DESC
-    OFFSET @p1 ROWS FETCH NEXT @p0 ROWS ONLY
+    FIRST @p0 SKIP @p1
     ```
 
 *   **MySQL:**
@@ -104,7 +113,7 @@ db.Append($"""
     SELECT p."Id", p."Name"
     FROM "Products" p
     ORDER BY p."CreatedAt" DESC
-    LIMIT ?0 OFFSET ?1
+    LIMIT @p1 OFFSET @p2
     ```
 
 > ⚠️ **SQL Server Order By Requirement**  
@@ -186,7 +195,7 @@ db.Append($"""
 *   **SQLite:**
     ```sql
     INSERT INTO "Products" ("Name", "Price")
-    VALUES (?0, ?1)
+    VALUES (@p1, @p2)
     RETURNING "Id"
     ```
 
@@ -243,7 +252,7 @@ db.Append($"""
 *   **SQLite:**
     ```sql
     INSERT INTO "Products" ("Id", "Name")
-    VALUES (?0, ?1)
+    VALUES (@p1, @p2)
     ON CONFLICT ("Id") DO UPDATE SET "Name" = EXCLUDED."Name"
     ```
 
@@ -302,7 +311,7 @@ db.Append($"""
     ```sql
     SELECT p."Id" FROM "Products" p
     EXCEPT
-    SELECT p."Id" FROM "Products" p WHERE p."CategoryId" = ?0
+    SELECT p."Id" FROM "Products" p WHERE p."CategoryId" = @p1
     ```
 
 ---
@@ -369,7 +378,7 @@ db.Append($"""
     DELETE [p]
     FROM "Products" "p"
     INNER JOIN "Categories" "c" ON "p"."CategoryId" = "c"."Id"
-    WHERE "c"."IsArchived" = ?0
+    WHERE "c"."IsArchived" = @p1
     ```
 
 ---
@@ -439,11 +448,110 @@ db.Append($"""
 *   **SQLite:**
     ```sql
     UPDATE "p"
-    SET "p"."Price" = ?0
+    SET "p"."Price" = @p1
     FROM "Products" "p"
     INNER JOIN "Categories" "c" ON "p"."CategoryId" = "c"."Id"
-    WHERE "c"."IsArchived" = ?1
+    WHERE "c"."IsArchived" = @p2
     ```
+
+---
+
+### 8. `SELECT INTO` — Rapid Table Creation
+
+Write using SQL Server / PostgreSQL-style canonical syntax:
+
+```csharp
+db.Entity<Product>(out var p);
+
+db.Append($"""
+    SELECT {p.Id}, {p.Name}
+    INTO #TempProducts
+    FROM {p}
+    WHERE {p.CategoryId} = {catId}
+    """);
+```
+
+*   **PostgreSQL:**
+    ```sql
+    SELECT "Products"."Id", "Products"."Name"
+    INTO #TempProducts
+    FROM "Products"
+    WHERE "Products"."CategoryId" = $1
+    ```
+
+*   **SQL Server:**
+    ```sql
+    SELECT [Products].[Id], [Products].[Name]
+    INTO #TempProducts
+    FROM [Products]
+    WHERE [Products].[CategoryId] = @p0
+    ```
+
+*   **MySQL:**
+    ```sql
+    CREATE TABLE `#TempProducts` AS
+    SELECT `Products`.`Id`, `Products`.`Name`
+    FROM `Products`
+    WHERE `Products`.`CategoryId` = @p0
+    ```
+
+*   **Oracle:**
+    ```sql
+    CREATE TABLE "#TempProducts" AS
+    SELECT "Products"."Id", "Products"."Name"
+    FROM "Products"
+    WHERE "Products"."CategoryId" = :p0
+    ```
+
+*   **SQLite:**
+    ```sql
+    CREATE TABLE "#TempProducts" AS
+    SELECT "Products"."Id", "Products"."Name"
+    FROM "Products"
+    WHERE "Products"."CategoryId" = @p1
+    ```
+
+*   **Firebird:** *(not supported — throws `SqlDialectException`)*
+
+---
+
+### 9. Row Lock Mode — `SqlLockMode.NoLock`
+
+In addition to `FOR UPDATE` and `FOR SHARE`, the `SqlLockMode.NoLock` value allows dirty reads. It renders as `WITH (NOLOCK)` on SQL Server, `READ UNCOMMITTED` isolation on MySQL, and is silently ignored on dialects that do not support lock hints (SQLite).
+
+```csharp
+db.Append($"""
+    SELECT {p.Id}, {p.Price}
+    FROM {p}
+    WHERE {p.CategoryId} = {catId}
+    FOR UPDATE {SqlLockMode.NoLock}
+    """);
+```
+
+| Dialect | `NoLock` Rendering |
+| :--- | :--- |
+| **SQL Server** | `WITH (NOLOCK)` *(inline table hint)* |
+| **MySQL** | `LOCK IN SHARE MODE` *(read-only scan)* |
+| **PostgreSQL** | *(silently ignored — use transaction isolation instead)* |
+| **SQLite** | *(silently ignored)* |
+
+---
+
+### 10. Native Operators & Boolean Literals
+
+The lexical preprocessor automatically normalises boolean literals and string-concatenation operators so you can write ANSI SQL and the engine adapts:
+
+```csharp
+db.Entity<User>(out var u);
+db.Append($"""
+    SELECT {u.FirstName} || ' ' || {u.LastName} AS FullName
+    FROM {u}
+    WHERE {u.IsActive} = {true} AND {u.IsDeleted} = {false}
+    """);
+```
+
+*   **PostgreSQL / Firebird / SQLite:** `TRUE` / `FALSE` passed through unchanged; `||` preserved.
+*   **Oracle / SQL Server:** `TRUE` → `1`, `FALSE` → `0`; SQL Server renders `+` instead of `||` for string concatenation.
 
 ---
 
@@ -452,15 +560,16 @@ db.Append($"""
 | Feature | Firebird | MySQL | Oracle | PostgreSQL | SQL Server | SQLite |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
 | **`LIMIT / OFFSET` Transpilation** | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ |
-| **Multi-Table DML Normalization** | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ |
-| **`FOR UPDATE` Lock Hints** | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ | ❌ |
-| **`FOR SHARE` Lock Hints** | ❌ | ✔️ | ❌ | ✔️ | ✔️ | ❌ |
+| **`SELECT INTO`** | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ |
+| **Multi-Table DML** | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ |
+| **`FOR UPDATE`** | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ | ❌ |
+| **`FOR SHARE`** | ❌ | ✔️ | ❌ | ✔️ | ✔️ | ❌ |
 | **`RETURNING` / `OUTPUT`** | ✔️ | ❌ | ✔️ | ✔️ | ✔️ | ✔️ |
 | **`ON CONFLICT` (Upsert)** | ✔️ | ✔️ | ❌ | ✔️ | ✔️ | ✔️ |
 
-> **Legend:**  
-> ✔️ **Supported:** Native database syntax or fully emulated by rewriter pipeline.  
-> ❌ **Not Supported:** Unsupported by database driver (throws `SqlDialectException` or triggers analyzer warning).
+> **Legend**  
+> ✔️ **Supported:** Native database syntax or fully emulated by the rewriter pipeline.  
+> ❌ **Not Supported:** Throws `SqlDialectException` or triggers an `SQLIA05` analyzer error at build time.
 
 ---
 

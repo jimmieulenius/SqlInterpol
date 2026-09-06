@@ -20,7 +20,7 @@ public static partial class SelectSubqueryTestHelper
                 SELECT
                     {{c.Name}}
                 FROM {{c}}
-                WHERE {{c.Id}} = {{db.Column(p, nameof(p.CategoryId))}} AND {{c.IsActive}} = {{activeStatus}}
+                WHERE {{c.Id}} = {{p.Column(nameof(p.CategoryId))}} AND {{c.IsActive}} = {{activeStatus}}
                 """));
     }
 }

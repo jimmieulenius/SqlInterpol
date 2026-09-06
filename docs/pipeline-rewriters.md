@@ -132,3 +132,6 @@ public class LegacyNoLockRewriter : ISqlSegmentRewriter
 ### 3. Renderers
 
 The **`ISqlSegmentRenderer`** is the final step, responsible for converting individual `SqlSegment` instances to their finalized SQL strings. You can supply a custom renderer to override how specific segment types are emitted.
+
+> ℹ️ **Packaging custom rules and rewriters as a plugin**  
+> To bundle `ISqlPreprocessorRule`, `ISqlSegmentRewriter`, and renderer overrides into a distributable extension that applies automatically, implement `ISqlExtension` and register it globally. See [Extensibility & Dialects](extensibility-dialects.md).
