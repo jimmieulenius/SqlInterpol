@@ -7,21 +7,11 @@ namespace SqlInterpol.AdoNet;
 
 public static class SqlInterpolAdoNetExtensions
 {
-    /// <summary>
-    /// Resolvers for mapping DbConnection Types to a SQL Dialect.
-    /// </summary>
-    public static IList<Func<Type, ISqlDialect?>> ConnectionResolvers { get; } = [];
+    public static IList<Func<Type, ISqlDialect?>> ConnectionResolvers { get; } = new List<Func<Type, ISqlDialect?>>();
 
-    /// <summary>
-    /// Creates a <see cref="SqlBuilder"/> whose dialect is automatically resolved from the connection.
-    /// </summary>
     public static SqlBuilder CreateSqlBuilder(this IDbConnection connection, SqlInterpolOptions? options = null)
         => new(DetectDialect(connection), options);
 
-    /// <summary>
-    /// Automatically creates and binds parameters from a SqlQueryResult to an existing DbCommand.
-    /// This delegates creation to the command's own factory, guaranteeing the correct concrete provider types.
-    /// </summary>
     public static void BindParameters(this DbCommand command, SqlQueryResult result)
     {
         foreach (var kvp in result.Parameters)
@@ -33,14 +23,111 @@ public static class SqlInterpolAdoNetExtensions
         }
     }
 
-    // ── Private helpers ────────────────────────────────────────────────────────
+    // ── DbConnection Direct Execution Overloads ────────────────────────────────
+
+    public static int ExecuteNonQuery(this DbConnection connection, SqlQueryResult result, DbTransaction? transaction = null)
+    {
+        using var command = connection.CreateBoundCommand(result, transaction);
+        return command.ExecuteNonQuery();
+    }
+
+    public static async Task<int> ExecuteNonQueryAsync(
+        this DbConnection connection, 
+        SqlQueryResult result, 
+        DbTransaction? transaction = null, 
+        CancellationToken cancellationToken = default)
+    {
+        using var command = connection.CreateBoundCommand(result, transaction);
+        return await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    public static object? ExecuteScalar(this DbConnection connection, SqlQueryResult result, DbTransaction? transaction = null)
+    {
+        using var command = connection.CreateBoundCommand(result, transaction);
+        return command.ExecuteScalar();
+    }
+
+    public static async Task<object?> ExecuteScalarAsync(
+        this DbConnection connection, 
+        SqlQueryResult result, 
+        DbTransaction? transaction = null, 
+        CancellationToken cancellationToken = default)
+    {
+        using var command = connection.CreateBoundCommand(result, transaction);
+        return await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    public static DbDataReader ExecuteReader(
+        this DbConnection connection, 
+        SqlQueryResult result, 
+        CommandBehavior behavior = CommandBehavior.Default, 
+        DbTransaction? transaction = null)
+    {
+        // Readers require the command to stay alive, so we do not use 'using' here.
+        var command = connection.CreateBoundCommand(result, transaction);
+        return command.ExecuteReader(behavior);
+    }
+
+    public static async Task<DbDataReader> ExecuteReaderAsync(
+        this DbConnection connection, 
+        SqlQueryResult result, 
+        CommandBehavior behavior = CommandBehavior.Default, 
+        DbTransaction? transaction = null, 
+        CancellationToken cancellationToken = default)
+    {
+        var command = connection.CreateBoundCommand(result, transaction);
+        return await command.ExecuteReaderAsync(behavior, cancellationToken).ConfigureAwait(false);
+    }
+
+    // ── DbCommand Execution Overloads ──────────────────────────────────────────
+
+    public static int ExecuteNonQuery(this DbCommand command, SqlQueryResult result)
+    {
+        command.ApplyResult(result);
+        return command.ExecuteNonQuery();
+    }
+
+    public static Task<int> ExecuteNonQueryAsync(this DbCommand command, SqlQueryResult result, CancellationToken cancellationToken = default)
+    {
+        command.ApplyResult(result);
+        return command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public static object? ExecuteScalar(this DbCommand command, SqlQueryResult result)
+    {
+        command.ApplyResult(result);
+        return command.ExecuteScalar();
+    }
+
+    public static Task<object?> ExecuteScalarAsync(this DbCommand command, SqlQueryResult result, CancellationToken cancellationToken = default)
+    {
+        command.ApplyResult(result);
+        return command.ExecuteScalarAsync(cancellationToken);
+    }
+
+    // ── Private Helpers ────────────────────────────────────────────────────
+
+    private static DbCommand CreateBoundCommand(this DbConnection connection, SqlQueryResult result, DbTransaction? transaction)
+    {
+        var command = connection.CreateCommand();
+        if (transaction != null) command.Transaction = transaction;
+        command.ApplyResult(result);
+        return command;
+    }
+
+    private static void ApplyResult(this DbCommand command, SqlQueryResult result)
+    {
+        command.CommandText = result.Sql;
+        command.BindParameters(result);
+    }
+
+    // ── Dialect Detection Private Helpers ──────────────────────────────────────
 
     private static ISqlDialect DetectDialect(IDbConnection connection)
     {
         var type = connection.GetType();
         var currentType = type;
 
-        // 1. Check registered connection hierarchy resolvers
         while (currentType != null && currentType != typeof(object))
         {
             foreach (var resolver in ConnectionResolvers)
@@ -50,7 +137,6 @@ public static class SqlInterpolAdoNetExtensions
             currentType = currentType.BaseType;
         }
 
-        // 2. Check built-in connection hierarchy
         var dialect = TryMatchConnectionHierarchy(connection);
 
         return dialect ?? throw new NotSupportedException(
