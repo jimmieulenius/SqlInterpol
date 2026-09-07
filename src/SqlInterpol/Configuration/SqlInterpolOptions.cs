@@ -102,7 +102,8 @@ public record SqlInterpolOptions
     {
         new SqlCoreSyntaxRewriter(),
         new SqlSelectIntoRewriter(),
-        new SqlMultiTableDmlRewriter()
+        new SqlMultiTableDmlRewriter(),
+        new SqlProcedureCallRewriter()
     };
 
     /// <summary>

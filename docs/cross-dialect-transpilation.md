@@ -555,6 +555,51 @@ db.Append($"""
 
 ---
 
+### 11. Stored Procedure `CALL`
+
+Write using ANSI-standard `CALL` syntax. The engine automatically transpiles to the target dialect's native invocation form.
+
+```csharp
+int orderId = 1;
+string status = "Active";
+
+db.Append($"CALL process_order({orderId}, {status})");
+```
+
+#### Transpiled Outputs
+
+*   **PostgreSQL (pass-through):**
+    ```sql
+    CALL process_order($1, $2)
+    ```
+
+*   **MySQL (pass-through):**
+    ```sql
+    CALL process_order(@p0, @p1)
+    ```
+
+*   **SQLite (pass-through):**
+    ```sql
+    CALL process_order(@p0, @p1)
+    ```
+
+*   **SQL Server:**
+    ```sql
+    EXEC process_order @p0, @p1
+    ```
+    The `(` and `)` delimiters are removed and `CALL` is replaced with `EXEC`.
+
+*   **Oracle:**
+    ```sql
+    BEGIN CALL process_order(:p0, :p1); END;
+    ```
+    The call is wrapped in an anonymous PL/SQL block.
+
+> ℹ️ **Zero Allocations for Native Dialects**  
+> PostgreSQL, MySQL, and SQLite natively support the `CALL` keyword. The rewriter's `IsApplicable` check short-circuits immediately, and those three dialects return the original segment list reference unchanged — no heap allocation occurs.
+
+---
+
 ## Feature Support Matrix
 
 | Feature | Firebird | MySQL | Oracle | PostgreSQL | SQL Server | SQLite |
@@ -566,9 +611,11 @@ db.Append($"""
 | **`FOR SHARE`** | ❌ | ✔️ | ❌ | ✔️ | ✔️ | ❌ |
 | **`RETURNING` / `OUTPUT`** | ✔️ | ❌ | ✔️ | ✔️ | ✔️ | ✔️ |
 | **`ON CONFLICT` (Upsert)** | ✔️ | ✔️ | ❌ | ✔️ | ✔️ | ✔️ |
+| **`CALL` (Stored Procedure)** | ➖ | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ |
 
 > **Legend**  
 > ✔️ **Supported:** Native database syntax or fully emulated by the rewriter pipeline.  
+> ➖ **Not Tested:** Feature may work but is not verified for this dialect.  
 > ❌ **Not Supported:** Throws `SqlDialectException` or triggers an `SQLIA05` analyzer error at build time.
 
 ---

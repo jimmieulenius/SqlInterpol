@@ -76,6 +76,9 @@ public sealed class SqlKeyword
     /// <summary>Represents the <c>FOR SHARE</c> row-locking keyword.</summary>
     public static readonly SqlKeyword ForShare = new("FOR SHARE");
 
+    /// <summary>Represents the <c>CALL</c> stored procedure invocation keyword.</summary>
+    public static readonly SqlKeyword Call = new("CALL", true, false);
+
     /// <summary>Represents the <c>WHERE</c> keyword.</summary>
     public static readonly SqlKeyword Where = new("WHERE", true, false);
     /// <summary>Represents the <c>GROUP BY</c> keyword.</summary>
@@ -176,6 +179,7 @@ public sealed class SqlKeyword
         Do,
         ForUpdate,
         ForShare,
+        Call,
         Where,
         GroupBy,
         Having,

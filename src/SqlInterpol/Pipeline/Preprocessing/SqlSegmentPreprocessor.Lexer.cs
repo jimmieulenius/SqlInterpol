@@ -77,6 +77,7 @@ public partial class SqlSegmentPreprocessor
                 else if (MatchKeyword(span, SqlKeyword.GroupBy.Value))    { matchedWord = SqlKeyword.GroupBy.Value;   targetTag = SqlSegmentTag.WhereKeyword; }
                 else if (MatchKeyword(span, SqlKeyword.Having.Value))     { matchedWord = SqlKeyword.Having.Value;   targetTag = SqlSegmentTag.WhereKeyword; }
                 else if (MatchKeyword(span, SqlKeyword.Delete.Value))     { matchedWord = SqlKeyword.Delete.Value;   targetTag = SqlSegmentTag.DeleteKeyword; }
+                else if (MatchKeyword(span, SqlKeyword.Call.Value))        { matchedWord = SqlKeyword.Call.Value;     targetTag = SqlSegmentTag.CallKeyword; }
                 
                 // ====================================================================
                 // NATIVE BOOLEAN TRANSPILATION
@@ -138,7 +139,8 @@ public partial class SqlSegmentPreprocessor
                     else if (targetTag == SqlSegmentTag.SelectKeyword || targetTag == SqlSegmentTag.SelectDistinctKeyword || 
                              targetTag == SqlSegmentTag.UpdateKeyword || targetTag == SqlSegmentTag.DeleteKeyword || 
                              targetTag == SqlSegmentTag.InsertValuesKeyword || targetTag == SqlSegmentTag.IntoKeyword || 
-                             targetTag == SqlSegmentTag.SetKeyword || targetTag == SqlSegmentTag.WhereKeyword) state.ForceBaseNamePhase = false;
+                             targetTag == SqlSegmentTag.SetKeyword || targetTag == SqlSegmentTag.WhereKeyword ||
+                             targetTag == SqlSegmentTag.CallKeyword) state.ForceBaseNamePhase = false;
 
                     if (j > lastSplitIdx) state.Refined.Add(new SqlSegment(SqlSegmentType.Literal, text[lastSplitIdx..j], segment.RenderMode, segment.Tags));
                     
@@ -166,7 +168,8 @@ public partial class SqlSegmentPreprocessor
                         matchedWord == SqlKeyword.Delete.Value || 
                         matchedWord == SqlKeyword.Select.Value || 
                         matchedWord == SqlKeyword.SelectDistinct.Value || 
-                        matchedWord == SqlKeyword.Insert.Value) 
+                        matchedWord == SqlKeyword.Insert.Value ||
+                        matchedWord == SqlKeyword.Call.Value) 
                     {
                         state.ActiveDmlKeyword = matchedWord;
                         state.FromCount = 0;

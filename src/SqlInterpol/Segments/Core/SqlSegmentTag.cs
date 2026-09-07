@@ -113,4 +113,7 @@ public static class SqlSegmentTag
 
     /// <summary>Identifies an ANSI standard string concatenation operator '||'.</summary>
     public const string ConcatOperator = "ConcatOperator";
+
+    /// <summary>Identifies a 'CALL' keyword used to invoke stored procedures.</summary>
+    public const string CallKeyword = "CallKeyword";
 }
