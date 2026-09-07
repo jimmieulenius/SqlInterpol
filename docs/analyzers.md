@@ -19,12 +19,14 @@ dotnet_diagnostic.SQLIA07.severity = none
 
 Passing a raw `string` variable, string literal, or string-concatenation expression directly to `Append()` or `AppendLine()` bypasses parameterization and may expose your application to SQL injection.
 
+**Incorrect**
 ```csharp
-// ❌ SQLIA01 — raw string passed to Append
 string filter = "IsActive = 1";
 db.Append(filter);
+```
 
-// ✅ Always use an interpolated string
+**Correct**
+```csharp
 db.Append($"WHERE {p.IsActive} = {true}");
 ```
 
@@ -44,9 +46,15 @@ db.Append($"ORDER BY {p.Name} {Sql.Raw(direction)}");
 
 Raised when a DTO passed to `Sql.BuildAssignments()` contains a property that does not exist on the target entity. This prevents silent column-not-found errors at runtime.
 
+**Incorrect**
 ```csharp
-// ❌ SQLIA02 — ProductDto has "ShippingWeight" but Product does not
+// ProductDto has "ShippingWeight" but Product does not
 Sql.BuildAssignments(entity, new ProductDto { ShippingWeight = 1.5 }, context);
+```
+
+**Correct**
+```csharp
+Sql.BuildAssignments(entity, new ProductDto { Name = "Widget", Price = 9.99m }, context);
 ```
 
 ---
@@ -57,9 +65,15 @@ Sql.BuildAssignments(entity, new ProductDto { ShippingWeight = 1.5 }, context);
 
 Raised when a string column selector (e.g., `p.Column("PropName")`) references a property name that does not exist on the entity type.
 
+**Incorrect**
 ```csharp
-// ❌ SQLIA03 — "ShippingWeight" is not a property on Product
+// "ShippingWeight" is not a property on Product
 db.Append($"SELECT {p.Column("ShippingWeight")} FROM {p}");
+```
+
+**Correct**
+```csharp
+db.Append($"SELECT {p.Column("Name")} FROM {p}");
 ```
 
 ---
@@ -70,13 +84,46 @@ db.Append($"SELECT {p.Column("ShippingWeight")} FROM {p}");
 
 Raised when a .NET system method (`ToString()`, `GetHashCode()`, etc.) is called on an entity proxy inside an interpolated string. This usually indicates a mistyped column access.
 
+**Incorrect**
 ```csharp
-// ❌ SQLIA04 — p.ToString() returns a C# string, not a column reference
+// p.ToString() returns a C# string, not a column reference
 db.Append($"SELECT {p.ToString()}");
+```
 
-// ✅ Access the property directly
+**Correct**
+```csharp
+// Access the property directly
 db.Append($"SELECT {p.Name}");
 ```
+
+---
+
+### SQLIA05 — Unsupported Dialect Feature
+**Severity:** Error  
+**Category:** Usage
+
+Raised when a SQL feature used in an interpolated string is not supported by the configured dialect. This prevents what would otherwise be a runtime `SqlDialectException` in production.
+
+**Incorrect**
+```csharp
+// Builder configured for MySQL
+using var db = SqlBuilder.MySql();
+db.Entity<Product>(out var p);
+
+// RETURNING is not supported by MySQL
+db.Append($"INSERT INTO {p} ({p.Name}) VALUES ({name}) RETURNING {p.Id}");
+```
+
+**Correct**
+```csharp
+// Builder configured for PostgreSQL
+using var db = SqlBuilder.PostgreSql();
+db.Entity<Product>(out var p);
+
+db.Append($"INSERT INTO {p} ({p.Name}) VALUES ({name}) RETURNING {p.Id}");
+```
+
+Supported feature detection is based on the `SqlBuilder` factory method used at the call site (`SqlBuilder.MySql()`, `SqlBuilder.PostgreSql()`, etc.).
 
 ---
 
@@ -86,13 +133,21 @@ db.Append($"SELECT {p.Name}");
 
 Raised when a class implementing `ISqlDialect` does not have a `[SqlDialect]` attribute. The AOT source generator requires this attribute to extract identifier-quoting rules at build time without executing runtime code.
 
+**Incorrect**
 ```csharp
-// ❌ SQLIA06 — missing attribute
-public class MyDialect : SqlDialectBase { ... }
+public class MyDialect : SqlDialectBase 
+{ 
+    // Missing [SqlDialect] attribute
+}
+```
 
-// ✅ Declare the quoting characters for the AOT generator
+**Correct**
+```csharp
 [SqlDialect(OpenQuote = "\"", CloseQuote = "\"")]
-public class MyDialect : SqlDialectBase { ... }
+public class MyDialect : SqlDialectBase 
+{ 
+    // Identifier quoting characters declared for AOT generator
+}
 ```
 
 ---
@@ -103,17 +158,21 @@ public class MyDialect : SqlDialectBase { ... }
 
 Raised when `db.Template(...)` is invoked inside an instance method or request handler. Templates initialized on every call allocate memory and negate the purpose of pre-compilation.
 
+**Incorrect**
 ```csharp
-// ❌ SQLIA07 — template compiled on every request
 public IEnumerable<Order> GetOrders(int customerId)
 {
+    // Template re-compiled on every invocation
     db.Template(out var template, $"SELECT {o.Id} FROM {o} WHERE {o.CustomerId} = {Sql.Arg("Id")}");
     return db.Append(template, new { Id = customerId }).Build();
 }
+```
 
-// ✅ Move to a static readonly field
+**Correct**
+```csharp
 public static class Queries
 {
+    // Pre-compiled once as a static template
     public static readonly ISqlTemplate GetOrders = CompileGetOrders();
 
     private static ISqlTemplate CompileGetOrders()
@@ -125,25 +184,6 @@ public static class Queries
     }
 }
 ```
-
----
-
-### SQLIA05 — Unsupported Dialect Feature
-**Severity:** Error  
-**Category:** Usage
-
-Raised when a SQL feature used in an interpolated string is not supported by the configured dialect. This prevents what would otherwise be a runtime `SqlDialectException` in production.
-
-```csharp
-// Builder configured for MySQL
-using var db = SqlBuilder.MySql();
-db.Entity<Product>(out var p);
-
-// ❌ SQLIA05 — RETURNING is not supported by MySQL
-db.Append($"INSERT INTO {p} ({p.Name}) VALUES ({name}) RETURNING {p.Id}");
-```
-
-Supported feature detection is based on the `SqlBuilder` factory method used at the call site (`SqlBuilder.MySql()`, `SqlBuilder.PostgreSql()`, etc.).
 
 ---
 
