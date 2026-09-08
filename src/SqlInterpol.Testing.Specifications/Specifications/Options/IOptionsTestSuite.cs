@@ -7,4 +7,5 @@ public interface IOptionsTestSuite : ISqlTestSuiteBase
 {
     static abstract TheoryData<SqlTestCase> CustomParameterIndexStartData { get; }
     static abstract TheoryData<SqlTestCase> EnumFormattingData { get; }
+    static abstract TheoryData<SqlTestCase> CrossDialectTranspilationWithCustomOptionsData { get; }
 }

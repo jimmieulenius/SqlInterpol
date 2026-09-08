@@ -18,4 +18,9 @@ public partial class SqlServerOptionsTestSuite : IOptionsTestSuite
         expectedSql: ["UPDATE [dbo].[Users] SET [Status] = @p0"],
         expectedParameters: ["Active"]
     )];
+
+    public static TheoryData<SqlTestCase> CrossDialectTranspilationWithCustomOptionsData => [new SqlTestCase(
+        expectedSql: ["SELECT * FROM Products OFFSET @p1 ROWS FETCH NEXT @p0 ROWS ONLY"],
+        expectedParameters: [10, 20]
+    )];
 }

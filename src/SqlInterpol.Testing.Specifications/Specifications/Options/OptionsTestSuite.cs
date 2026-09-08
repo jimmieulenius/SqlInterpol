@@ -23,6 +23,19 @@ public abstract partial class OptionsTestSuite
         testCase.Assert();
     }
 
+    [SqlTest(nameof(IOptionsTestSuite.CrossDialectTranspilationWithCustomOptionsData))]
+    public void Options_CrossDialectTranspilation_WithCustomOptions(SqlTestCase testCase)
+    {
+        // Regression: dialect-specific rewriters must be included even when options are passed inline
+        var options = new SqlInterpolOptions { CrossDialectSqlTranspilation = true };
+        var db = CreateBuilder(options);
+        int limit = 10;
+        int offset = 20;
+
+        testCase.Act(() => db.Append($"SELECT * FROM Products LIMIT {limit} OFFSET {offset}").Build());
+        testCase.Assert();
+    }
+
     [SqlTest(nameof(IOptionsTestSuite.EnumFormattingData))]
     public void Options_GlobalEnumFormatting_AppliesToDtoMapping(SqlTestCase testCase)
     {

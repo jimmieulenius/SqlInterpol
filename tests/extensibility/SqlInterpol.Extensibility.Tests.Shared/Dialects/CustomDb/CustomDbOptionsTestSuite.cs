@@ -23,4 +23,9 @@ public partial class CustomDbOptionsTestSuite : IOptionsTestSuite
         expectedSql: ["UPDATE <<dbo>>.<<Users>> SET <<Status>> = !!100"], // Inherits the 0-index because we overrode the options in the test!
         expectedParameters: ["Active"]
     )];
+
+    public static TheoryData<SqlTestCase> CrossDialectTranspilationWithCustomOptionsData => [new SqlTestCase(
+        expectedSql: ["SELECT * FROM Products LIMIT !!100 OFFSET !!101"],
+        expectedParameters: [10, 20]
+    )];
 }

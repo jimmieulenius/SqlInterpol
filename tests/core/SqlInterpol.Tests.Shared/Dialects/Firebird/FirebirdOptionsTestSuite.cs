@@ -18,4 +18,9 @@ public partial class FirebirdOptionsTestSuite : IOptionsTestSuite
         expectedSql: ["UPDATE \"dbo\".\"Users\" SET \"Status\" = @p0"],
         expectedParameters: ["Active"]
     )];
+
+    public static TheoryData<SqlTestCase> CrossDialectTranspilationWithCustomOptionsData => [new SqlTestCase(
+        expectedSql: ["SELECT * FROM Products FIRST @p0 SKIP @p1"],
+        expectedParameters: [10, 20]
+    )];
 }

@@ -18,4 +18,9 @@ public partial class OracleOptionsTestSuite : IOptionsTestSuite
         expectedSql: ["UPDATE \"dbo\".\"Users\" SET \"Status\" = :0"],
         expectedParameters: ["Active"]
     )];
+
+    public static TheoryData<SqlTestCase> CrossDialectTranspilationWithCustomOptionsData => [new SqlTestCase(
+        expectedSql: ["SELECT * FROM Products OFFSET :1 ROWS FETCH NEXT :0 ROWS ONLY"],
+        expectedParameters: [10, 20]
+    )];
 }

@@ -18,4 +18,9 @@ public partial class MySqlOptionsTestSuite : IOptionsTestSuite
         expectedSql: ["UPDATE `dbo`.`Users` SET `Status` = @p0"],
         expectedParameters: ["Active"]
     )];
+
+    public static TheoryData<SqlTestCase> CrossDialectTranspilationWithCustomOptionsData => [new SqlTestCase(
+        expectedSql: ["SELECT * FROM Products LIMIT @p0 OFFSET @p1"],
+        expectedParameters: [10, 20]
+    )];
 }

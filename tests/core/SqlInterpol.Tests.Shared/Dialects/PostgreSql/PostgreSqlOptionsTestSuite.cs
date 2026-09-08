@@ -18,4 +18,9 @@ public partial class PostgreSqlOptionsTestSuite : IOptionsTestSuite
         expectedSql: ["UPDATE \"dbo\".\"Users\" SET \"Status\" = $1"],
         expectedParameters: ["Active"]
     )];
+
+    public static TheoryData<SqlTestCase> CrossDialectTranspilationWithCustomOptionsData => [new SqlTestCase(
+        expectedSql: ["SELECT * FROM Products LIMIT $1 OFFSET $2"],
+        expectedParameters: [10, 20]
+    )];
 }
