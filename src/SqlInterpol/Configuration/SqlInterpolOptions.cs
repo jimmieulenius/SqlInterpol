@@ -157,6 +157,11 @@ public record SqlInterpolOptions
             return defaultOptions with { Dialect = dialect.Kind };
         }
 
+        // Merge dialect-specific rewriters the user's options may be missing (e.g. SqlServerSyntaxRewriter).
+        // UniqueCollection deduplication makes this safe and idempotent.
+        foreach (var rewriter in defaultOptions.Rewriters)
+            overrides.Rewriters.Add(rewriter);
+
         // Coalesce the user's explicit overrides safely on top of the defaults.
         // By using `overrides with { ... }`, we also preserve any lists (Rewriters, Rules) they modified!
         return overrides with 
