@@ -58,6 +58,7 @@
 
   <PropertyGroup>
     <PackageIcon>sqlinterpol_128x128.png</PackageIcon>
+    <PackageIconUrl>https://raw.githubusercontent.com/jimmieulenius/SqlInterpol/main/assets/sqlinterpol_128x128.png</PackageIconUrl>
   </PropertyGroup>
 
   <ItemGroup>
