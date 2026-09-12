@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/jimmieulenius/SqlInterpol/compare/v1.0.1...v1.1.0) (2026-09-12)
+
+
+### Features
+
+* Add PackageIconUrl for sqlinterpol package in project files ([4c387d2](https://github.com/jimmieulenius/SqlInterpol/commit/4c387d24bd15835aab2cd61d1042c5a5741d151a))
+
 ## [1.0.1](https://github.com/jimmieulenius/SqlInterpol/compare/v1.0.0...v1.0.1) (2026-09-12)
 
 
