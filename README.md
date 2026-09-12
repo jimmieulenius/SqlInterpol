@@ -1,6 +1,6 @@
 # ![logo][] SqlInterpol
 
-![CI](https://github.com/jimmieulenius/SqlInterpol/actions/workflows/ci.yml/badge.svg) ![NuGet Version](https://img.shields.io/nuget/v/SqlInterpol?style=flat-square) ![NuGet Downloads](https://img.shields.io/nuget/dt/SqlInterpol?style=flat-square) ![License](https://img.shields.io/github/license/jimmieulenius/SqlInterpol?style=flat-square)
+![CI](https://github.com/jimmieulenius/SqlInterpol/actions/workflows/ci.yml/badge.svg) ![CD](https://github.com/jimmieulenius/SqlInterpol/actions/workflows/cd.yml/badge.svg) ![NuGet Version](https://img.shields.io/nuget/v/SqlInterpol?style=flat-square) ![NuGet Downloads](https://img.shields.io/nuget/dt/SqlInterpol?style=flat-square) ![License](https://img.shields.io/github/license/jimmieulenius/SqlInterpol?style=flat-square)
 
 **SqlInterpol** is a next-generation, zero-boilerplate SQL Query Builder for .NET 8+.
 
