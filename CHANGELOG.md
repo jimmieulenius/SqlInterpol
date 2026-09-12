@@ -1,3 +1,10 @@
+## [1.0.1](https://github.com/jimmieulenius/SqlInterpol/compare/v1.0.0...v1.0.1) (2026-09-12)
+
+
+### Bug Fixes
+
+* Correct IsPackable property in project file ([1d7edf3](https://github.com/jimmieulenius/SqlInterpol/commit/1d7edf386e59d615b67b512b6bb3fab6e3dc5b3e))
+
 # 1.0.0 (2026-09-12)
 
 
