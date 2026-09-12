@@ -98,13 +98,13 @@ public record SqlInterpolOptions
     /// The compilation pipeline modules. Modifying this list allows you to inject 
     /// custom SQL structural transformations. Duplicate rewriter types are safely ignored.
     /// </summary>
-    public SqlSegmentRewriterCollection Rewriters { get; } = new SqlSegmentRewriterCollection
-    {
+    public SqlSegmentRewriterCollection Rewriters { get; } =
+    [
         new SqlCoreSyntaxRewriter(),
         new SqlSelectIntoRewriter(),
         new SqlMultiTableDmlRewriter(),
         new SqlProcedureCallRewriter()
-    };
+    ];
 
     /// <summary>
     /// Gets an optional custom <see cref="ISqlSegmentRenderer"/>.
@@ -128,6 +128,11 @@ public record SqlInterpolOptions
     /// Provides a resolved, strictly non-nullable view of the configuration options.
     /// </summary>
     public SqlInterpolOptionsValue Value => new SqlInterpolOptionsValue(this);
+
+    public List<ISqlMapping> Mappings { get; } = [];
+
+
+
 
     /// <summary>
     /// Creates a new instance of options and automatically applies any globally registered extensions.
@@ -199,4 +204,18 @@ public readonly struct SqlInterpolOptionsValue(SqlInterpolOptions opt)
     public int QueryParametersMaxCount => opt.QueryParametersMaxCount ?? 999;
     public bool EntityAutoAliasing => opt.EntityAutoAliasing ?? false;
     public bool CrossDialectSqlTranspilation => opt.CrossDialectSqlTranspilation ?? true;
+}
+
+
+public interface ISqlMapping
+{
+    string TableName { get; }
+    string SchemaName { get; }
+    IEnumerable<ISqlColumnMapping> Columns { get; }
+}
+
+public interface ISqlColumnMapping
+{
+    string PropertyName { get; }
+    string ColumnName { get; }
 }

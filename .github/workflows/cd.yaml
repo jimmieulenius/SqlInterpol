@@ -1,0 +1,105 @@
+name: CD
+
+on:
+  push:
+    branches:
+      - main
+      - preview/*
+      - feature/*
+      - hotfix/*
+  workflow_dispatch:
+
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  DOTNET_VERSION: '10.x'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: ${{ runner.os }}-nuget-
+
+      - name: Restore
+        run: dotnet restore SqlInterpol.slnx
+
+      - name: Build
+        run: dotnet build SqlInterpol.slnx --no-restore --configuration Release
+
+      # Only enforced on main — prerelease builds may reference prerelease deps intentionally
+      - name: Validate no prerelease dependencies
+        if: github.ref == 'refs/heads/main'
+        shell: pwsh
+        run: |
+          Import-Module './scripts/CICD.DotNet.psm1'
+          $allErrors = @()
+          Get-ChildItem -Path './src' -Filter 'project.assets.json' -Recurse | ForEach-Object {
+              Test-ProjectAsset -Path $_.Directory.Parent.FullName -ErrorVariable 'projectErrors'
+              $allErrors += $projectErrors
+          }
+          if ($allErrors.Count -gt 0) { exit 1 }
+
+  semantic_release:
+    name: Semantic Release
+    needs: build
+    uses: ./.github/workflows/.semantic-release.yaml
+    permissions:
+      contents: write
+    secrets: inherit
+
+  publish:
+    if: needs.semantic_release.outputs.new_release_published == 'true'
+    needs: [semantic_release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: ${{ runner.os }}-nuget-
+
+      - name: Restore
+        run: dotnet restore SqlInterpol.slnx
+
+      - name: Pack
+        run: |
+          dotnet pack SqlInterpol.slnx \
+            --no-restore \
+            --configuration Release \
+            --output ./nupkgs \
+            -p:Version=${{ needs.semantic_release.outputs.new_release_version }}
+
+      # To switch to nuget.org: replace source/api-key with --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_ORG_API_KEY }}
+      - name: Push to GitHub Packages
+        run: |
+          dotnet nuget push "./nupkgs/*.nupkg" \
+            --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" \
+            --api-key ${{ secrets.GITHUB_TOKEN }} \
+            --skip-duplicate
