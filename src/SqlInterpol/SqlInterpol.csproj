@@ -33,4 +33,12 @@
     <None Include="SqlInterpol.targets" Pack="true" PackagePath="build\;buildTransitive\" />
   </ItemGroup>
 
+  <PropertyGroup>
+    <PackageIcon>sqlinterpol_128x128.png</PackageIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="assets\sqlinterpol_128x128.png" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
 </Project>
