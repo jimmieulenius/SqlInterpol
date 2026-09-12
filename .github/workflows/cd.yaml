@@ -15,6 +15,8 @@ concurrency:
 
 env:
   DOTNET_VERSION: '10.x'
+  SOLUTION: 'SqlInterpol.slnx'
+  SRC_PATH: './src'
 
 jobs:
   build:
@@ -36,19 +38,19 @@ jobs:
           restore-keys: ${{ runner.os }}-nuget-
 
       - name: Restore
-        run: dotnet restore SqlInterpol.slnx
+        run: dotnet restore ${{ env.SOLUTION }}
 
       - name: Build
-        run: dotnet build SqlInterpol.slnx --no-restore --configuration Release
+        run: dotnet build ${{ env.SOLUTION }} --no-restore --configuration Release
 
       # Only enforced on main — prerelease builds may reference prerelease deps intentionally
       - name: Validate no prerelease dependencies
         if: github.ref == 'refs/heads/main'
         shell: pwsh
         run: |
-          Import-Module './scripts/CICD.DotNet.psm1'
+          Import-Module './.github/workflows/scripts/CICD.DotNet.psm1'
           $allErrors = @()
-          Get-ChildItem -Path './src' -Filter 'project.assets.json' -Recurse | ForEach-Object {
+          Get-ChildItem -Path '${{ env.SRC_PATH }}' -Filter 'project.assets.json' -Recurse | ForEach-Object {
               Test-ProjectAsset -Path $_.Directory.Parent.FullName -ErrorVariable 'projectErrors'
               $allErrors += $projectErrors
           }
@@ -86,11 +88,11 @@ jobs:
           restore-keys: ${{ runner.os }}-nuget-
 
       - name: Restore
-        run: dotnet restore SqlInterpol.slnx
+        run: dotnet restore ${{ env.SOLUTION }}
 
       - name: Pack
         run: |
-          dotnet pack SqlInterpol.slnx \
+          dotnet pack ${{ env.SOLUTION }} \
             --no-restore \
             --configuration Release \
             --output ./nupkgs \
