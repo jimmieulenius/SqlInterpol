@@ -1,3 +1,11 @@
+## [1.0.1](https://github.com/jimmieulenius/SqlInterpol/compare/v1.0.0...v1.0.1) (2026-09-12)
+
+
+### Bug Fixes
+
+* Update asset paths for sqlinterpol icon in project files ([9a6c967](https://github.com/jimmieulenius/SqlInterpol/commit/9a6c967bf751725ef1de1996099efc666a6a83aa))
+* Update README.md ([787c29f](https://github.com/jimmieulenius/SqlInterpol/commit/787c29fb9c677718af101f4a716f9a80aefc99db))
+
 # 1.0.0 (2026-09-12)
 
 
