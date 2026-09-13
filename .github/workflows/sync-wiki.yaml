@@ -25,15 +25,16 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Clone the wiki repository
           git clone https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.wiki.git wiki_repo
 
-          # Copy docs folder contents to wiki root
+          # Clear existing wiki files (excluding .git) so deletions in docs/ are synced
+          find wiki_repo -maxdepth 1 -type f ! -name '.git*' -delete
+
+          # Copy updated docs
           cp -r docs/* wiki_repo/
 
-          # Commit and push changes if updates exist
           cd wiki_repo
-          git add .
+          git add -A
           if git diff --staged --quiet; then
             echo "No changes to sync."
           else
