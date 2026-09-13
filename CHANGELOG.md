@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/jimmieulenius/SqlInterpol/compare/v1.1.0...v1.2.0) (2026-09-13)
+
+
+### Features
+
+* Add sync workflow for documentation updates to wiki ([270e002](https://github.com/jimmieulenius/SqlInterpol/commit/270e00233ada4587567434c3a688f9de443d4d75))
+
 # [1.1.0](https://github.com/jimmieulenius/SqlInterpol/compare/v1.0.1...v1.1.0) (2026-09-12)
 
 
