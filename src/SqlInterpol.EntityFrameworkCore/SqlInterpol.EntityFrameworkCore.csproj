@@ -23,4 +23,13 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.0" />
   </ItemGroup>
 
+  <PropertyGroup>
+    <PackageIcon>sqlinterpol_128x128.png</PackageIcon>
+    <PackageIconUrl>https://raw.githubusercontent.com/jimmieulenius/SqlInterpol/main/assets/sqlinterpol_128x128.png</PackageIconUrl>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\assets\sqlinterpol_128x128.png" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
 </Project>

@@ -56,4 +56,13 @@
     <InterceptorsNamespaces>$(InterceptorsNamespaces);SqlInterpol.Testing.Generators.Generated;SqlInterpol.Generators.Generated</InterceptorsNamespaces>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <PackageIcon>sqlinterpol_128x128.png</PackageIcon>
+    <PackageIconUrl>https://raw.githubusercontent.com/jimmieulenius/SqlInterpol/main/assets/sqlinterpol_128x128.png</PackageIconUrl>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\assets\sqlinterpol_128x128.png" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
 </Project>
