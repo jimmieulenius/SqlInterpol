@@ -43,6 +43,26 @@ public static class SqlBuilderTestExtensions
     }
 
     /// <summary>
+    /// Asserts that the last <see cref="SqlBuilder.Build()"/> used the JIT path on an AOT-enabled
+    /// test assembly (intentional fallback, e.g. UPSERT/MERGE → SQLIG10). On JIT-only test
+    /// assemblies this is a no-op beyond verifying interception stayed off.
+    /// </summary>
+    public static void AssertJitFallback(this SqlBuilder builder)
+    {
+        var testAssembly = Assembly.GetCallingAssembly();
+        bool isAotProject = testAssembly.GetCustomAttribute<SqlInterpolAotEnabledAttribute>() != null;
+
+        if (builder.LastBuildWasAotIntercepted)
+        {
+            throw new InvalidOperationException(
+                isAotProject
+                    ? "JIT Fallback Assertion Failed: Expected SQLIG10/JIT path, but the query was AOT-intercepted."
+                    : "JIT Assertion Failed: This query executed via AOT, but the JIT test project is running!"
+            );
+        }
+    }
+
+    /// <summary>
     /// Grants test-time access to the internal Segment Stream (Token List) for custom assertions.
     /// Allows developers to verify structural rewriters without exposing internal state globally.
     /// </summary>

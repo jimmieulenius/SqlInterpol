@@ -57,4 +57,7 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <!-- ProjectReference does not auto-import package build targets; wire AOT assembly marker. -->
+  <Import Project="..\..\..\src\SqlInterpol.Testing.Xunit\SqlInterpol.Testing.Xunit.targets" />
+
 </Project>

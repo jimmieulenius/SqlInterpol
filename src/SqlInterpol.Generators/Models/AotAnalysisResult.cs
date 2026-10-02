@@ -76,7 +76,8 @@ internal sealed class SqlAotAnalysisResult
         || HasReturning
         || HasComplexDynamicHoles
         || HasUnconsumableAlias
-        || HasUpsert
+        // Handwritten UPSERT/ON CONFLICT/MERGE is AOT-emitted; CrossDialect rewrite stays in Build().
+        // HasUpsert still drives structural GetSegment emit for conflict/target columns.
         // DML queries with text-based inline aliases (FROM {{entity}} AS alias) plus parameter holes
         // can involve complex dialect rewrites (multi-table UPDATE → MERGE, etc.) that the AOT
         // emitter cannot safely unroll using literal strings.

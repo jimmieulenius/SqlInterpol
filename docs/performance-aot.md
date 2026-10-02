@@ -2,17 +2,30 @@
 
 `SqlInterpol` is engineered for high-throughput, zero-allocation query building. By leveraging modern C# features like `[InterpolatedStringHandler]` and Roslyn Interceptors, the engine shifts the heavy lifting of structural parsing and dialect transpilation from runtime to compile time.
 
+## At a glance
+
+- Many `Append` / `AppendLine` shapes are compile-time intercepted on .NET 8+.
+- Handwritten `ON CONFLICT` / `ON DUPLICATE` / `MERGE` UPSERT shapes can be intercepted; dialect rewrite (for example SQL Server `MERGE`) may still run when you call `Build()`.
+- Pre-compiled templates and CRUD helpers: [templates-caching.md](templates-caching.md).
+- Verify interception with `LastBuildWasAotIntercepted` or `SqlInterpol.Testing.Xunit` asserts (below).
+
 ---
 
 ## Ahead-Of-Time (AOT) Compilation
 
-For applications running on .NET 8 and .NET 9+, `SqlInterpol` automatically opts into compiler interceptors. This completely eliminates runtime string parsing overhead.
+For applications running on .NET 8+, `SqlInterpol` opts into Roslyn interceptors for many `Append` / `AppendLine` shapes. Intercepted queries skip runtime interpolated-string parsing. **Dialect rewrite for complex DML can still run at `Build()`** even when the interpolated string was intercepted.
 
 *   **Zero-Allocation Handlers:** The `SqlQueryInterpolatedStringHandler` uses an `ArrayPool<PendingHole>` to capture SQL text literals and typed interpolation holes without triggering per-hole heap allocations.
-*   **Compile-Time Routing:** The source generator maps your C# interpolated strings directly to highly optimized structural segments. The query bypasses the JIT-evaluation path entirely.
-*   **Telemetry & Validation:** The `SqlBuilder` exposes an `IsAotIntercepted` flag to verify successful compile-time routing. The `SQLIA07` analyzer (see [Analyzer Reference](analyzers.md)) warns when `Template()` is called on a non-static path. 
+*   **Compile-Time Routing:** When interception succeeds, the generator emits structural segments directly. Some shapes (window/set ops, dynamic fragments, RETURNING) still fall back to JIT `Append` (diagnostic `SQLIG10`). Handwritten UPSERT is emitted so cross-dialect rewrite at `Build()` can still apply.
+*   **Telemetry & Validation:** Read `db.LastBuildWasAotIntercepted` after `Build()`, or use `AssertAotIntercepted()` / `AssertJitFallback()` from `SqlInterpol.Testing.Xunit`.
 
-To detect whether a specific build was intercepted, read `db.LastBuildWasAotIntercepted` after calling `Build()`, or call `db.AssertAotIntercepted()` from the `SqlInterpol.Testing.Xunit` package in test code.
+### AOT vs CrossDialect (UPSERT)
+
+| Shape | AOT interceptor | Cross-dialect rewrite |
+|-------|-----------------|------------------------|
+| Simple SELECT / DML without UPSERT | Usually intercepted | Quoting / simple transforms at `Build()` |
+| Handwritten `ON CONFLICT` / UPSERT / MERGE | **Intercepted** | Yes — runtime rewriters at `Build()` (e.g. SQL Server → `MERGE`) |
+| `AppendUpsert` CRUD helper | Uses template cache (not interceptor SQL) | Via `SqlCrudTemplateCache` |
 
 ```csharp
 var result = db.Append($"SELECT {p.Id} FROM {p}").Build();

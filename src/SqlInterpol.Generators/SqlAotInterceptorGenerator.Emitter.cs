@@ -109,7 +109,6 @@ public partial class SqlAotInterceptorGenerator
                         {
                             { HasWindowFunction: true } => "a window function (OVER)",
                             { HasSetOperation: true } => "a set operation (UNION/INTERSECT/EXCEPT)",
-                            { HasUpsert: true } => "an UPSERT/MERGE operation",
                             { HasComplexDynamicHoles: true } => "a dynamically evaluated SQL fragment",
                             { HasReturning: true } => "a RETURNING clause",
                             _ => "unsupported dynamic parameters or complex aliases"
@@ -366,11 +365,15 @@ public partial class SqlAotInterceptorGenerator
                 if (propertyName != null && entityIdentifier != null)
                 {
                     var entityDecl = queryContext.Entities[entityIdentifier];
-                    
-                    if (queryContext.SubqueryEntities.Contains(entityDecl.VariableName))
+
+                    // UPSERT conflict/target columns must stay structural so Build() rewriters
+                    // (e.g. SqlServer → MERGE, PG ON CONFLICT parens) can see column refs.
+                    if (analysis.HasUpsert || queryContext.SubqueryEntities.Contains(entityDecl.VariableName))
                     {
                         flushLiteral();
-                        sb.AppendLine($"                    // AOT Mapped Property Subquery/Dynamic Fallback: {entityDecl.VariableName}");
+                        sb.AppendLine(analysis.HasUpsert
+                            ? $"                    // AOT Upsert: structural property hole for Build rewriters: {entityDecl.VariableName}.{propertyName}"
+                            : $"                    // AOT Mapped Property Subquery/Dynamic Fallback: {entityDecl.VariableName}");
                         sb.AppendLine($"                    genDb.AppendSegment(handler.GetSegment({segmentIndex}));");
                         segmentIndex++;
                         continue; 

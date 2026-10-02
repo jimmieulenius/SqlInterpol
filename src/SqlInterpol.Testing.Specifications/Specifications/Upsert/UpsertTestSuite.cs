@@ -23,13 +23,11 @@ public abstract partial class UpsertTestSuite
         {
             db.Entity<Product>(out var p);
 
-            #pragma warning disable SQLIG10
             return db.Append($$"""
                 INSERT INTO {{p}} {{newProduct}}
                 ON CONFLICT {{p.Id}}
                 DO UPDATE SET {{updateProduct}}
                 """).Build();
-            #pragma warning restore SQLIG10
         });
 
         testCase.Assert();
@@ -44,14 +42,12 @@ public abstract partial class UpsertTestSuite
 
         testCase.Act(() => 
         {
-            #pragma warning disable SQLIG10
             db.Entity<Product>(out var p);
             return db.Append($$"""
                 INSERT INTO {{p}} (Id, Price)
                 VALUES ({{id}}, {{newPrice}})
                 ON DUPLICATE KEY UPDATE Price = {{newPrice}}
                 """).Build();
-            #pragma warning restore SQLIG10
         });
 
         testCase.Assert();
@@ -65,14 +61,12 @@ public abstract partial class UpsertTestSuite
 
         testCase.Act(() => 
         {
-            #pragma warning disable SQLIG10
             db.Entity<Product>(out var p);
             return db.Append($$"""
                 INSERT INTO {{p}} (Id)
                 VALUES ({{id}})
                 ON CONFLICT DO NOTHING
                 """).Build();
-            #pragma warning restore SQLIG10
         });
 
         testCase.Assert();
