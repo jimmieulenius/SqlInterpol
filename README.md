@@ -141,5 +141,7 @@ The same pattern works for bulk `INSERT`, `AppendUpdate`, `AppendDelete`, and cr
 ## Contributing
 Contributions are welcome! Please open an issue before submitting large pull requests to discuss proposed changes.
 
+**Docs:** topic guides under `docs/` are for **NuGet / wiki consumers**. Contributor and agent situating rules live in [`AGENTS.md`](AGENTS.md) (do not put `src/` paths or host test harness names in wiki topic pages).
+
 ## License
 MIT License. See [LICENSE](LICENSE) for details.
