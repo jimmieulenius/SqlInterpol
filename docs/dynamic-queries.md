@@ -2,6 +2,11 @@
 
 The `SqlBuilder` is designed for stateful, forward-only query construction. You can incrementally build complex SQL statements based on runtime conditions (like optional search filters) while maintaining complete parameter safety and type-safe column references.
 
+## At a glance
+
+- Conditional `Append`, composable subqueries, and dynamic WHERE patterns (below).
+- Core builder API: [core-query-building.md](core-query-building.md).
+
 ## Conditional Appending
 
 The most common pattern for dynamic queries is appending `WHERE` clauses based on user input. Because `SqlInterpol` securely extracts variables into parameters at the exact moment of evaluation, dynamically concatenating interpolated strings never exposes your application to SQL injection.

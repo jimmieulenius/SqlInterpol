@@ -1,0 +1,23 @@
+# Railkit compressed intent mirror
+
+Any LLM / agent tool may load this file. Full table: README.md (Start here by intent).
+
+Session: pick one intent. Name the task in one sentence. Open only that owner Fast path before first edit. Re-open the right doc when blocked or the work shifts.
+
+- install / merge into host -> docs/00-QUICK-START.md
+- adopt / bootstrap existing docs -> docs/ADOPTION.md ; skill adopt
+- implement / fix / refactor -> AGENTS.md -> docs/CANONICAL-SOURCES.md (one row)
+- code-first / tribal to code -> docs/CODE-FIRST.md
+- CI / merge / what to run -> docs/ops/ci-flow.md ; skill ci-gate
+- layering / placement -> docs/engineering/architecture/application-layering.md + docs/ops/code-quality-and-refactor.md ; skill layering-review
+- priorities / checks vs ranks -> docs/ops/governing-priorities.md ; skill priorities-review
+- stability / side writes / leftover forks -> docs/ops/ongoing-engineering-bar.md ; skill stability-review
+- tests when behavior moves -> docs/ops/testing-bar.md
+- UI / design pass -> docs/product/heuristics/ui-principles.md ; skill ui-review
+- fit / who we serve -> docs/product/heuristics/customer-targets.md then customer-fit.md ; skill fit-review
+- doc structure / plain language -> docs/DOCUMENTATION-PRINCIPLES.md ; skill doc-review
+- browse docs -> docs/MAP.md
+- skills -> agents/skills/
+- editor adapters -> adapters/README.md
+
+Policy lives in docs/ and agents/skills/. Adapters stay thin. Size budgets only get stricter. Checks follow governing-priorities ranks. Rank 7 = dated queue (owner + due date), not a soft skip. Agents do must/should work without asking; stop only on AGENTS.md stop allowlist. Repeatable how = scripts, infra, workflows, skills (docs/CODE-FIRST.md). Write plainly (docs/DOCUMENTATION-PRINCIPLES.md#plain-language).

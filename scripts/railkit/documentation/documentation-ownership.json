@@ -1,0 +1,24 @@
+{
+  "decidingHomes": [
+    "docs/CANONICAL-SOURCES.md",
+    "docs/CODE-FIRST.md",
+    "docs/ADOPTION.md",
+    "docs/DOCUMENTATION-PRINCIPLES.md",
+    "docs/00-QUICK-START.md",
+    "docs/getting-started.md",
+    "docs/ops/ci-flow.md",
+    "docs/ops/code-quality-and-refactor.md",
+    "docs/ops/ongoing-engineering-bar.md",
+    "docs/ops/governing-priorities.md",
+    "docs/ops/testing-bar.md",
+    "docs/ops/integrations-as-code.md",
+    "docs/ops/adopt-receipt.md",
+    "docs/ops/tribal-inventory.md",
+    "docs/ops/rank7-dated-queue.md",
+    "docs/engineering/architecture/application-layering.md",
+    "docs/product/heuristics/customer-fit.md",
+    "docs/product/heuristics/customer-targets.md"
+  ],
+  "fastPathMaxNonEmptyLines": 25,
+  "canonicalTaskTable": "docs/CANONICAL-SOURCES.md"
+}

@@ -1,0 +1,7 @@
+{
+  "roots": ["src"],
+  "extensions": [".cs"],
+  "warnLines": 400,
+  "maxLines": 800,
+  "ignore": ["node_modules/**", "bin/**", "obj/**"]
+}

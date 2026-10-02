@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'docs/**'
+      - '.github/workflows/sync-wiki.yaml'
   workflow_dispatch:
 
 jobs:
@@ -18,7 +19,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Sync Markdown Files to Wiki
+      - name: Sync consumer Markdown to Wiki
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -27,17 +28,43 @@ jobs:
 
           git clone https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.wiki.git wiki_repo
 
-          # Clear existing wiki files (excluding .git) so deletions in docs/ are synced
-          find wiki_repo -maxdepth 1 -type f ! -name '.git*' -delete
+          # Wipe prior wiki payload (keep .git). Allowlist only — do not `cp -r docs/*`.
+          find wiki_repo -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
 
-          # Copy updated docs
-          cp -r docs/* wiki_repo/
+          # NuGet / wiki consumer topic guides only.
+          # Contributor situating (ops/, engineering/, CANONICAL, ADOPTION, CODE-FIRST, etc.) stays in-repo.
+          # Audience rules: AGENTS.md, .cursor/rules/documentation-audience.mdc
+          CONSUMER_DOCS=(
+            analyzers.md
+            configuration-options.md
+            core-query-building.md
+            cross-dialect-transpilation.md
+            dynamic-queries.md
+            extensibility-dialects.md
+            getting-started.md
+            integration-adonet.md
+            integration-dapper.md
+            integration-entityframeworkcore.md
+            performance-aot.md
+            pipeline-rewriters.md
+            schema-mapping.md
+            templates-caching.md
+            testing-mocking.md
+          )
+
+          for f in "${CONSUMER_DOCS[@]}"; do
+            if [ ! -f "docs/$f" ]; then
+              echo "Missing consumer doc: docs/$f" >&2
+              exit 1
+            fi
+            cp "docs/$f" "wiki_repo/$f"
+          done
 
           cd wiki_repo
           git add -A
           if git diff --staged --quiet; then
             echo "No changes to sync."
           else
-            git commit -m "chore(wiki): sync documentation from main [skip ci]"
+            git commit -m "chore(wiki): sync consumer documentation from main [skip ci]"
             git push
           fi

@@ -1,0 +1,18 @@
+---
+description: Repeatable work belongs in scripts, contracts, workflows, skills.
+globs:
+  - "docs/**"
+  - "scripts/**"
+  - "infra/**"
+  - ".github/**"
+alwaysApply: false
+---
+
+# Code-first
+
+**Owner:** docs/CODE-FIRST.md
+
+- If it must be done twice, put it in the repo as code or a contract.
+- Docs explain why and link; do not grow a second how-tree beside scripts/infra/workflows/skills.
+- CI must call the same check entrypoints as local.
+- Portal-only steps are debt; inventory or script them (docs/ops/integrations-as-code.md).

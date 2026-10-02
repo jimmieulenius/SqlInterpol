@@ -1,0 +1,15 @@
+---
+description: Delete or unexport unused symbols; repo is not a published library by default.
+globs:
+  - "**/*.{ts,tsx,js,jsx}"
+alwaysApply: false
+---
+
+# Unreferenced code
+
+**Owner:** AGENTS.md, docs/ops/code-quality-and-refactor.md
+
+- New helpers stay unexported unless a second file imports them in the same change.
+- When deleting importers, drop export or delete the symbol in the same edit.
+- No silence-only test imports to hide unused exports.
+- Exceptions: file-based routing, dynamic import, string-keyed registries (narrow ignore + comment).

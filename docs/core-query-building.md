@@ -2,6 +2,11 @@
 
 The `SqlBuilder` is the primary entry point for constructing parameterized, dialect-aware SQL queries using C# interpolated strings. It maintains a stateful sequence of query segments and tracks your registered entity variables.
 
+## At a glance
+
+- `Append` / `AppendLine` / `Fragment` / `Template` / `Build` on `SqlBuilder`.
+- Templates and CRUD cache: [templates-caching.md](templates-caching.md).
+
 ---
 
 ## Creating a Builder

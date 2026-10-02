@@ -1,0 +1,5 @@
+{
+  "maxFilesOverWarn": 3,
+  "maxLargestFileLines": 780,
+  "policy": "Ceilings only tighten. Extract and fix; do not raise to unblock CI. Baselined 2026-10-02 on SqlInterpol src/**/*.cs after Railkit install."
+}

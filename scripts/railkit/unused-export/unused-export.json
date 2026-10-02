@@ -1,0 +1,7 @@
+{
+  "mode": "queued",
+  "tool": "dotnet-unused-public-api",
+  "owner": "sqlinterpol-maintainers",
+  "due": "2026-11-15",
+  "notes": "Rank 7 clock: .NET host — wire IDE analyzers / custom unused public API gate (not Knip). Refresh due or set mode to a runnable command after foundation adopt."
+}

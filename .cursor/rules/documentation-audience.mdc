@@ -1,0 +1,32 @@
+---
+description: Separate NuGet/wiki consumer docs from contributor/agent docs
+alwaysApply: true
+---
+
+# Documentation audience (SqlInterpol)
+
+This repo ships a **NuGet package**. Public docs under `docs/` (topic guides) sync to the **GitHub wiki** and are for **package consumers**. Contributor/agent situating must not leak into those pages.
+
+## Two audiences
+
+| Audience | Question they ask | Write here |
+|----------|-------------------|------------|
+| **Consumer** (NuGet / wiki) | How do I install, query, configure, integrate, assert AOT in *my* app? | Wiki allowlisted topic guides in `docs/` (see `.github/workflows/sync-wiki.yaml`) |
+| **Contributor** (improving the package) | Where is the code, which test proves it, how do agents situate? | Root `AGENTS.md`, `.cursor/rules/`, `TODO.md`, PR bodies; if Railkit is present: `docs/ops/`, `docs/engineering/`, `docs/CANONICAL-SOURCES.md`, etc. |
+
+Canon detail: [AGENTS.md](../../AGENTS.md) (Documentation audience section).
+
+## Prefer / Avoid (when editing docs)
+
+| Prefer | Avoid |
+|--------|--------|
+| Public API, package names, install steps, consumer-visible behavior | `src/...` paths in wiki topic guides |
+| `LastBuildWasAotIntercepted`, `SqlInterpol.Testing.Xunit` asserts | Host test class names (`*TestSuite`, `*CallSiteTests`, Spec/Shared hosting notes) |
+| Links to other **consumer** topic guides | Links from wiki pages into CANONICAL / ops / CODE-FIRST / ratchets / agent situating |
+| Contributor proof and harness notes in PR / `TODO.md` / ops docs | Pasting Railkit Fast-path situating into consumer topic intros |
+
+## Fail if
+
+- A wiki-synced page names repo-only tests, Spec harness internals, or generator source paths as the primary guidance.
+- A consumer page becomes the deciding home for contributor situating (CANONICAL, ranks, adopt).
+- Wiki sync is broadened to copy `docs/ops/`, `docs/engineering/`, or other contributor trees without an explicit product decision.

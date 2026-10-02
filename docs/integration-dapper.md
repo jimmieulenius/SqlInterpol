@@ -2,6 +2,11 @@
 
 The `SqlInterpol.Dapper` package bridges type-safe AST generation with Dapper's high-performance materializer, eliminating manual parameter mapping and raw string concatenation.
 
+## At a glance
+
+- `CreateSqlBuilder()` on `IDbConnection` and Dapper execution helpers (`SqlInterpol.Dapper`).
+- Core builder: [core-query-building.md](core-query-building.md).
+
 ## Installation
 
 ```bash

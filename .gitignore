@@ -483,3 +483,6 @@ $RECYCLE.BIN/
 
 # Explicitly ignored files
 %*
+# Railkit / Node check scripts
+node_modules/
+

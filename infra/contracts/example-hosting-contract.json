@@ -1,0 +1,20 @@
+{
+  "$schemaComment": "Example only. Replace provider fields for the host. Secrets stay in a secret store; names listed here.",
+  "name": "example-hosting",
+  "provider": "cloud-agnostic",
+  "publicHostnames": ["www.example.com", "api.example.com"],
+  "regions": ["primary-region"],
+  "requiredEnvKeys": [
+    "DATABASE_URL",
+    "SESSION_SECRET",
+    "PUBLIC_ORIGIN"
+  ],
+  "dns": {
+    "managedInRepo": true,
+    "notes": "Point apply/assert scripts at your DNS provider API"
+  },
+  "edge": {
+    "cdn": false,
+    "accessGate": false
+  }
+}

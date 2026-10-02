@@ -1,0 +1,16 @@
+---
+description: Placement and thin boundaries. Always-on for app code edits.
+globs:
+  - "**/*.{ts,tsx,js,jsx,py,go,rs}"
+alwaysApply: false
+---
+
+# Architecture guardrails
+
+**Owners:** docs/engineering/architecture/application-layering.md, docs/ops/code-quality-and-refactor.md
+
+- Thin HTTP/UI shells; domain owns persistence and side effects.
+- One coordinator per write concern; no parallel v2 write path without a removal plan.
+- First-pass splits: feature folder + index that re-exports only the external surface.
+- Delete or inline unused scaffolding before wrapping; named owner destination for "for later".
+- Do not raise architecture ratchet ceilings to unblock CI; extract and tighten.

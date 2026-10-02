@@ -1,6 +1,11 @@
 # Compiler Pipeline, Rewriters & Rendering
 
-When you build a query, the `SqlPipeline` orchestrates preprocessing and segment rewriting before delegating to the dialect's final renderer. 
+When you build a query, the `SqlPipeline` orchestrates preprocessing and segment rewriting before delegating to the dialect's final renderer.
+
+## At a glance
+
+- Segments vs fragments, custom `ISqlFragment`, and preprocessor/rewriter extension points (below).
+- Custom dialect packaging: [extensibility-dialects.md](extensibility-dialects.md).
 
 ## Segments vs. Fragments
 

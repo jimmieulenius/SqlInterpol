@@ -2,6 +2,12 @@
 
 `SqlInterpol` translates type-safe C# interpolated strings into dialect-specific SQL and heavily optimized native database parameters.
 
+## At a glance
+
+- Install the core package plus optional Dapper / EF Core packages (below).
+- Next: [core-query-building.md](core-query-building.md).
+- Integrations: [integration-dapper.md](integration-dapper.md), [integration-entityframeworkcore.md](integration-entityframeworkcore.md), [integration-adonet.md](integration-adonet.md).
+
 ## 1. Installation
 
 Install the core package and the specific integration package for your preferred data access strategy via the .NET CLI:

@@ -2,6 +2,11 @@
 
 The `SqlInterpol` core package provides zero-boilerplate execution methods for raw ADO.NET, completely eliminating manual `DbCommand` instantiation and parameter mapping.
 
+## At a glance
+
+- ADO.NET helpers on `DbConnection` (core `SqlInterpol` package).
+- Core builder: [core-query-building.md](core-query-building.md).
+
 ## Installation
 
 ```bash

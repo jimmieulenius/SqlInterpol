@@ -1,0 +1,15 @@
+---
+description: Doc placement and lifecycle; thin adapters.
+globs:
+  - "docs/**/*.md"
+alwaysApply: false
+---
+
+# Development docs
+
+**Owner:** docs/DOCUMENTATION-PRINCIPLES.md
+
+- One deciding owner; indexes point only.
+- Why vs how: procedures in scripts/CI/infra/skills.
+- Fast path on deciding homes.
+- Leave docs smaller when editing; do not raise budgets to hide forks.

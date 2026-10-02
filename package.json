@@ -1,0 +1,17 @@
+{
+  "name": "sqlinterpol",
+  "version": "0.0.0",
+  "private": true,
+  "description": "SqlInterpol host — Railkit governing checks (Node). Product build remains .NET.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "check:documentation": "node scripts/railkit/documentation/check-documentation.js",
+    "check:documentation:ownership": "node scripts/railkit/documentation/check-documentation-ownership.js",
+    "check:architecture": "node scripts/railkit/architecture/check-architecture.js",
+    "check:architecture:ratchet": "node scripts/railkit/architecture/check-architecture-ratchet.js",
+    "check:unused-export": "node scripts/railkit/unused-export/check-unused-export.js",
+    "check:railkit": "npm run check:documentation && npm run check:documentation:ownership && npm run check:architecture && npm run check:architecture:ratchet"
+  }
+}

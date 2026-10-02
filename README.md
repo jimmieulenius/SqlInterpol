@@ -138,8 +138,20 @@ The same pattern works for bulk `INSERT`, `AppendUpdate`, `AppendDelete`, and cr
 | **EF Core Integration** | Using `FromSql`, `ExecuteSql`, and sharing schema mappings | [`docs/integration-entityframeworkcore.md`](docs/integration-entityframeworkcore.md) |
 | **ADO.NET Integration** | Pure zero-boilerplate `DbCommand` and parameter execution | [`docs/integration-adonet.md`](docs/integration-adonet.md) |
 
-## Contributing
+## Contributing / agents
 Contributions are welcome! Please open an issue before submitting large pull requests to discuss proposed changes.
+
+**Docs:** allowlisted topic guides under `docs/` are for **NuGet / wiki consumers**. Contributor and agent situating: [`AGENTS.md`](AGENTS.md). Do not put `src/` paths or host test harness names in wiki topic pages.
+
+| Intent (contributors / agents) | Open |
+|--------|------|
+| Install / adopt Railkit | [docs/00-QUICK-START.md](docs/00-QUICK-START.md) ; [docs/ADOPTION.md](docs/ADOPTION.md) |
+| Implement / fix / refactor | [AGENTS.md](AGENTS.md) → [docs/CANONICAL-SOURCES.md](docs/CANONICAL-SOURCES.md) |
+| CI / merge | [docs/ops/ci-flow.md](docs/ops/ci-flow.md) |
+| Code-first / tribal → code | [docs/CODE-FIRST.md](docs/CODE-FIRST.md) |
+| Library consumer docs | [docs/getting-started.md](docs/getting-started.md) |
+
+**Governing checks:** `npm run check:railkit` (Node 20+). Product build remains .NET (`dotnet`).
 
 ## License
 MIT License. See [LICENSE](LICENSE) for details.

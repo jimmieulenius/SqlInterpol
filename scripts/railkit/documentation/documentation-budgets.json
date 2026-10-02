@@ -1,0 +1,38 @@
+{
+  "areas": {
+    "hub": {
+      "globs": [
+        "docs/CANONICAL-SOURCES.md",
+        "docs/00-QUICK-START.md",
+        "docs/DOCUMENTATION-PRINCIPLES.md",
+        "docs/CODE-FIRST.md",
+        "docs/WHY.md",
+        "docs/ADOPTION.md",
+        "AGENTS.md"
+      ],
+      "max": 300,
+      "warn": 250
+    },
+    "product": {
+      "globs": ["docs/product/**/*.md"],
+      "max": 500,
+      "warn": 400
+    },
+    "engineering": {
+      "globs": ["docs/engineering/**/*.md"],
+      "max": 500,
+      "warn": 400
+    },
+    "ops": {
+      "globs": ["docs/ops/**/*.md"],
+      "max": 400,
+      "warn": 300
+    },
+    "indexes": {
+      "globs": ["docs/MAP.md", "README.md"],
+      "max": 200,
+      "warn": 180
+    }
+  },
+  "skip": ["docs/wip/**"]
+}

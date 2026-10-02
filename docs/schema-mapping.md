@@ -2,6 +2,12 @@
 
 `SqlInterpol` allows you to bind C# classes and properties directly to database tables, views, and columns using lightweight schema attributes or a strongly-typed Fluent API. This provides compile-time safety, automatic column escaping, and context-aware aliasing without requiring verbose configuration.
 
+## At a glance
+
+- `[SqlTable]` / `[SqlColumn]`, Fluent metadata, and `db.Entity<T>()`.
+- Default: C# names map 1:1; override only when the physical schema differs.
+- Builder usage after mapping: [core-query-building.md](core-query-building.md).
+
 > ℹ️ **Attribute-Free Mapping (Clean POCOs)**  
 > You do **not** need to use schema attributes if you prefer to keep your domain models strictly decoupled from your database schema. By default, `SqlInterpol` uses the exact C# class and property names.
 >

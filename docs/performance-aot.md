@@ -2,6 +2,11 @@
 
 `SqlInterpol` is engineered for high-throughput, zero-allocation query building. By leveraging modern C# features like `[InterpolatedStringHandler]` and Roslyn Interceptors, the engine shifts the heavy lifting of structural parsing and dialect transpilation from runtime to compile time.
 
+## At a glance
+
+- AOT interceptors and `LastBuildWasAotIntercepted` (below).
+- Templates: [templates-caching.md](templates-caching.md).
+
 ---
 
 ## Ahead-Of-Time (AOT) Compilation
