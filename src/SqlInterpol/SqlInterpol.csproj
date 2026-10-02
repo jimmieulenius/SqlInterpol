@@ -27,6 +27,8 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="SqlInterpol.Testing.Xunit" />
+    <InternalsVisibleTo Include="SqlInterpol.Tests.Jit" />
+    <InternalsVisibleTo Include="SqlInterpol.Tests.Aot" />
   </ItemGroup>
 
   <ItemGroup>

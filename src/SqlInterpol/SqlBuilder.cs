@@ -19,23 +19,6 @@ public partial class SqlBuilder : ISqlEntityRegistry
     private readonly List<ISqlEntityBase> _entities = [];
 
     /// <summary>
-    /// Maps well-known segment tags to their required <see cref="SqlFeature"/> and human-readable
-    /// feature name. Adding a new feature only requires a new entry here — no changes to the
-    /// validation loop in <see cref="BuildSegments"/>.
-    /// </summary>
-    private static readonly IReadOnlyDictionary<string, (SqlFeature Feature, string Name)> _tagFeatureMap =
-        new Dictionary<string, (SqlFeature, string)>(StringComparer.OrdinalIgnoreCase)
-        {
-            [SqlSegmentTag.ForUpdateKeyword]  = (SqlFeature.ForUpdate,  "FOR UPDATE"),
-            [SqlSegmentTag.ForShareKeyword]   = (SqlFeature.ForShare,   "FOR SHARE"),
-            [SqlSegmentTag.ReturningKeyword]  = (SqlFeature.Returning,  "RETURNING"),
-            [SqlSegmentTag.OnConflictKeyword] = (SqlFeature.OnConflict, "ON CONFLICT"),
-            [SqlSegmentTag.DeleteAsKeyword]   = (SqlFeature.DeleteAs,   "DELETE with target alias"),
-            [SqlSegmentTag.UpdateAsKeyword]   = (SqlFeature.UpdateAs,   "UPDATE with target alias"),
-        };
-
-
-    /// <summary>
     /// Tracks variable names mapped from caller argument expressions for zero-allocation property routing.
     /// </summary>
     internal Dictionary<string, ISqlEntityBase> ScopedVariables { get; } = new(StringComparer.Ordinal);
@@ -415,34 +398,7 @@ public partial class SqlBuilder : ISqlEntityRegistry
             
             var compiledSegments = pipeline.Process(finalInputSegments, Context);
 
-            foreach (var segment in compiledSegments)
-            {
-                SqlFeature? requiredFeature = null;
-                string? featureName = null;
-
-                if (segment.Value is ISqlFeatureRequirement req)
-                {
-                    requiredFeature = req.RequiredFeature;
-                    featureName = req.FeatureName;
-                }
-                else if (segment.Tags != null)
-                {
-                    for (int t = 0; t < segment.Tags.Length; t++)
-                    {
-                        if (_tagFeatureMap.TryGetValue(segment.Tags[t], out var mapped))
-                        {
-                            requiredFeature = mapped.Feature;
-                            featureName = mapped.Name;
-                            break;
-                        }
-                    }
-                }
-
-                if (requiredFeature.HasValue && !Context.Dialect.SupportedFeatures.Contains(requiredFeature.Value))
-                {
-                    throw new SqlDialectException(Context.Dialect.Kind.ToString(), featureName!);
-                }
-            }
+            SqlFeatureGate.EnsureSupported(Context.Dialect, compiledSegments);
 
             var vsb = new ValueStringBuilder(stackalloc char[2048]);
 

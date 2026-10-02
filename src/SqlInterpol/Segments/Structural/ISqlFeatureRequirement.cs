@@ -6,9 +6,10 @@ namespace SqlInterpol.Segments;
 /// Marks a SQL fragment as requiring a specific dialect feature, enabling pre-render validation.
 /// </summary>
 /// <remarks>
-/// During <see cref="SqlBuilder.Build(bool)"/>, all segments are inspected for <see cref="ISqlFeatureRequirement"/>.
-/// If any required feature is absent from the active dialect's <see cref="ISqlDialect.SupportedFeatures"/>,
-/// a <see cref="SqlDialectException"/> is thrown listing all violations before any SQL is rendered.
+/// During build, <see cref="SqlInterpol.Pipeline.SqlFeatureGate"/> inspects segments for
+/// <see cref="ISqlFeatureRequirement"/> (and well-known tags). If any required feature is absent from
+/// the active dialect's <see cref="ISqlDialect.SupportedFeatures"/>, a <see cref="SqlDialectException"/>
+/// is thrown before any SQL is rendered.
 /// </remarks>
 public interface ISqlFeatureRequirement
 {
