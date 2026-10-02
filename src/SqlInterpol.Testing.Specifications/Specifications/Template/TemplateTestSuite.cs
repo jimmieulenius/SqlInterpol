@@ -89,6 +89,33 @@ public abstract partial class TemplateTestSuite
         testCase.Assert();
     }
 
+    /// <summary>
+    /// Same expected SQL as <see cref="Template_Select"/>, but via <c>AppendLine(ISqlTemplate)</c>
+    /// instead of <c>Append(template)</c> + <c>AppendLine()</c>.
+    /// </summary>
+    [SqlTest(nameof(ITemplateTestSuite.TemplateSelectData))]
+    public void Template_AppendLine_Select(SqlTestCase testCase)
+    {
+        testCase.Act(() =>
+        {
+            var db = CreateBuilder();
+
+            db.Entity<TemplateOrderModel>(out var o, "o1");
+
+            var activeOrderTemplate = _activeOrderTemplates.GetOrAdd(
+                db.Context.Dialect.Kind,
+                _ => CompileOrderTemplate());
+
+#pragma warning disable SQLIG10
+            return db.AppendLine(activeOrderTemplate, new { CustId = 5 })
+                     .Append($"ORDER BY {o.Id} DESC")
+                     .Build();
+#pragma warning restore SQLIG10
+        });
+
+        testCase.Assert();
+    }
+
     [SqlTest(nameof(ITemplateTestSuite.TemplateBulkInsertData))]
     public void Template_BulkInsert(SqlTestCase testCase)
     {
