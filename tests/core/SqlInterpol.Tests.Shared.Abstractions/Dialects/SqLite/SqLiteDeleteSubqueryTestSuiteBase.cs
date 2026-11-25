@@ -1,0 +1,30 @@
+using SqlInterpol.Configuration;
+using SqlInterpol.Testing.Specifications;
+using SqlInterpol.Testing.Xunit;
+using Xunit;
+
+namespace SqlInterpol.Tests.Dialects.SqLite;
+
+public abstract partial class SqLiteDeleteSubqueryTestSuiteBase : IDeleteSubqueryTestSuite
+{
+    private static readonly object[] _expectedParameters = ["Cancelled"];
+
+    public virtual SqlBuilder CreateBuilder(SqlInterpolOptions? options = null) => SqlBuilder.SqLite(options);
+
+    public static TheoryData<SqlTestCase> Delete_WithSubqueryData =>
+    [
+        new SqlTestCase(
+            expectedSql: [
+                """
+                DELETE FROM "OrderLine"
+                WHERE "OrderLine"."OrderId" IN (
+                    SELECT "Orders"."Id"
+                    FROM "Orders"
+                    WHERE "Orders"."order_status" = @p1
+                )
+                """
+            ],
+            expectedParameters: _expectedParameters
+        )
+    ];
+}

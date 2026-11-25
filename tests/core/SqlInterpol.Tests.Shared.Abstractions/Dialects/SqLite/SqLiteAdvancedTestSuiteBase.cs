@@ -1,0 +1,86 @@
+using SqlInterpol.Configuration;
+using SqlInterpol.Testing.Specifications;
+using SqlInterpol.Testing.Xunit;
+using Xunit;
+
+namespace SqlInterpol.Tests.Dialects.SqLite;
+
+public abstract partial class SqLiteAdvancedTestSuiteBase : IAdvancedTestSuite
+{
+    public virtual SqlBuilder CreateBuilder(SqlInterpolOptions? options = null) => SqlBuilder.SqLite(options);
+
+    public static TheoryData<SqlTestCase> DynamicQueryData =>
+    [
+        new SqlTestCase(
+            [
+                """
+                SELECT "stats"."OrderId", "stats"."TotalAmount"
+                FROM (
+                    SELECT 
+                        "o"."CustomerId",
+                        "o"."Id" AS "OrderId", 
+                        SUM("ol"."Price") AS "TotalAmount"
+                    FROM "Orders" AS "o"
+                    JOIN "OrderLine" AS "ol" ON "o"."Id" = "ol"."OrderId"
+                    GROUP BY "o"."CustomerId", "o"."Id"
+                ) AS "stats"
+                WHERE "stats"."CustomerId" = @p1
+                ORDER BY "stats"."TotalAmount" DESC
+                LIMIT @p2 OFFSET @p3
+                """
+            ]
+        )
+    ];
+
+    public static TheoryData<SqlTestCase> AdvancedDynamicQueryData =>
+    [
+        new SqlTestCase(
+            [
+                """
+                SELECT "stats"."OrderId", "stats"."ProductName", "stats"."TotalAmount"
+                FROM (
+                    SELECT 
+                        "o"."Id" AS "OrderId", 
+                        "p"."PROD_NAME" AS "ProductName",
+                        "ol_agg"."TotalAmount" AS "TotalAmount"
+                    FROM "Orders" AS "o"
+                    
+                    JOIN (
+                        SELECT 
+                            "ol"."OrderId" AS "OrderId",
+                            "ol"."ProductId" AS "ProductId",
+                            SUM("ol"."Price") AS "TotalAmount"
+                        -- JOIN ol_agg ON ...
+                        FROM "OrderLine" AS "ol"
+                        GROUP BY "ol"."OrderId", "ol"."ProductId"
+                    ) AS "ol_agg" ON "o"."Id" = "ol_agg"."OrderId"
+                    
+                    JOIN "Products" AS "p" ON "ol_agg"."ProductId" = "p"."Id"
+                    JOIN "Category" AS "cat" ON "p"."CategoryId" = "cat"."Id"
+                ) AS "stats"
+                WHERE "stats"."ProductName" = @p1
+                ORDER BY "stats"."TotalAmount" DESC
+                LIMIT @p2 OFFSET @p3
+                """
+            ]
+        )
+    ];
+
+    public static TheoryData<SqlTestCase> ComplexRawSqlData =>
+    [
+        new SqlTestCase(
+            [
+                """
+                SELECT "Products"."Id", "Products"."PROD_NAME"
+                FROM "Products"
+                WHERE "Products"."Price" > @p1
+                  AND Products.Status = 'ACTIVE' /* Raw SQL condition */
+                GROUP BY "Products"."Id", "Products"."PROD_NAME"
+                HAVING COUNT(*) > 1
+                ORDER BY "Products"."PROD_NAME" DESC
+                LIMIT 10 OFFSET 5
+                """
+            ]
+        )
+    ];
+}

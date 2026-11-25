@@ -14,8 +14,10 @@
   <Folder Name="/tests/core/">
     <Project Path="tests/core/SqlInterpol.Tests.Aot/SqlInterpol.Tests.Aot.csproj" />
     <Project Path="tests/core/SqlInterpol.Tests.Jit/SqlInterpol.Tests.Jit.csproj" />
+    <Project Path="tests/core/SqlInterpol.Tests.Shared.Abstractions/SqlInterpol.Tests.Shared.Abstractions.csproj" />
     <Project Path="tests/core/SqlInterpol.Tests.Shared/SqlInterpol.Tests.Shared.csproj" />
   </Folder>
+
   <Folder Name="/tests/e2e/">
     <Project Path="tests/e2e/SqlInterpol.E2E.Tests/SqlInterpol.E2E.Tests.csproj" />
   </Folder>

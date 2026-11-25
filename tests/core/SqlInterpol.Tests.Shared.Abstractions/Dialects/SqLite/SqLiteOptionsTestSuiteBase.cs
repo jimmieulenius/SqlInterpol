@@ -1,0 +1,26 @@
+using SqlInterpol.Configuration;
+using SqlInterpol.Testing.Specifications;
+using SqlInterpol.Testing.Xunit;
+using Xunit;
+
+namespace SqlInterpol.Tests.Dialects.SqLite;
+
+public abstract partial class SqLiteOptionsTestSuiteBase : IOptionsTestSuite
+{
+    public virtual SqlBuilder CreateBuilder(SqlInterpolOptions? options = null) => SqlBuilder.SqLite(options);
+
+    public static TheoryData<SqlTestCase> CustomParameterIndexStartData => [new SqlTestCase(
+        expectedSql: ["SELECT * FROM Users WHERE Id = @p50 AND Age = @p51"],
+        expectedParameters: [100, 200]
+    )];
+
+    public static TheoryData<SqlTestCase> EnumFormattingData => [new SqlTestCase(
+        expectedSql: ["UPDATE \"Users\" SET \"Status\" = @p1"],
+        expectedParameters: ["Active"]
+    )];
+
+    public static TheoryData<SqlTestCase> CrossDialectTranspilationWithCustomOptionsData => [new SqlTestCase(
+        expectedSql: ["SELECT * FROM Products LIMIT @p1 OFFSET @p2"],
+        expectedParameters: [10, 20]
+    )];
+}

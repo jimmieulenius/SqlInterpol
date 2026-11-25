@@ -23,7 +23,7 @@ public class PostgreSqlFixture : E2EDatabaseTestSuiteBase
 
 [Trait("Category", "PostgreSQL")]
 [Trait("Category", "E2E")]
-public partial class PostgreSqlFromSpecs : PostgreSqlFromTestSuite, IClassFixture<PostgreSqlFixture>
+public partial class PostgreSqlFromSpecs : PostgreSqlFromTestSuiteBase, IClassFixture<PostgreSqlFixture>
 {
     private readonly PostgreSqlFixture _fixture;
 

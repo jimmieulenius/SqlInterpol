@@ -1,0 +1,43 @@
+using SqlInterpol.Configuration;
+using SqlInterpol.Testing.Specifications;
+using SqlInterpol.Testing.Xunit;
+using Xunit;
+
+namespace SqlInterpol.Tests.Dialects.MySql;
+
+public abstract partial class MySqlLockTestSuiteBase : ILockTestSuite
+{
+    private static object[] _expectedParameters = [5];
+
+    public virtual SqlBuilder CreateBuilder(SqlInterpolOptions? options = null) => SqlBuilder.MySql(options);
+
+    public static TheoryData<SqlTestCase> SelectWithForUpdateData => 
+    [
+        new SqlTestCase(
+            expectedSql: [
+                """
+                SELECT `dbo`.`Products`.`Id`, `dbo`.`Products`.`PROD_NAME`
+                FROM `dbo`.`Products`
+                WHERE `dbo`.`Products`.`Id` = @p0
+                FOR UPDATE
+                """
+            ],
+            expectedParameters: _expectedParameters
+        )
+    ];
+
+    public static TheoryData<SqlTestCase> SelectWithForShareData => 
+    [
+        new SqlTestCase(
+            expectedSql: [
+                """
+                SELECT `dbo`.`Products`.`Id`, `dbo`.`Products`.`PROD_NAME`
+                FROM `dbo`.`Products`
+                WHERE `dbo`.`Products`.`Id` = @p0
+                FOR SHARE
+                """
+            ],
+            expectedParameters: _expectedParameters
+        )
+    ];
+}

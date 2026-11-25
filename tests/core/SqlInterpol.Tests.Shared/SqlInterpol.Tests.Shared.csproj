@@ -5,13 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
-    
     <IsTestProject>false</IsTestProject>
-    <DiscoverTests>false</DiscoverTests>
-    <ExcludeFromTestExplorer>true</ExcludeFromTestExplorer>
-    
-    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
-    <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
 
     <CopyBuildOutputToOutputDirectory>false</CopyBuildOutputToOutputDirectory>
     <GenerateDependencyFile>false</GenerateDependencyFile>
