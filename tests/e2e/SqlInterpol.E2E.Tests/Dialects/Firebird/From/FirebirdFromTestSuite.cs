@@ -26,7 +26,7 @@ public partial class FirebirdFromTestSuite : FirebirdFromTestSuiteBase
         var (seed, expectedData) = testName switch
         {
             nameof(From_SingleEntity) => (
-                SqlTestDbSeed.Path("From_SingleEntity.sql"),
+                SqlTestDbSeed.Path(testName),
                 new SqlTestDbData
                 {
                     Data = [
@@ -38,7 +38,7 @@ public partial class FirebirdFromTestSuite : FirebirdFromTestSuiteBase
             ),
 
             nameof(From_Entity_WithSqlTableNameOnly) => (
-                SqlTestDbSeed.Path("From_Entity_WithSqlTableNameOnly.sql"),
+                SqlTestDbSeed.Path(testName),
                 new SqlTestDbData
                 {
                     Data = [new TableOnlyModel(Id: 1)]

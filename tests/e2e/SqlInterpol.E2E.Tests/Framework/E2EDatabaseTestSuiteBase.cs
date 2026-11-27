@@ -51,7 +51,13 @@ public abstract class E2EDatabaseTestSuiteBase : IAsyncLifetime
 
     public void PrepareTest(string suiteFolder, SqlTestDbSeed? seed = null)
     {
-        if (Connection is null) return;
+        if (Connection is null)
+        {
+            throw new InvalidOperationException(
+                $"E2E connection for '{Dialect}' is not open. Verify the database is running, RUN_E2E is enabled, and connection settings are valid.");
+        }
+
+        SqlTestCase.CurrentConnection.Value = Connection;
 
         // 1. Wipe database via dialect-specific reset
         ResetDatabaseAsync().GetAwaiter().GetResult();

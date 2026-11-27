@@ -43,9 +43,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="Dialects\**\*.sql">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
+    <None Update="Dialects/**/*.sql" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
