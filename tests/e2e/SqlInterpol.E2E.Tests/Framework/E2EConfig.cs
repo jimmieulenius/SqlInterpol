@@ -11,7 +11,7 @@ public static class E2EConfig
     public static string GetConnectionString(SqlDialectKind dialect) => dialect switch
     {
         _ when dialect == SqlDialectKind.Firebird => Environment.GetEnvironmentVariable("ConnectionStrings__Firebird") 
-            ?? $"User=sysdba;Password={Environment.GetEnvironmentVariable("E2E_FIREBIRD_PASSWORD") ?? "masterkey"};Database=localhost:test.fdb;DataSource=localhost;Port=3050;Dialect=3;",
+            ?? $"User=sysdba;Password={Environment.GetEnvironmentVariable("E2E_FIREBIRD_PASSWORD") ?? "masterkey"};Database=/firebird/data/test.fdb;DataSource=localhost;Port=3050;Dialect=3;",
 
         _ when dialect == SqlDialectKind.MySql => Environment.GetEnvironmentVariable("ConnectionStrings__MySql") 
             ?? $"Server=localhost;Port=3306;Database={DbName};Uid=root;Pwd={DbPassword};",

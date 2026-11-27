@@ -18,8 +18,21 @@ public class FirebirdFixture : E2EDatabaseTestSuiteBase
 {
     protected override SqlDialectKind Dialect => SqlDialectKind.Firebird;
 
-    protected override IDbConnection CreateConnection() =>
-        new FbConnection(E2EConfig.GetConnectionString(SqlDialectKind.Firebird));
+    protected override IDbConnection CreateConnection()
+    {
+        var cs = E2EConfig.GetConnectionString(SqlDialectKind.Firebird);
+        try
+        {
+            using var probe = new FbConnection(cs);
+            probe.Open();
+        }
+        catch (FbException ex) when (ex.ErrorCode == 335544344)
+        {
+            FbConnection.CreateDatabase(cs, pageSize: 16384, forcedWrites: false, overwrite: false);
+        }
+
+        return new FbConnection(cs);
+    }
 
     protected override SqlBuilder ConfigureBuilder(SqlInterpolOptions? options = null) =>
         SqlBuilder.Firebird(options);
