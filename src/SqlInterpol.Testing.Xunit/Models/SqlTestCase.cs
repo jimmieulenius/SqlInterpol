@@ -67,9 +67,9 @@ public sealed class SqlTestCase : IXunitSerializable
     public object?[] ExpectedParameters { get; private set; } = [];
 
     /// <summary>
-    /// Gets the expected database state and structure for E2E test validation.
+    /// Gets or sets the expected database state and structure for E2E test validation.
     /// </summary>
-    public SqlTestDbData? ExpectedData { get; private set; }
+    public SqlTestDbData? ExpectedData { get; set; }
 
     /// <summary>
     /// Gets the type of exception expected to be thrown, typically for unsupported features or invalid syntax.

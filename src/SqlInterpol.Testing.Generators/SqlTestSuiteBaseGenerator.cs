@@ -168,6 +168,8 @@ public sealed class SqlTestSuiteBaseGenerator : IIncrementalGenerator
 
         if (candidateInterfaces.Count == 0) return;
 
+        bool emittedConfigureE2E = false;
+
         // 2. Process each candidate
         foreach (var contract in candidateInterfaces)
         {
@@ -268,6 +270,19 @@ public sealed class SqlTestSuiteBaseGenerator : IIncrementalGenerator
             sb.AppendLine();
             sb.AppendLine($"{classModifier} {className}");
             sb.Append("{");
+
+            if (!emittedConfigureE2E)
+            {
+                emittedConfigureE2E = true;
+                sb.AppendLine();
+                sb.AppendLine("    /// <summary>");
+                sb.AppendLine("    /// Optional hook invoked before each test case executes, allowing E2E test suites");
+                sb.AppendLine("    /// to seed the database and attach <see cref=\"SqlTestCase.ExpectedData\"/>.");
+                sb.AppendLine("    /// </summary>");
+                sb.AppendLine("    /// <param name=\"testCase\">The active test case instance.</param>");
+                sb.AppendLine("    /// <param name=\"testName\">The name of the executing test method.</param>");
+                sb.AppendLine("    protected virtual void ConfigureE2E(SqlTestCase testCase, string testName) { }");
+            }
 
             var activeMembers = templateClassSyntax.Members
                 .Where(m => !m.AttributeLists
@@ -385,8 +400,35 @@ public sealed class SqlTestSuiteBaseGenerator : IIncrementalGenerator
         if (!modifiers.Contains("public"))
             modifiers = "public " + modifiers;
 
+        var testCaseParam = method.ParameterList.Parameters
+            .FirstOrDefault(p => p.Type?.ToString() is "SqlTestCase" or "SqlInterpol.Testing.Xunit.SqlTestCase");
+
+        var hookCall = testCaseParam is not null
+            ? $"ConfigureE2E({testCaseParam.Identifier.Text}, nameof({method.Identifier}));"
+            : null;
+
         sb.AppendLine($"    {modifiers.Trim()} {method.ReturnType} {method.Identifier}{method.ParameterList}");
-        sb.Append((method.Body?.ToFullString() ?? $"    {{ {method.ExpressionBody?.ToFullString()}; }}").TrimEnd());
+
+        if (method.Body is not null)
+        {
+            var bodyText = method.Body.ToFullString().TrimEnd();
+            var braceIndex = bodyText.IndexOf('{');
+            if (hookCall is not null && braceIndex >= 0)
+            {
+                sb.AppendLine(bodyText.Substring(0, braceIndex + 1));
+                sb.Append($"        {hookCall}");
+                sb.Append(bodyText.Substring(braceIndex + 1));
+            }
+            else
+            {
+                sb.Append(bodyText);
+            }
+        }
+        else if (method.ExpressionBody is not null)
+        {
+            var prefix = hookCall is not null ? $"{hookCall} " : string.Empty;
+            sb.Append($"    {{ {prefix}{method.ExpressionBody.ToFullString()}; }}");
+        }
     }
 
     /// <summary>

@@ -8,38 +8,33 @@ namespace SqlInterpol.E2E.Tests.Framework;
 
 public abstract class E2EDatabaseTestSuiteBase : IAsyncLifetime
 {
+    private const string InitFolderName = "$Init";
+
     protected abstract IDbConnection CreateConnection();
+
     protected abstract SqlBuilder ConfigureBuilder(SqlInterpolOptions? options);
-    
+
     protected abstract SqlDialectKind Dialect { get; }
 
-    // Made public so the Test Classes can check if it's null to trigger a Skip
     public IDbConnection? Connection { get; private set; }
 
-    public async Task InitializeAsync()
+    public abstract Task ResetDatabaseAsync();
+
+    public Task InitializeAsync()
     {
         try
         {
             Connection = CreateConnection();
             Connection.Open();
-
-            foreach (var script in GetSchemaScripts())
-            {
-                if (string.IsNullOrWhiteSpace(script)) continue;
-
-                using var command = Connection.CreateCommand();
-                command.CommandText = script;
-                command.ExecuteNonQuery();
-            }
         }
         catch (Exception)
         {
-            // Database is offline or failed to initialize. 
-            // Gracefully swallow the exception so xUnit can hit Assert.Skip() in the test classes.
+            // Database is offline or failed to initialize.
+            // Gracefully swallow the exception so xUnit can skip in the test classes.
             Connection = null;
         }
 
-        await Task.CompletedTask;
+        return Task.CompletedTask;
     }
 
     public Task DisposeAsync()
@@ -54,26 +49,83 @@ public abstract class E2EDatabaseTestSuiteBase : IAsyncLifetime
         return ConfigureBuilder(options);
     }
 
-    protected virtual IEnumerable<string> GetSchemaScripts()
+    public void PrepareTest(string suiteFolder, SqlTestDbSeed? seed = null)
     {
-        var scriptDir = Path.Combine("Dialects", Dialect.Value, "Scripts");
+        if (Connection is null) return;
 
-        var initPath = Path.Combine(scriptDir, "00_Init.sql");
-        if (File.Exists(initPath))
+        // 1. Wipe database via dialect-specific reset
+        ResetDatabaseAsync().GetAwaiter().GetResult();
+
+        var scriptsRoot = Path.Combine(
+            AppContext.BaseDirectory,
+            "Dialects",
+            Dialect.Value,
+            suiteFolder,
+            "Db",
+            "Scripts");
+
+        // 2. Always run $Init scripts first if present
+        if (Directory.Exists(scriptsRoot))
         {
-            yield return File.ReadAllText(initPath);
+            ExecuteDirectory(Path.Combine(scriptsRoot, InitFolderName));
         }
 
-        var modelDir = Path.Combine(scriptDir, "Models");
-        if (Directory.Exists(modelDir))
+        if (seed is null || string.IsNullOrWhiteSpace(seed.Value))
+            return;
+
+        // 3. Run inline SQL or resolve folder/file path
+        if (seed.Kind == SqlSeedKind.Inline)
         {
-            // CRITICAL: Directory.GetFiles does not guarantee order on all OS platforms.
-            // OrderBy ensures your 10_ schemas run before 11_ data files!
-            var modelFiles = Directory.GetFiles(modelDir, "*.sql").OrderBy(f => f);
-            foreach (var file in modelFiles)
-            {
-                yield return File.ReadAllText(file);
-            }
+            ExecuteSql(seed.Value);
+            return;
         }
+
+        var targetPath = Path.Combine(scriptsRoot, seed.Value);
+
+        if (Directory.Exists(targetPath))
+        {
+            ExecuteDirectory(targetPath);
+        }
+        else if (File.Exists(targetPath))
+        {
+            ExecuteFile(targetPath);
+        }
+        else if (File.Exists($"{targetPath}.sql"))
+        {
+            ExecuteFile($"{targetPath}.sql");
+        }
+        else
+        {
+            throw new FileNotFoundException($"E2E seed path not found: {targetPath}");
+        }
+    }
+
+    private void ExecuteDirectory(string directoryPath)
+    {
+        if (!Directory.Exists(directoryPath)) return;
+
+        var files = Directory
+            .GetFiles(directoryPath, "*.sql", SearchOption.TopDirectoryOnly)
+            .OrderBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var file in files)
+        {
+            ExecuteFile(file);
+        }
+    }
+
+    private void ExecuteFile(string filePath)
+    {
+        var sql = File.ReadAllText(filePath);
+        ExecuteSql(sql);
+    }
+
+    private void ExecuteSql(string sql)
+    {
+        if (Connection is null || string.IsNullOrWhiteSpace(sql)) return;
+
+        using var command = Connection.CreateCommand();
+        command.CommandText = sql;
+        command.ExecuteNonQuery();
     }
 }
