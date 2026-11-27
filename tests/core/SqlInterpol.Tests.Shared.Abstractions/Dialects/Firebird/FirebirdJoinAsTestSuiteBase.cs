@@ -14,7 +14,7 @@ public abstract partial class FirebirdJoinAsTestSuiteBase : IJoinAsTestSuite
         SELECT
             "p"."Id",
             "ol"."OrderId"
-        FROM "dbo"."Products" AS "p"
+        FROM "Products" AS "p"
         JOIN "OrderLine" AS "ol"
             ON "p"."Id" = "ol"."ProductItemNumber"
         """
@@ -36,8 +36,8 @@ public abstract partial class FirebirdJoinAsTestSuiteBase : IJoinAsTestSuite
         SELECT
             "original"."Id",
             "related"."Id"
-        FROM "dbo"."Products" AS "original"
-        JOIN "dbo"."Products" AS "related"
+        FROM "Products" AS "original"
+        JOIN "Products" AS "related"
             ON "original"."CategoryId" = "related"."CategoryId"
         """
     ])];
@@ -45,11 +45,11 @@ public abstract partial class FirebirdJoinAsTestSuiteBase : IJoinAsTestSuite
     public static TheoryData<SqlTestCase> JoinWithConfigOverrideData => [new SqlTestCase([
         """
         SELECT
-            "history"."Archive_Products"."Id",
+            "Archive_Products"."Id",
             "OrderLine"."OrderId"
-        FROM "history"."Archive_Products"
+        FROM "Archive_Products"
         JOIN "OrderLine"
-            ON "history"."Archive_Products"."Id" = "OrderLine"."ProductItemNumber"
+            ON "Archive_Products"."Id" = "OrderLine"."ProductItemNumber"
         """
     ])];
 }

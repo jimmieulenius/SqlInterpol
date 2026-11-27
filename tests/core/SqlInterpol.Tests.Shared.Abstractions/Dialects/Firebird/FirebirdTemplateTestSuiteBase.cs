@@ -13,7 +13,7 @@ public abstract partial class FirebirdTemplateTestSuiteBase : ITemplateTestSuite
         expectedSql: [
             """
             SELECT "o1"."Id", "o1"."CustomerId"
-            FROM "dbo"."Orders" AS "o1"
+            FROM "Orders" AS "o1"
             WHERE "o1"."CustomerId" = @p0
             ORDER BY "o1"."Id" DESC
             """
@@ -23,7 +23,7 @@ public abstract partial class FirebirdTemplateTestSuiteBase : ITemplateTestSuite
     public static TheoryData<SqlTestCase> TemplateBulkInsertData => [new SqlTestCase(
         expectedSql: [
             """
-            INSERT INTO "dbo"."Orders" ("Id")
+            INSERT INTO "Orders" ("Id")
             VALUES (@p0), (@p1)
             """
         ]
@@ -32,8 +32,8 @@ public abstract partial class FirebirdTemplateTestSuiteBase : ITemplateTestSuite
     public static TheoryData<SqlTestCase> TemplateUpdateData => [new SqlTestCase(
         expectedSql: [
             """
-            UPDATE "dbo"."Orders" SET "CustomerId" = @p0 WHERE "Id" = @p1;
-            UPDATE "dbo"."Orders" SET "CustomerId" = @p2 WHERE "Id" = @p3
+            UPDATE "Orders" SET "CustomerId" = @p0 WHERE "Id" = @p1;
+            UPDATE "Orders" SET "CustomerId" = @p2 WHERE "Id" = @p3
             """
         ]
     )];
@@ -41,8 +41,8 @@ public abstract partial class FirebirdTemplateTestSuiteBase : ITemplateTestSuite
     public static TheoryData<SqlTestCase> TemplateDeleteData => [new SqlTestCase(
         expectedSql: [
             """
-            DELETE FROM "dbo"."Orders" WHERE "Id" = @p0;
-            DELETE FROM "dbo"."Orders" WHERE "Id" = @p1
+            DELETE FROM "Orders" WHERE "Id" = @p0;
+            DELETE FROM "Orders" WHERE "Id" = @p1
             """
         ]
     )];
@@ -50,7 +50,7 @@ public abstract partial class FirebirdTemplateTestSuiteBase : ITemplateTestSuite
     public static TheoryData<SqlTestCase> TemplateManualInsertData => [new SqlTestCase(
         expectedSql: [
             """
-            INSERT INTO "dbo"."Orders"
+            INSERT INTO "Orders"
             ("Id", "CustomerId")
             VALUES (@p0, @p1)
             """
@@ -60,7 +60,7 @@ public abstract partial class FirebirdTemplateTestSuiteBase : ITemplateTestSuite
     public static TheoryData<SqlTestCase> TemplateManualUpdateData => [new SqlTestCase(
         expectedSql: [
             """
-            UPDATE "dbo"."Orders"
+            UPDATE "Orders"
             SET "CustomerId" = @p0
             WHERE "Id" = @p1
             """

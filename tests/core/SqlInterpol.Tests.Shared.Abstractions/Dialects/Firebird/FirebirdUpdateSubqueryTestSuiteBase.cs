@@ -30,7 +30,7 @@ public abstract partial class FirebirdUpdateSubqueryTestSuiteBase : IUpdateSubqu
                 SELECT
                     "p"."CategoryId" AS "CategoryId",
                     MAX("p"."Price") AS "MaxPrice"
-                FROM "dbo"."Products" AS "p"
+                FROM "Products" AS "p"
                 GROUP BY "p"."CategoryId"
             )
             UPDATE "stats"

@@ -11,17 +11,17 @@ public abstract partial class FirebirdUpdateTestSuiteBase : IUpdateTestSuite
     public virtual SqlBuilder CreateBuilder(SqlInterpolOptions? options = null) => SqlBuilder.Firebird(options);
 
     public static TheoryData<SqlTestCase> UpdateData => [new SqlTestCase(
-        expectedSql: ["UPDATE \"dbo\".\"Orders\"\nSET \"order_status\" = @p0, \"Total\" = @p1\nWHERE \"dbo\".\"Orders\".\"Id\" = @p2"],
+        expectedSql: ["UPDATE \"Orders\"\nSET \"order_status\" = @p0, \"Total\" = @p1\nWHERE \"Orders\".\"Id\" = @p2"],
         expectedParameters: ["Shipped", 99.99m, 42]
     )];
 
     public static TheoryData<SqlTestCase> UpdateExplicitData => [new SqlTestCase(
-        expectedSql: ["UPDATE \"dbo\".\"Orders\"\nSET \"dbo\".\"Orders\".\"order_status\" = @p0, \"dbo\".\"Orders\".\"Total\" = @p1\nWHERE \"dbo\".\"Orders\".\"Id\" = @p2"],
+        expectedSql: ["UPDATE \"Orders\"\nSET \"Orders\".\"order_status\" = @p0, \"Orders\".\"Total\" = @p1\nWHERE \"Orders\".\"Id\" = @p2"],
         expectedParameters: ["Shipped", 99.99m, 42]
     )];
 
     public static TheoryData<SqlTestCase> UpdateWithIgnoreData => [new SqlTestCase(
-        expectedSql: ["UPDATE \"dbo\".\"Orders\"\nSET \"Id\" = @p0, \"order_status\" = @p1, \"Total\" = @p2\nWHERE \"dbo\".\"Orders\".\"Id\" = @p3"],
+        expectedSql: ["UPDATE \"Orders\"\nSET \"Id\" = @p0, \"order_status\" = @p1, \"Total\" = @p2\nWHERE \"Orders\".\"Id\" = @p3"],
         expectedParameters: [42, "Shipped", 99.99m, 42]
     )];
 

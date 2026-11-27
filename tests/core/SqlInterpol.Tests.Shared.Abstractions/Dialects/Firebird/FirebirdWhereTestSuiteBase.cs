@@ -13,9 +13,9 @@ public abstract partial class FirebirdWhereTestSuiteBase : IWhereTestSuite
         expectedSql: [
             """
             SELECT
-                "dbo"."Products"."Id"
-            FROM "dbo"."Products"
-            WHERE "dbo"."Products"."Id" = @p0
+                "Products"."Id"
+            FROM "Products"
+            WHERE "Products"."Id" = @p0
             """
         ],
         expectedParameters: [42]
@@ -25,9 +25,9 @@ public abstract partial class FirebirdWhereTestSuiteBase : IWhereTestSuite
         expectedSql: [
             """
             SELECT
-                "dbo"."Products"."Id"
-            FROM "dbo"."Products"
-            WHERE "dbo"."Products"."CategoryId" IN (@p0, @p1, @p2)
+                "Products"."Id"
+            FROM "Products"
+            WHERE "Products"."CategoryId" IN (@p0, @p1, @p2)
             """
         ],
         expectedParameters: [10, 20, 30]

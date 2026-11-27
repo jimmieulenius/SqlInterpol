@@ -12,24 +12,24 @@ public abstract partial class FirebirdSelectAsTestSuiteBase : ISelectAsTestSuite
     public static TheoryData<SqlTestCase> ProjectionAsLiteralData => [new SqlTestCase([
         """
         SELECT
-            "dbo"."Products"."Id" AS "ProductId"
-        FROM "dbo"."Products"
+            "Products"."Id" AS "ProductId"
+        FROM "Products"
         """
     ])];
 
     public static TheoryData<SqlTestCase> RawColumnAsProjectionData => [new SqlTestCase([
         """
         SELECT
-            "dbo"."Products"."Id" AS "ProductId"
-        FROM "dbo"."Products"
+            "Products"."Id" AS "ProductId"
+        FROM "Products"
         """
     ])];
 
     public static TheoryData<SqlTestCase> ProjectionAsProjectionWithAttributeData => [new SqlTestCase([
         """
         SELECT
-            "dbo"."Products"."PROD_NAME" AS "Name"
-        FROM "dbo"."Products"
+            "Products"."PROD_NAME" AS "Name"
+        FROM "Products"
         """
     ])];
 }

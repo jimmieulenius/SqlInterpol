@@ -13,7 +13,7 @@ public abstract partial class FirebirdFromAsTestSuiteBase : IFromAsTestSuite
         """
         SELECT
             "p"."Id"
-        FROM "dbo"."Products" AS "p"
+        FROM "Products" AS "p"
         """
     ])];
 
@@ -21,7 +21,7 @@ public abstract partial class FirebirdFromAsTestSuiteBase : IFromAsTestSuite
         """
         SELECT
             "prod"."Id"
-        FROM "dbo"."Products" AS "prod"
+        FROM "Products" AS "prod"
         """
     ])];
 
@@ -45,14 +45,14 @@ public abstract partial class FirebirdFromAsTestSuiteBase : IFromAsTestSuite
         """
         SELECT
             "Product"."Id"
-        FROM "dbo"."Products" AS "Product"
+        FROM "Products" AS "Product"
         """
     ])];
 
     public static TheoryData<SqlTestCase> FromAsEntityAsItsOwnAliasInceptionData => [new SqlTestCase([
         """
         SELECT "Product"."CategoryId", "Product"."Id", "Product"."IsActive", "Product"."PROD_NAME", "Product"."Price"
-        FROM "dbo"."Products" AS "Product"
+        FROM "Products" AS "Product"
         """
     ])];
 
@@ -60,7 +60,7 @@ public abstract partial class FirebirdFromAsTestSuiteBase : IFromAsTestSuite
         """
         SELECT
             "prod"."Id"
-        FROM "dbo"."Products" AS "prod"
+        FROM "Products" AS "prod"
         """
     ])];
 
@@ -68,14 +68,14 @@ public abstract partial class FirebirdFromAsTestSuiteBase : IFromAsTestSuite
         """
         SELECT
             "p"."Id"
-        FROM "dbo"."Products" AS "p"
+        FROM "Products" AS "p"
         """
     ])];
 
     public static TheoryData<SqlTestCase> From_AutoAliasingInceptionData => [new SqlTestCase([
         """
         SELECT "myProd"."CategoryId", "myProd"."Id", "myProd"."IsActive", "myProd"."PROD_NAME", "myProd"."Price"
-        FROM "dbo"."Products" AS "myProd"
+        FROM "Products" AS "myProd"
         """
     ])];
 }

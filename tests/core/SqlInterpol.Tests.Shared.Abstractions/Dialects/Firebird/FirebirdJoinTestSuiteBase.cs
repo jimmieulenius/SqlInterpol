@@ -12,11 +12,11 @@ public abstract partial class FirebirdJoinTestSuiteBase : IJoinTestSuite
     public static TheoryData<SqlTestCase> JoinTwoEntitiesData => [new SqlTestCase([
         """
         SELECT
-            "dbo"."Products"."Id",
+            "Products"."Id",
             "OrderLine"."OrderId"
-        FROM "dbo"."Products"
+        FROM "Products"
         JOIN "OrderLine"
-            ON "dbo"."Products"."Id" = "OrderLine"."ProductItemNumber"
+            ON "Products"."Id" = "OrderLine"."ProductItemNumber"
         """
     ])];
 }

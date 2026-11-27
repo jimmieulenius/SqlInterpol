@@ -13,18 +13,18 @@ public abstract partial class FirebirdLexicalBoundaryTestSuiteBase : ILexicalBou
 
     public static TheoryData<SqlTestCase> EscapedQuotesInLiteralData => [new SqlTestCase([
         """
-        SELECT "dbo"."Products"."Id"
-        FROM "dbo"."Products"
-        WHERE "dbo"."Products"."PROD_NAME" = 'O''Connor' AND "dbo"."Products"."CategoryId" = 1
+        SELECT "Products"."Id"
+        FROM "Products"
+        WHERE "Products"."PROD_NAME" = 'O''Connor' AND "Products"."CategoryId" = 1
         """
     ])];
 
     public static TheoryData<SqlTestCase> ParameterizedQuotesData => [new SqlTestCase(
         expectedSql: [
             """
-            SELECT "dbo"."Products"."Id"
-            FROM "dbo"."Products"
-            WHERE "dbo"."Products"."PROD_NAME" = @p0
+            SELECT "Products"."Id"
+            FROM "Products"
+            WHERE "Products"."PROD_NAME" = @p0
             """
         ],
         expectedParameters: _parameterizedExpectedParams
@@ -32,43 +32,43 @@ public abstract partial class FirebirdLexicalBoundaryTestSuiteBase : ILexicalBou
 
     public static TheoryData<SqlTestCase> MultiLineCommentWithQuotesData => [new SqlTestCase([
         """
-        SELECT "dbo"."Products"."Id"
+        SELECT "Products"."Id"
         /* This is a multi-line comment.
            It has 'single quotes' and "double quotes".
            The parser should completely ignore them.
         */
-        FROM "dbo"."Products"
+        FROM "Products"
         """
     ])];
 
     public static TheoryData<SqlTestCase> SingleLineCommentWithQuotesData => [new SqlTestCase([
         """
-        SELECT "dbo"."Products"."Id"
+        SELECT "Products"."Id"
         -- This is a single-line comment with 'quotes' and "more quotes"
-        FROM "dbo"."Products"
+        FROM "Products"
         """
     ])];
 
     public static TheoryData<SqlTestCase> StringLiteralWithCommentTokensData => [new SqlTestCase([
         """
-        SELECT "dbo"."Products"."Id"
-        FROM "dbo"."Products"
-        WHERE "dbo"."Products"."PROD_NAME" = 'Item /* Note */ -- 1'
+        SELECT "Products"."Id"
+        FROM "Products"
+        WHERE "Products"."PROD_NAME" = 'Item /* Note */ -- 1'
         """
     ])];
 
     public static TheoryData<SqlTestCase> KeywordsInLiteralData => [new SqlTestCase([
         """
-        SELECT "dbo"."Products"."Id"
-        FROM "dbo"."Products"
-        WHERE "dbo"."Products"."PROD_NAME" = 'INSERT VALUES RETURNING FOR UPDATE'
+        SELECT "Products"."Id"
+        FROM "Products"
+        WHERE "Products"."PROD_NAME" = 'INSERT VALUES RETURNING FOR UPDATE'
         """
     ])];
 
     public static TheoryData<SqlTestCase> KeywordsInCommentData => [new SqlTestCase([
         """
-        SELECT "dbo"."Products"."Id"
-        FROM "dbo"."Products"
+        SELECT "Products"."Id"
+        FROM "Products"
         /* We don't want to INSERT VALUES RETURNING FOR UPDATE here */
         """
     ])];

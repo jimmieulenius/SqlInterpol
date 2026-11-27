@@ -12,7 +12,7 @@ public abstract partial class FirebirdUpsertTestSuiteBase : IUpsertTestSuite
     public static TheoryData<SqlTestCase> UpsertData => [new SqlTestCase(
         expectedSql: [
             """
-            INSERT INTO "dbo"."Products" ("Id", "PROD_NAME", "CategoryId", "Price")
+            INSERT INTO "Products" ("Id", "PROD_NAME", "CategoryId", "Price")
             VALUES (@p0, @p1, @p2, @p3)
             ON CONFLICT "Id"
             DO UPDATE SET "PROD_NAME" = @p4, "Price" = @p5
@@ -24,7 +24,7 @@ public abstract partial class FirebirdUpsertTestSuiteBase : IUpsertTestSuite
     public static TheoryData<SqlTestCase> OnDuplicateKeyData => [new SqlTestCase(
         expectedSql: [
             """
-            INSERT INTO "dbo"."Products" (Id, Price)
+            INSERT INTO "Products" (Id, Price)
             VALUES (@p0, @p1)
             ON DUPLICATE KEY UPDATE Price = @p2
             """
@@ -35,7 +35,7 @@ public abstract partial class FirebirdUpsertTestSuiteBase : IUpsertTestSuite
     public static TheoryData<SqlTestCase> OnConflictData => [new SqlTestCase(
         expectedSql: [
             """
-            INSERT INTO "dbo"."Products" (Id)
+            INSERT INTO "Products" (Id)
             VALUES (@p0)
             ON CONFLICT DO NOTHING
             """

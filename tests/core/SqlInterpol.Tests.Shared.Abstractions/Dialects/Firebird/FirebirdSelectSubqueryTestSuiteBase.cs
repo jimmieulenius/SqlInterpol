@@ -20,7 +20,7 @@ public abstract partial class FirebirdSelectSubqueryTestSuiteBase : ISelectSubqu
                     FROM "Category"
                     WHERE "Category"."Id" = "prod"."CategoryId" AND "Category"."IsActive" = @p0
                 ) AS "CategoryName"
-            FROM "dbo"."Products" AS "prod"
+            FROM "Products" AS "prod"
             WHERE "prod"."Price" > @p1
             """,
             """
@@ -32,7 +32,7 @@ public abstract partial class FirebirdSelectSubqueryTestSuiteBase : ISelectSubqu
                     FROM "Category"
                     WHERE "Category"."Id" = "second_prod"."CategoryId" AND "Category"."IsActive" = @p0
                 ) AS "CategoryName"
-            FROM "dbo"."Products" AS "second_prod"
+            FROM "Products" AS "second_prod"
             WHERE "second_prod"."Price" > @p1
             """
         ],

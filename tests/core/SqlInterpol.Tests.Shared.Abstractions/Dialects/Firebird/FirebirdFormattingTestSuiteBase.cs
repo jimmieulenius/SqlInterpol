@@ -12,47 +12,47 @@ public abstract partial class FirebirdFormattingTestSuiteBase : IFormattingTestS
     public static TheoryData<SqlTestCase> Select_WithNewLinesData => [new SqlTestCase([
         """
         SELECT 
-            "dbo"."Products"."Id", 
-            "dbo"."Products"."PROD_NAME"
+            "Products"."Id", 
+            "Products"."PROD_NAME"
         FROM 
-            "dbo"."Products"
+            "Products"
         """
     ])];
 
     public static TheoryData<SqlTestCase> Select_WithTabsData => [new SqlTestCase([
         """
-        SELECT  "dbo"."Products"."Id",  "dbo"."Products"."PROD_NAME"
-        FROM  "dbo"."Products"
+        SELECT  "Products"."Id",  "Products"."PROD_NAME"
+        FROM  "Products"
         """
     ])];
 
     public static TheoryData<SqlTestCase> Select_WithExtraSpacesData => [new SqlTestCase([
         """
-        SELECT "dbo"."Products"."Id"
-          FROM "dbo"."Products"
-         WHERE "dbo"."Products"."Id" = 1
+        SELECT "Products"."Id"
+          FROM "Products"
+         WHERE "Products"."Id" = 1
         """
     ])];
 
     public static TheoryData<SqlTestCase> Select_WithMixedWhitespaceData => [new SqlTestCase([
         """
 
-            SELECT "dbo"."Products"."Id"
-            FROM "dbo"."Products"
+            SELECT "Products"."Id"
+            FROM "Products"
 
         """
     ])];
 
     public static TheoryData<SqlTestCase> Select_WithCommentsData => [new SqlTestCase([
         """
-        SELECT "dbo"."Products"."Id" -- This is the primary key
-        FROM "dbo"."Products" /* This is the table */
+        SELECT "Products"."Id" -- This is the primary key
+        FROM "Products" /* This is the table */
         """
     ])];
 
     public static TheoryData<SqlTestCase> InsertVerticalLayoutData => [new SqlTestCase([
         """
-        INSERT INTO "dbo"."Orders"
+        INSERT INTO "Orders"
         (
             "order_status",
             "Total"
@@ -67,7 +67,7 @@ public abstract partial class FirebirdFormattingTestSuiteBase : IFormattingTestS
 
     public static TheoryData<SqlTestCase> UpdateVerticalLayoutData => [new SqlTestCase([
         """
-        UPDATE "dbo"."Orders"
+        UPDATE "Orders"
         SET
             "order_status" = @p0,
             "Total" = @p1
@@ -76,7 +76,7 @@ public abstract partial class FirebirdFormattingTestSuiteBase : IFormattingTestS
 
     public static TheoryData<SqlTestCase> BulkInsertVerticalLayoutData => [new SqlTestCase([
         """
-        INSERT INTO "dbo"."Products"
+        INSERT INTO "Products"
         (
             "PROD_NAME",
             "CategoryId",
@@ -99,8 +99,8 @@ public abstract partial class FirebirdFormattingTestSuiteBase : IFormattingTestS
     public static TheoryData<SqlTestCase> WhereInVerticalLayoutData => [new SqlTestCase([
         """
         SELECT *
-        FROM "dbo"."Orders"
-        WHERE "dbo"."Orders"."Id" IN (
+        FROM "Orders"
+        WHERE "Orders"."Id" IN (
             @p0,
             @p1,
             @p2
@@ -111,10 +111,10 @@ public abstract partial class FirebirdFormattingTestSuiteBase : IFormattingTestS
     public static TheoryData<SqlTestCase> OrderByEnumerableVerticalLayoutData => [new SqlTestCase([
         """
         SELECT *
-        FROM "dbo"."Orders"
+        FROM "Orders"
         ORDER BY 
-            "dbo"."Orders"."Total",
-            "dbo"."Orders"."Id" DESC
+            "Orders"."Total",
+            "Orders"."Id" DESC
         """
     ])];
 
@@ -123,7 +123,7 @@ public abstract partial class FirebirdFormattingTestSuiteBase : IFormattingTestS
         SELECT
             "p1"."Id",
             "p1"."PROD_NAME"
-        FROM "dbo"."Products" AS "p1"
+        FROM "Products" AS "p1"
         """
     ])];
 }

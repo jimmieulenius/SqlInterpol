@@ -21,8 +21,8 @@ public abstract partial class FirebirdDeleteAsTestSuiteBase : IDeleteAsTestSuite
         new SqlTestCase(
             expectedSql: [
                 """
-                DELETE FROM "dbo"."Orders"
-                WHERE "dbo"."Orders"."Id" = @p0
+                DELETE FROM "Orders"
+                WHERE "Orders"."Id" = @p0
                 """
             ],
             expectedParameters: _expectedParameters

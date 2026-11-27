@@ -120,7 +120,7 @@ public abstract class E2EDatabaseTestSuiteBase : IAsyncLifetime
         ExecuteSql(sql);
     }
 
-    private void ExecuteSql(string sql)
+    protected virtual void ExecuteSql(string sql)
     {
         if (Connection is null || string.IsNullOrWhiteSpace(sql)) return;
 

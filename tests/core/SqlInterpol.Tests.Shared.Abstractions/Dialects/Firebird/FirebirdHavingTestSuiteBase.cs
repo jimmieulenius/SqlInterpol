@@ -15,11 +15,11 @@ public abstract partial class FirebirdHavingTestSuiteBase : IHavingTestSuite
         expectedSql: [
             """
             SELECT 
-                "dbo"."Products"."CategoryId",
-                COUNT("dbo"."Products"."Id") AS "ProductCount"
-            FROM "dbo"."Products"
-            GROUP BY "dbo"."Products"."CategoryId"
-            HAVING COUNT("dbo"."Products"."Id") > @p0
+                "Products"."CategoryId",
+                COUNT("Products"."Id") AS "ProductCount"
+            FROM "Products"
+            GROUP BY "Products"."CategoryId"
+            HAVING COUNT("Products"."Id") > @p0
             """
         ],
         expectedParameters: _expectedParameters

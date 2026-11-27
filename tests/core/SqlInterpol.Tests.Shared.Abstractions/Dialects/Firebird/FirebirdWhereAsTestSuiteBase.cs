@@ -14,7 +14,7 @@ public abstract partial class FirebirdWhereAsTestSuiteBase : IWhereAsTestSuite
             """
             SELECT
                 "p"."Id" AS "ProductId"
-            FROM "dbo"."Products" AS "p"
+            FROM "Products" AS "p"
             WHERE "p"."Id" = @p0 AND "p"."CategoryId" = @p1
             """
         ],

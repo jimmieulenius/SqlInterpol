@@ -13,12 +13,12 @@ public abstract partial class FirebirdWindowFunctionTestSuiteBase : IWindowFunct
         expectedSql: [
             """
             SELECT
-                "dbo"."Products"."PROD_NAME",
-                SUM("dbo"."Products"."Price") OVER (
-                    PARTITION BY "dbo"."Products"."CategoryId"
-                    ORDER BY "dbo"."Products"."Id" DESC
+                "Products"."PROD_NAME",
+                SUM("Products"."Price") OVER (
+                    PARTITION BY "Products"."CategoryId"
+                    ORDER BY "Products"."Id" DESC
                 ) AS CategoryTotal
-            FROM "dbo"."Products"
+            FROM "Products"
             """
         ]
     )];
@@ -27,10 +27,10 @@ public abstract partial class FirebirdWindowFunctionTestSuiteBase : IWindowFunct
         expectedSql: [
             """
             SELECT 
-                "dbo"."Products"."PROD_NAME",
-                "dbo"."Products"."Price",
-                AVG("dbo"."Products"."Price") OVER (PARTITION BY "dbo"."Products"."CategoryId") AS "AvgCategoryPrice"
-            FROM "dbo"."Products"
+                "Products"."PROD_NAME",
+                "Products"."Price",
+                AVG("Products"."Price") OVER (PARTITION BY "Products"."CategoryId") AS "AvgCategoryPrice"
+            FROM "Products"
             """
         ]
     )];

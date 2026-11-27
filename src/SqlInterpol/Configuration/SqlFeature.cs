@@ -43,5 +43,11 @@ public enum SqlFeature
     /// <c>CREATE TABLE AS SELECT</c> syntax. 
     /// Used as a fallback for dialects that do not support <c>SELECT INTO</c>.
     /// </summary>
-    CreateTableAsSelect
+    CreateTableAsSelect,
+
+    /// <summary>
+    /// Schema-qualified table names (e.g. <c>schema.table</c>).
+    /// Supported by PostgreSQL, SQL Server, MySQL, and Oracle; omitted by Firebird and SQLite.
+    /// </summary>
+    Schemas
 }

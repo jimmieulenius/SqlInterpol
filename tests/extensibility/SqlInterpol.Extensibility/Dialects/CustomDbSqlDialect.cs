@@ -23,7 +23,8 @@ public class CustomDbSqlDialect : SqlDialectBase
     public override IReadOnlySet<SqlFeature> SupportedFeatures { get; } = new HashSet<SqlFeature>
     {
         SqlFeature.MultiTableDelete,
-        SqlFeature.UpdatableInlineViews
+        SqlFeature.UpdatableInlineViews,
+        SqlFeature.Schemas
     };
 
     public override SqlInterpolOptions GetDefaultOptions() => new() { ParameterIndexStart = 100 };

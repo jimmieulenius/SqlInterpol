@@ -12,7 +12,7 @@ public abstract partial class FirebirdGroupByAsTestSuiteBase : IGroupByAsTestSui
     public static TheoryData<SqlTestCase> GroupByWithExplicitAliasData => [new SqlTestCase([
         """
         SELECT "prod"."PROD_NAME", "prod"."IsActive", COUNT(*)
-        FROM "dbo"."Products" AS "prod"
+        FROM "Products" AS "prod"
         GROUP BY "prod"."PROD_NAME", "prod"."IsActive"
         """
     ])];

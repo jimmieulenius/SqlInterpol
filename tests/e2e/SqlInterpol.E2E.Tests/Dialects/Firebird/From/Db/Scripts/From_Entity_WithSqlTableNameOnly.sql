@@ -1,0 +1,5 @@
+CREATE TABLE "MyTable" (
+    "Id" INT NOT NULL PRIMARY KEY
+);
+
+INSERT INTO "MyTable" ("Id") VALUES (1);

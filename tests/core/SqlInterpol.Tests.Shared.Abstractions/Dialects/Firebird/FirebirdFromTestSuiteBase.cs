@@ -26,7 +26,7 @@ public abstract partial class FirebirdFromTestSuiteBase : IFromTestSuite
     public static TheoryData<SqlTestCase> From_Entity_WithSqlTableNameAndSchemaData => [new SqlTestCase([
         """
         SELECT *
-        FROM "MySchema"."MyTable"
+        FROM "MyTable"
         """
     ])];
 }

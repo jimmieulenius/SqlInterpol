@@ -16,9 +16,9 @@ public abstract partial class FirebirdLockTestSuiteBase : ILockTestSuite
         new SqlTestCase(
             expectedSql: [
                 """
-                SELECT "dbo"."Products"."Id", "dbo"."Products"."PROD_NAME"
-                FROM "dbo"."Products"
-                WHERE "dbo"."Products"."Id" = @p0
+                SELECT "Products"."Id", "Products"."PROD_NAME"
+                FROM "Products"
+                WHERE "Products"."Id" = @p0
                 WITH LOCK
                 """
             ],

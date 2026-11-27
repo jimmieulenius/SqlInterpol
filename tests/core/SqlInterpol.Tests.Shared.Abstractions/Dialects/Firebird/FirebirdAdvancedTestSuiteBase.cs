@@ -20,7 +20,7 @@ public abstract partial class FirebirdAdvancedTestSuiteBase : IAdvancedTestSuite
                         "o"."CustomerId",
                         "o"."Id" AS "OrderId", 
                         SUM("ol"."Price") AS "TotalAmount"
-                    FROM "dbo"."Orders" AS "o"
+                    FROM "Orders" AS "o"
                     JOIN "OrderLine" AS "ol" ON "o"."Id" = "ol"."OrderId"
                     GROUP BY "o"."CustomerId", "o"."Id"
                 ) AS "stats"
@@ -43,7 +43,7 @@ public abstract partial class FirebirdAdvancedTestSuiteBase : IAdvancedTestSuite
                         "o"."Id" AS "OrderId", 
                         "p"."PROD_NAME" AS "ProductName",
                         "ol_agg"."TotalAmount" AS "TotalAmount"
-                    FROM "dbo"."Orders" AS "o"
+                    FROM "Orders" AS "o"
                     
                     JOIN (
                         SELECT 
@@ -55,7 +55,7 @@ public abstract partial class FirebirdAdvancedTestSuiteBase : IAdvancedTestSuite
                         GROUP BY "ol"."OrderId", "ol"."ProductId"
                     ) AS "ol_agg" ON "o"."Id" = "ol_agg"."OrderId"
                     
-                    JOIN "dbo"."Products" AS "p" ON "ol_agg"."ProductId" = "p"."Id"
+                    JOIN "Products" AS "p" ON "ol_agg"."ProductId" = "p"."Id"
                     JOIN "Category" AS "cat" ON "p"."CategoryId" = "cat"."Id"
                 ) AS "stats"
                 WHERE "stats"."ProductName" = @p0
@@ -71,13 +71,13 @@ public abstract partial class FirebirdAdvancedTestSuiteBase : IAdvancedTestSuite
         new SqlTestCase(
             [
                 """
-                SELECT "dbo"."Products"."Id", "dbo"."Products"."PROD_NAME"
-                FROM "dbo"."Products"
-                WHERE "dbo"."Products"."Price" > @p0
+                SELECT "Products"."Id", "Products"."PROD_NAME"
+                FROM "Products"
+                WHERE "Products"."Price" > @p0
                   AND Products.Status = 'ACTIVE' /* Raw SQL condition */
-                GROUP BY "dbo"."Products"."Id", "dbo"."Products"."PROD_NAME"
+                GROUP BY "Products"."Id", "Products"."PROD_NAME"
                 HAVING COUNT(*) > 1
-                ORDER BY "dbo"."Products"."PROD_NAME" DESC
+                ORDER BY "Products"."PROD_NAME" DESC
                 LIMIT 10 OFFSET 5
                 """
             ]

@@ -19,7 +19,7 @@ public abstract partial class FirebirdFromSubqueryTestSuiteBase : IFromSubqueryT
             SELECT
                 "p"."CategoryId" AS "CategoryId",
                 SUM("p"."Price") AS "TotalPrice"
-            FROM "dbo"."Products" AS "p"
+            FROM "Products" AS "p"
             GROUP BY "p"."CategoryId"
         ) AS "stats"
         JOIN "Category" AS "c" ON "stats"."CategoryId" = "c"."Id"

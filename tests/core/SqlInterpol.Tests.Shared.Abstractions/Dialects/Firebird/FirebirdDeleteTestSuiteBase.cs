@@ -8,7 +8,6 @@ namespace SqlInterpol.Tests.Dialects.Firebird;
 public abstract partial class FirebirdDeleteTestSuiteBase : IDeleteTestSuite
 {
     private static readonly object[] _pureManualParams = [42];
-    private static readonly object[] _multiTableParams = [];
     private static readonly object[] _templateParams = [1];
 
     public virtual SqlBuilder CreateBuilder(SqlInterpolOptions? options = null) => SqlBuilder.Firebird(options);
@@ -18,8 +17,8 @@ public abstract partial class FirebirdDeleteTestSuiteBase : IDeleteTestSuite
         new SqlTestCase(
             expectedSql: [
                 """
-                DELETE FROM "dbo"."Orders"
-                WHERE "dbo"."Orders"."Id" = @p0
+                DELETE FROM "Orders"
+                WHERE "Orders"."Id" = @p0
                 """
             ],
             expectedParameters: _pureManualParams

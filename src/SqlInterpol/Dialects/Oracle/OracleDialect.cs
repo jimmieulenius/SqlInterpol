@@ -37,7 +37,8 @@ public class OracleDialect : SqlDialectBase
             SqlFeature.CreateTableAsSelect,
             SqlFeature.UpdatableInlineViews,
             SqlFeature.MultiTableUpdate,
-            SqlFeature.MultiTableDelete
+            SqlFeature.MultiTableDelete,
+            SqlFeature.Schemas
         };
     
     /// <inheritdoc />

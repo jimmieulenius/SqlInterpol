@@ -64,7 +64,11 @@ public abstract class SqlDialectBase : ISqlDialect
     public virtual string QuoteEntityName(string table, string? schema = null)
     {
         var quotedTable = QuoteIdentifier(table);
-        if (string.IsNullOrWhiteSpace(schema)) return quotedTable;
+        if (string.IsNullOrWhiteSpace(schema) || !SupportedFeatures.Contains(SqlFeature.Schemas))
+        {
+            return quotedTable;
+        }
+
         return $"{QuoteIdentifier(schema)}.{quotedTable}";
     }
 

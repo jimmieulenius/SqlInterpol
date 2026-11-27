@@ -375,23 +375,37 @@ public sealed class SqlTestSuiteBaseGenerator : IIncrementalGenerator
         MethodDeclarationSyntax method,
         AttributeSyntax sqlTestAttr,
         INamedTypeSymbol classSymbol,
-        string? normalizedFilePath)
+        string? fallbackFilePath)
     {
         var dataPropertyName = ExtractDataPropertyName(sqlTestAttr);
         if (string.IsNullOrWhiteSpace(dataPropertyName)) return;
 
-        // Look up the line number of the TheoryData property for the Ctrl+Click navigation hint.
-        int lineNumber = 1;
-        var dataMember = classSymbol.GetMembers(dataPropertyName!).FirstOrDefault();
-        if (dataMember is not null)
+        // Walk the inheritance hierarchy so we find the TheoryData property on *TestSuiteBase
+        // in Shared.Abstractions, rather than only checking the leaf class.
+        ISymbol? dataMember = null;
+        for (var current = classSymbol; current is not null; current = current.BaseType)
         {
-            var location = dataMember.Locations.FirstOrDefault();
-            if (location is not null)
-                lineNumber = location.GetLineSpan().StartLinePosition.Line + 1;
+            dataMember = current.GetMembers(dataPropertyName!).FirstOrDefault();
+            if (dataMember is not null) break;
         }
 
-        if (normalizedFilePath is not null)
-            sb.AppendLine($"    // Ctrl+Click to edit test data: file:///{normalizedFilePath}#{lineNumber}");
+        int lineNumber = 1;
+        string? targetFilePath = fallbackFilePath;
+
+        var location = dataMember?.Locations.FirstOrDefault(l => l.IsInSource);
+        if (location is not null)
+        {
+            var lineSpan = location.GetLineSpan();
+            lineNumber = lineSpan.StartLinePosition.Line + 1;
+
+            if (!string.IsNullOrWhiteSpace(lineSpan.Path))
+            {
+                targetFilePath = System.IO.Path.GetFullPath(lineSpan.Path).Replace('\\', '/');
+            }
+        }
+
+        if (targetFilePath is not null)
+            sb.AppendLine($"    // Ctrl+Click to edit test data: file:///{targetFilePath}#{lineNumber}");
 
         sb.AppendLine("    [Theory]");
         sb.AppendLine($"    [MemberData(nameof({dataPropertyName}))]");

@@ -18,7 +18,7 @@ public abstract partial class FirebirdCteTestSuiteBase : ICteTestSuite
                 """
                 WITH "CategoryStats" AS (
                     SELECT "p"."CategoryId", SUM("p"."Price") AS "TotalPrice"
-                    FROM "dbo"."Products" AS "p"
+                    FROM "Products" AS "p"
                     GROUP BY "p"."CategoryId"
                 )
                 SELECT "c"."Name", "cs"."TotalPrice"
@@ -52,7 +52,7 @@ public abstract partial class FirebirdCteTestSuiteBase : ICteTestSuite
             expectedSql: [
                 """
                 WITH ExpensiveProducts AS (
-                    SELECT * FROM "dbo"."Products" WHERE "dbo"."Products"."Price" > @p0
+                    SELECT * FROM "Products" WHERE "Products"."Price" > @p0
                 )
                 SELECT * FROM ExpensiveProducts
                 """

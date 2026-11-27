@@ -18,9 +18,9 @@ public abstract partial class FirebirdDeleteSubqueryTestSuiteBase : IDeleteSubqu
                 """
                 DELETE FROM "OrderLine"
                 WHERE "OrderLine"."OrderId" IN (
-                    SELECT "dbo"."Orders"."Id"
-                    FROM "dbo"."Orders"
-                    WHERE "dbo"."Orders"."order_status" = @p0
+                    SELECT "Orders"."Id"
+                    FROM "Orders"
+                    WHERE "Orders"."order_status" = @p0
                 )
                 """
             ],

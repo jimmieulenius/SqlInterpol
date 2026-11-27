@@ -12,13 +12,13 @@ public abstract partial class FirebirdRawSqlTestSuiteBase : IRawSqlTestSuite
     public static TheoryData<SqlTestCase> ComplexRawSqlData => [new SqlTestCase(
         expectedSql: [
             """
-            SELECT "dbo"."Products"."Id", "dbo"."Products"."PROD_NAME"
-            FROM "dbo"."Products"
-            WHERE "dbo"."Products"."Price" > @p0
+            SELECT "Products"."Id", "Products"."PROD_NAME"
+            FROM "Products"
+            WHERE "Products"."Price" > @p0
               AND p.Status = 'ACTIVE' /* Raw SQL condition */
-            GROUP BY "dbo"."Products"."Id", "dbo"."Products"."PROD_NAME"
+            GROUP BY "Products"."Id", "Products"."PROD_NAME"
             HAVING COUNT(*) > 1
-            ORDER BY "dbo"."Products"."PROD_NAME" DESC
+            ORDER BY "Products"."PROD_NAME" DESC
             LIMIT 10 OFFSET 5
             """
         ],
@@ -29,10 +29,10 @@ public abstract partial class FirebirdRawSqlTestSuiteBase : IRawSqlTestSuite
         expectedSql: [
             """
             SELECT 
-                "dbo"."Products"."PROD_NAME",
-                "dbo"."Products"."Price",
-                AVG("dbo"."Products"."Price") OVER (PARTITION BY "dbo"."Products"."CategoryId") AS "AvgCategoryPrice"
-            FROM "dbo"."Products"
+                "Products"."PROD_NAME",
+                "Products"."Price",
+                AVG("Products"."Price") OVER (PARTITION BY "Products"."CategoryId") AS "AvgCategoryPrice"
+            FROM "Products"
             """
         ]
     )];

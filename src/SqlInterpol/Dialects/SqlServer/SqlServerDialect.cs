@@ -39,7 +39,8 @@ public class SqlServerDialect : SqlDialectBase
             SqlFeature.MultiTableDelete,
             SqlFeature.MultiTableUpdate,
             SqlFeature.DeleteAs,
-            SqlFeature.UpdateAs
+            SqlFeature.UpdateAs,
+            SqlFeature.Schemas
         };
     
     /// <inheritdoc />
