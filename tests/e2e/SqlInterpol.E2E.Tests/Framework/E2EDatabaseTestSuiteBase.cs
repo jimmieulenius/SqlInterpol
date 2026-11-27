@@ -10,6 +10,8 @@ public abstract class E2EDatabaseTestSuiteBase : IAsyncLifetime
 {
     private const string InitFolderName = "$Init";
 
+    private Exception? _initException;
+
     protected abstract IDbConnection CreateConnection();
 
     protected abstract SqlBuilder ConfigureBuilder(SqlInterpolOptions? options);
@@ -27,10 +29,9 @@ public abstract class E2EDatabaseTestSuiteBase : IAsyncLifetime
             Connection = CreateConnection();
             Connection.Open();
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // Database is offline or failed to initialize.
-            // Gracefully swallow the exception so xUnit can skip in the test classes.
+            _initException = ex;
             Connection = null;
         }
 
@@ -54,7 +55,8 @@ public abstract class E2EDatabaseTestSuiteBase : IAsyncLifetime
         if (Connection is null)
         {
             throw new InvalidOperationException(
-                $"E2E connection for '{Dialect}' is not open. Verify the database is running, RUN_E2E is enabled, and connection settings are valid.");
+                $"E2E connection for '{Dialect}' is not open. Root cause: {_initException?.Message}",
+                _initException);
         }
 
         SqlTestCase.CurrentConnection.Value = Connection;

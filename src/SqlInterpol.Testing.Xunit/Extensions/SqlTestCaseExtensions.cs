@@ -8,50 +8,29 @@ namespace SqlInterpol.Testing.Xunit;
 public static class SqlTestCaseExtensions
 {
     /// <summary>
-    /// Executes the query build action and appends the primitive results (or exceptions) to the TestCase state.
-    /// </summary>
-    /// <param name="testCase">The test case context.</param>
-    /// <param name="action">The function that executes the query generation.</param>
-    public static void Act(this SqlTestCase testCase, Func<SqlQueryResult> action)
-    {
-        if (testCase.ExpectedExceptionType != null)
-        {
-            var ex = Record.Exception(action);
-            if (ex != null) testCase.ActualExceptions.Add(ex);
-        }
-        else
-        {
-            var result = action();
-            testCase.ActualSql.Add(result.Sql);
-            testCase.ActualParametersList.Add(result.Parameters.Values.ToArray());
-        }
-    }
-
-    /// <summary>
     /// Executes a query build action that returns multiple queries and appends all results to the TestCase state.
     /// </summary>
     /// <param name="testCase">The test case context.</param>
     /// <param name="action">The function that executes the batch query generation.</param>
     public static void Act(this SqlTestCase testCase, Func<IEnumerable<SqlQueryResult>> action)
     {
-        if (testCase.ExpectedExceptionType != null)
+        try
         {
-            var ex = Record.Exception(action);
-            if (ex != null) testCase.ActualExceptions.Add(ex);
-        }
-        else
-        {
-            var results = action();
+            var results = action().ToArray();
             foreach (var result in results)
             {
-                testCase.ActualSql.Add(result.Sql);
-                testCase.ActualParametersList.Add(result.Parameters.Values.ToArray());
+                testCase.Act(() => result);
             }
+        }
+        catch (Exception ex)
+        {
+            testCase.ActualExceptions.Add(ex);
         }
     }
 
     /// <summary>
-    /// Automatically routes to the correct assertions based on the Expected state, validating all queries and parameters.
+    /// Automatically routes to the correct assertions based on the Expected state, validating exceptions,
+    /// generated SQL, parameters, and E2E database results.
     /// </summary>
     /// <param name="testCase">The test case context.</param>
     public static void Assert(this SqlTestCase testCase)
@@ -59,11 +38,21 @@ public static class SqlTestCaseExtensions
         if (testCase.ExpectedExceptionType != null)
         {
             testCase.Assert.Exception();
+            return;
         }
-        else
+
+        if (testCase.ActualExceptions.Count == 1)
         {
-            testCase.Assert.Sql();
-            testCase.Assert.Parameters();
+            // Re-throw preserving original stack trace so xUnit displays the exact DB/builder failure
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(testCase.ActualExceptions[0]).Throw();
         }
+        else if (testCase.ActualExceptions.Count > 1)
+        {
+            throw new AggregateException(testCase.ActualExceptions);
+        }
+
+        testCase.Assert.Sql();
+        testCase.Assert.Parameters();
+        testCase.Assert.Data();
     }
 }
