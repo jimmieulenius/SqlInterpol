@@ -44,7 +44,7 @@ jobs:
       - name: Setup .NET SDK
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '10.0.x'
 
       - name: Boot Database (${{ matrix.dialect }})
         run: docker compose -f docker-compose.e2e.yml up -d ${{ matrix.dialect }}
