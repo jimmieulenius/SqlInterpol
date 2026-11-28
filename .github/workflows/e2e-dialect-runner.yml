@@ -17,7 +17,7 @@ defaults:
 jobs:
   execute:
     name: Run
-    if: ${{ inputs.has_tests }}
+    if: ${{ inputs.has_tests == true }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
