@@ -57,7 +57,7 @@ if (-not [string]::IsNullOrWhiteSpace($env:GITHUB_STEP_SUMMARY)) {
         "| :--- | :--- |"
     )
     foreach ($item in $matrix) {
-        $status = if ($item.hasTests) { "✅ Queued" } else { "⏭️ Skipped (no E2E tests found)" }
+        $status = if ($item.hasTests) { "Queued" } else { "Skipped (no E2E tests found)" }
         $summary += "| **$($item.dialect)** | $status |"
     }
     $summary | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
