@@ -1,0 +1,44 @@
+name: E2E Dialect Runner
+
+on:
+  workflow_call:
+    inputs:
+      dialect:
+        required: true
+        type: string
+      has_tests:
+        required: true
+        type: boolean
+
+defaults:
+  run:
+    shell: pwsh
+
+jobs:
+  execute:
+    name: Run
+    if: ${{ inputs.has_tests }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Boot Database (${{ inputs.dialect }})
+        run: docker compose -f docker-compose.e2e.yml up -d ${{ inputs.dialect }}
+
+      - name: Wait for Database Warmup
+        run: Start-Sleep -Seconds 15
+
+      - name: Run E2E Integration Tests
+        env:
+          RUN_E2E: 'true'
+        run: dotnet test tests/e2e/SqlInterpol.E2E.Tests --filter "Category=${{ inputs.dialect }}" -- RunConfiguration.TreatNoTestsAsError=true
+
+      - name: Teardown Database
+        if: always()
+        run: docker compose -f docker-compose.e2e.yml down

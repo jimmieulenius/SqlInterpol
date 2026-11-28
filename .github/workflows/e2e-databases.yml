@@ -28,39 +28,17 @@ jobs:
         run: .github/scripts/Get-E2EDatabaseMatrix.ps1 -Target "${{ inputs.target }}"
 
   run-e2e:
-    name: Test ${{ matrix.dialect }}
+    name: Test ${{ matrix.item.dialect }}
     needs: prepare-matrix
     if: ${{ needs.prepare-matrix.outputs.dialects != '[]' }}
-    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        dialect: ${{ fromJson(needs.prepare-matrix.outputs.dialects) }}
-        
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Setup .NET SDK
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
-
-      - name: Boot Database (${{ matrix.dialect }})
-        run: docker compose -f docker-compose.e2e.yml up -d ${{ matrix.dialect }}
-
-      - name: Wait for Database Warmup
-        run: Start-Sleep -Seconds 15
-
-      - name: Run E2E Integration Tests
-        # Inject the environment variable here so the .csproj recognizes it as a test project
-        env:
-          RUN_E2E: 'true'
-        run: dotnet test tests/e2e/SqlInterpol.E2E.Tests --filter "Category=${{ matrix.dialect }}"
-
-      - name: Teardown Database
-        if: always()
-        run: docker compose -f docker-compose.e2e.yml down
+        item: ${{ fromJson(needs.prepare-matrix.outputs.dialects) }}
+    uses: ./.github/workflows/e2e-dialect-runner.yml
+    with:
+      dialect: ${{ matrix.item.dialect }}
+      has_tests: ${{ matrix.item.hasTests }}
 
   e2e-gatekeeper:
     name: E2E Gatekeeper
