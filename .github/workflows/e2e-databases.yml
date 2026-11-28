@@ -33,7 +33,7 @@ jobs:
         run: .github/scripts/Get-E2EDatabaseMatrix.ps1 -Target "${{ inputs.target }}"
 
   run-e2e:
-    name: Test ${{ matrix.item.dialect }}
+    name: ${{ matrix.item.dialect }}
     needs: prepare-matrix
     if: ${{ needs.prepare-matrix.outputs.dialects != '[]' }}
     strategy:
